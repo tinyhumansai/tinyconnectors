@@ -50,36 +50,29 @@ where
     Fut: std::future::Future<Output = Result<T>>,
 {
     let mut delay = AUTHORIZE_RATE_LIMIT_INITIAL_BACKOFF;
-    let mut last_error: Option<Error> = None;
 
-    for attempt_number in 1..=AUTHORIZE_RATE_LIMIT_MAX_ATTEMPTS {
+    // Every attempt but the last. Written this way rather than as a loop over
+    // all of them so there is no unreachable "ran out of attempts" arm at the
+    // end: the final attempt below is the one that reports.
+    for attempt_number in 1..AUTHORIZE_RATE_LIMIT_MAX_ATTEMPTS {
         match attempt().await {
             Ok(value) => return Ok(value),
             Err(error) => {
-                let rendered = error.to_string();
-                if attempt_number < AUTHORIZE_RATE_LIMIT_MAX_ATTEMPTS
-                    && is_authorize_rate_limited(&rendered)
-                {
-                    tracing::warn!(
-                        attempt = attempt_number,
-                        max_attempts = AUTHORIZE_RATE_LIMIT_MAX_ATTEMPTS,
-                        sleep_secs = delay.as_secs(),
-                        "[connectors][oauth] authorize rate-limited; backing off"
-                    );
-                    tokio::time::sleep(delay).await;
-                    delay = (delay * 2).min(AUTHORIZE_RATE_LIMIT_MAX_BACKOFF);
-                    last_error = Some(error);
-                    continue;
+                if !is_authorize_rate_limited(&error.to_string()) {
+                    return Err(error);
                 }
-                return Err(error);
+                tracing::warn!(
+                    attempt = attempt_number,
+                    max_attempts = AUTHORIZE_RATE_LIMIT_MAX_ATTEMPTS,
+                    sleep_secs = delay.as_secs(),
+                    "[connectors][oauth] authorize rate-limited; backing off"
+                );
+                tokio::time::sleep(delay).await;
+                delay = (delay * 2).min(AUTHORIZE_RATE_LIMIT_MAX_BACKOFF);
             }
         }
     }
 
-    // Unreachable while the loop runs at least once: the final attempt returns
-    // through the `Err` arm above rather than falling out of the loop.
-    Err(last_error.unwrap_or_else(|| Error::Authorize {
-        toolkit: String::new(),
-        message: "authorize failed after retries".to_string(),
-    }))
+    // The last attempt, reported whatever it produces.
+    attempt().await
 }

@@ -19,6 +19,18 @@ impl ClientActions {
     }
 }
 
+/// What to report when a provider refuses an action.
+///
+/// The execute pipeline formats a message for every failed response, so the
+/// fallback is not expected — but "the provider said no and would not say why"
+/// is still more useful to whoever reads the sync log than an empty string.
+fn refusal_message(error: Option<String>) -> String {
+    error
+        .map(|error| error.trim().to_string())
+        .filter(|error| !error.is_empty())
+        .unwrap_or_else(|| "the provider reported failure".to_string())
+}
+
 #[async_trait]
 impl ActionRunner for ClientActions {
     async fn run(
@@ -43,9 +55,7 @@ impl ActionRunner for ClientActions {
             // records it never read.
             return Err(SyncError::Action {
                 action: action.to_string(),
-                message: response
-                    .error
-                    .unwrap_or_else(|| "the provider reported failure".to_string()),
+                message: refusal_message(response.error),
             });
         }
 

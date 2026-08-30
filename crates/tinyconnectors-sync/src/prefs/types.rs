@@ -90,14 +90,18 @@ impl UserScopePref {
     ///
     /// # Errors
     ///
-    /// Returns [`Error::Decode`] if it cannot be serialized, and
-    /// [`Error::Store`] when the store failed to write it.
+    /// Returns [`Error::Store`] when the store failed to write it. Building the
+    /// value cannot fail — three booleans always serialize — so it is built
+    /// directly rather than through a fallible conversion with a branch nothing
+    /// can reach.
     pub async fn save(self, store: &dyn SyncStateStore, toolkit: &str) -> Result<()> {
-        let key = Self::key(toolkit);
-        let value = serde_json::to_value(self).map_err(|error| Error::Decode {
-            key: key.clone(),
-            message: error.to_string(),
-        })?;
-        store.set(PREFS_NAMESPACE, &key, &value).await
+        let value = serde_json::json!({
+            "read": self.read,
+            "write": self.write,
+            "admin": self.admin,
+        });
+        store
+            .set(PREFS_NAMESPACE, &Self::key(toolkit), &value)
+            .await
     }
 }
