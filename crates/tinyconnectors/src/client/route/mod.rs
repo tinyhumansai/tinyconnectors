@@ -40,7 +40,7 @@ use async_trait::async_trait;
 
 use crate::{
     ComposioAuthorizeResponse, ComposioConnectionsResponse, ComposioDeleteResponse,
-    ComposioToolkitsResponse, Result,
+    ComposioExecuteResponse, ComposioToolkitsResponse, ComposioToolsResponse, Result,
 };
 
 /// One way of reaching Composio.
@@ -81,6 +81,34 @@ pub trait Route: Send + Sync + std::fmt::Debug {
         toolkit: &str,
         body: &serde_json::Value,
     ) -> Result<ComposioAuthorizeResponse>;
+
+    /// List the callable tools for `toolkits`, optionally narrowed by `tags`.
+    ///
+    /// Tags are OR semantics: more tags broaden the result.
+    ///
+    /// # Errors
+    ///
+    /// Returns the underlying transport or decode failure.
+    async fn list_tools(&self, toolkits: &[String], tags: &[String])
+    -> Result<ComposioToolsResponse>;
+
+    /// Run one action.
+    ///
+    /// `arguments` is already prepared — normalized and validated by
+    /// [`crate::execute`]. A route sends it as its own API expects.
+    ///
+    /// A provider that answers `successful: false` is not an error: the call
+    /// got a real answer. Only a call that never completed is an `Err`.
+    ///
+    /// # Errors
+    ///
+    /// Returns the underlying transport or decode failure.
+    async fn execute(
+        &self,
+        tool: &str,
+        arguments: &serde_json::Value,
+        connection_id: Option<&str>,
+    ) -> Result<ComposioExecuteResponse>;
 
     /// Remove a connection.
     ///
