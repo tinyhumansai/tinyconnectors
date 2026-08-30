@@ -77,6 +77,16 @@ pub struct ComposioConnectionsResponse {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(tag = "route", rename_all = "snake_case")]
 pub enum ComposioConfigureRequest {
+    /// Hold no credential at all.
+    ///
+    /// The instruction a host sends when its user signs out, clears their API
+    /// key, or disables the integration. Keeping the old route would be worse
+    /// than having none: a revoked bearer answers 401 to everything, and "your
+    /// account is broken" is a bad way to tell someone they are signed out.
+    ///
+    /// It also means a credential does not outlive the session that supplied
+    /// it, which matters on a shared machine.
+    None,
     /// Reach Composio through the `TinyHumans` backend.
     Proxy {
         /// Base URL of the connector backend.

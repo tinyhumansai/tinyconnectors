@@ -174,7 +174,7 @@ impl ModuleConfig {
     }
 }
 
-impl From<ComposioConfigureRequest> for RouteConfig {
+impl RouteConfig {
     /// Reuse the load-time route builder for a runtime reconfiguration.
     ///
     /// The two carry the same description of a route, so building one from the
@@ -185,26 +185,27 @@ impl From<ComposioConfigureRequest> for RouteConfig {
     /// `state_dir` is dropped rather than carried: the trigger archive is
     /// opened once at load, and letting a later call move it would leave
     /// already-archived history behind with nothing pointing at it.
-    fn from(request: ComposioConfigureRequest) -> Self {
+    fn try_from(request: ComposioConfigureRequest) -> Option<Self> {
         match request {
+            ComposioConfigureRequest::None => None,
             ComposioConfigureRequest::Proxy {
                 base_url,
                 auth_token,
-            } => Self::Proxy {
+            } => Some(Self::Proxy {
                 base_url,
                 auth_token,
                 state_dir: None,
-            },
+            }),
             ComposioConfigureRequest::Direct {
                 api_key,
                 entity_id,
                 base_url,
-            } => Self::Direct {
+            } => Some(Self::Direct {
                 api_key,
                 entity_id,
                 base_url,
                 state_dir: None,
-            },
+            }),
         }
     }
 }
