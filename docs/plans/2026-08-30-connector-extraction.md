@@ -44,12 +44,21 @@ Source: `openhuman/src/openhuman/integrations/composio/` — `client.rs`,
 Nineteen members, each a `CONTRACT_VERSION` minor bump as it lands. Grouped by
 what they need, in dependency order:
 
-1. **Tools and execute** — `ListTools`, `Execute`. Brings
-   `execute_prepare`/`execute_dispatch`, `error_mapping`, and the
-   `googlecalendar_args` normalization. Note the post-OAuth readiness retry in
-   `client.rs`: Composio's gateway reports "connection error, try to
-   authenticate" for a window after a handoff completes, and the existing code
-   retries once after ten seconds.
+1. **Tools and execute** — `ListTools`, `Execute`. ✅ **landed**, contract
+   `(1, 1)`. `crates/tinyconnectors/src/execute/` holds the whole pipeline:
+   `prepare` (argument normalization and validation), `classify` (failure
+   classes and their messages), `retry` (both policies). Both routes implement
+   `list_tools` and `execute`; the direct route reshapes v3 into the proxy's
+   envelope.
+
+   Two things worth knowing for the groups that follow. The upstream had
+   **three** retry layers that could stack — an in-client retry, a wrapper
+   around a non-retrying primitive that existed only to avoid the first, and a
+   rate-limit loop — which its own comments record as issuing up to four calls
+   per logical retry. Here the policy lives in one place. And **egress
+   enforcement did not move**: OpenHuman refuses outbound tool calls under
+   local-only mode and discloses every external transfer. That is host policy
+   about the user's data, applied before the bus call.
 2. **Triggers** — `ListAvailableTriggers`, `ListTriggers`, `EnableTrigger`,
    `DisableTrigger`, `CreateTrigger`, `ListGithubRepos`, `ListTriggerHistory`.
    The JSONL archive in `trigger_history.rs` moves with them.
@@ -87,34 +96,44 @@ Source: `tinymemory-core/src/sync/composio/` (~12k),
 Lands as a new workspace member, `crates/tinyconnectors-sync`, so the module
 crate does not grow a memory dependency:
 
-1. **Provider registry and traits** — `providers/traits.rs`,
-   `providers/registry.rs`, `providers/types.rs`, `tool_scope.rs`,
-   `user_scopes.rs`, `sync_state.rs`.
-2. **Per-provider catalogs** — `providers/catalogs*.rs` and the
+1. **Foundations** — ✅ **landed**. `crates/tinyconnectors-sync` exists with
+   `scope` (`ToolScope`, `CuratedTool`, `classify_unknown`, `toolkit_from_slug`)
+   and `state` (`SyncStateStore`, `SyncState`, `DailyBudget`). No memory
+   dependency, and its manifest says so.
+
+   **The memory-read seam turned out to be smaller than feared.** Two findings
+   from reading the source rather than the call graph:
+
+   - `SyncStateStore` already exists as an engine-neutral KV trait — two methods
+     over JSON. It *is* the host-supplied input, and it moved as-is.
+   - `ProviderContext::memory_client()` has **zero callers** in the entire sync
+     tree. The direct memory coupling I flagged as the riskiest thing in this
+     phase is dead API.
+
+   So the only real coupling left is `pipelines::host::run_composio_connection`,
+   which is the call the record-returning shape replaces anyway.
+
+2. **Provider registry and traits** — `providers/traits.rs`,
+   `providers/registry.rs`, `providers/types.rs`, `user_scopes.rs`.
+   `ProviderContext` sheds `memory_client` (dead) and gains a
+   `&dyn SyncStateStore`.
+3. **Per-provider catalogs** — `providers/catalogs*.rs` and the
    `gmail` / `slack` / `github` / `notion` / `linear` / `clickup` directories.
-3. **Pipelines and orchestrator** — `pipelines/composio/`, including the
-   per-provider modules and `page_size.rs`.
-4. **Record post-processing** — the `tinymemory-sync` crate's
+4. **Pipelines and orchestrator** — `pipelines/composio/`, including the
+   per-provider modules and `page_size.rs`. Each pipeline's `MemoryClient`
+   writes become records appended to a batch; its progress logging becomes a
+   `SyncEvent`; its paging loop becomes `cursor` + `complete` on the batch, so
+   the host drives resumption.
+5. **Record post-processing** — the `tinymemory-sync` crate's
    `gmail_post_process`, `slack_post_process`, `email_clean`,
-   `email_markdown`, and the per-provider normalizers.
+   `email_markdown`, and the per-provider normalizers. These are pure functions
+   over provider payloads and should port almost unchanged.
 
 **Settled: pipelines return records.** A pipeline produces
 `ConnectorRecordBatch` and returns it; the host hands it to the memory engine
 over memory's own bus API. `crates/tinyconnectors-sync` therefore takes
 `tinyconnectors-bus` and *no memory dependency at all* — which is what makes
 this phase a move rather than a rewrite.
-
-Concretely, per pipeline:
-
-- Replace every `MemoryClient` write with a record appended to the batch.
-- Replace progress logging with a `SyncEvent`.
-- Paging state becomes `ConnectorRecordBatch::cursor` and `complete`, so a run
-  is resumable by the host rather than by a pipeline-local loop.
-
-The one thing to watch: some pipelines currently *read* memory to decide what to
-re-sync (`sync_state.rs`, the diff logic). Those reads become an input the host
-supplies to the run, not a call the pipeline makes. Design that input before
-porting the first provider — it is the only remaining coupling.
 
 A `Sync` member on the bus emits batches. It is added when the first pipeline
 lands, as a minor contract bump.
@@ -171,8 +190,11 @@ it needs connections and execute, not the trigger or catalog surface.
 Phases 2 and 3 are independent and can run in parallel; both must land before
 phase 4, and phase 4 before phase 5 for either host.
 
-Both open design questions are now settled — records out rather than memory
-writes, and routing in the module with selection in the host. What remains
-riskiest in phase 3 is the pipelines that *read* memory to decide what to
-re-sync: that input has to be designed before the first provider is ported,
-because retrofitting it means touching every pipeline again.
+Both open design questions are settled — records out rather than memory writes,
+and routing in the module with selection in the host — and the memory-read seam
+turned out to already exist as `SyncStateStore`, with the one type that looked
+like a hard coupling having no callers at all.
+
+What remains riskiest is now phase 4's deletion step: until the payload types
+are removed from `tinymemory-api`, they exist in two places and can drift. The
+sooner phase 3 lands far enough to allow that, the shorter that window.
