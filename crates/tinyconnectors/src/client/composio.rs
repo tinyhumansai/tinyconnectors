@@ -5,7 +5,7 @@ use std::sync::Arc;
 use super::route::Route;
 use crate::{
     ComposioAuthorizeResponse, ComposioConnectionsResponse, ComposioDeleteResponse,
-    ComposioToolkitsResponse, Error, Result,
+    ComposioExecuteResponse, ComposioToolkitsResponse, ComposioToolsResponse, Error, Result,
 };
 
 /// Keys the backend derives itself. Letting a caller set them would let a tool
@@ -145,6 +145,39 @@ impl ComposioClient {
             });
         }
         self.route.delete_connection(connection_id).await
+    }
+
+    /// List the callable tools for `toolkits`, optionally narrowed by `tags`.
+    ///
+    /// # Errors
+    ///
+    /// Returns a transport or decode failure.
+    pub async fn list_tools(
+        &self,
+        toolkits: &[String],
+        tags: &[String],
+    ) -> Result<ComposioToolsResponse> {
+        self.route.list_tools(toolkits, tags).await
+    }
+
+    /// Run one action against a connected account.
+    ///
+    /// Goes through [`crate::execute`], which prepares the arguments, applies
+    /// the retry policies, and formats a reported failure. A provider that
+    /// refuses the call returns `Ok` with `successful: false` — only a call
+    /// that never completed is an `Err`.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`Error::InvalidArguments`] when local validation rejects the
+    /// call, and otherwise a transport or decode failure.
+    pub async fn execute(
+        &self,
+        tool: &str,
+        arguments: Option<serde_json::Value>,
+        connection_id: Option<&str>,
+    ) -> Result<ComposioExecuteResponse> {
+        crate::execute::execute_action(self.route.as_ref(), tool, arguments, connection_id).await
     }
 }
 

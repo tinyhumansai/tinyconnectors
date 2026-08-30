@@ -37,7 +37,9 @@ use serde::Deserialize;
 use tinybus::{Connection, Result as TinyBusResult};
 use tinyconnectors_bus::{
     ComposioAuthorizeRequest, ComposioAuthorizeResponse, ComposioConnectionsResponse,
-    ComposioDeleteConnectionRequest, ComposioDeleteResponse, ComposioToolkitsResponse, names,
+    ComposioDeleteConnectionRequest, ComposioDeleteResponse, ComposioExecuteRequest,
+    ComposioExecuteResponse, ComposioListToolsRequest, ComposioToolkitsResponse,
+    ComposioToolsResponse, names,
 };
 
 use crate::client::{
@@ -164,6 +166,30 @@ impl ConnectorService {
             .await
             .map_err(|error| to_bus_error(&error))
     }
+
+    async fn list_tools(
+        &self,
+        request: ComposioListToolsRequest,
+    ) -> TinyBusResult<ComposioToolsResponse> {
+        self.client
+            .list_tools(&request.toolkits, &request.tags)
+            .await
+            .map_err(|error| to_bus_error(&error))
+    }
+
+    async fn execute(
+        &self,
+        request: ComposioExecuteRequest,
+    ) -> TinyBusResult<ComposioExecuteResponse> {
+        self.client
+            .execute(
+                &request.tool,
+                request.arguments,
+                request.connection_id.as_deref(),
+            )
+            .await
+            .map_err(|error| to_bus_error(&error))
+    }
 }
 
 /// Flatten a crate error onto the bus.
@@ -193,7 +219,14 @@ tinybus_module::module_export! {
     config = ModuleConfig,
     worker_threads = 1,
     provides = ["ai.tinyhumans.connectors.Composio"],
-    methods = ["ListToolkits", "ListConnections", "Authorize", "DeleteConnection"],
+    methods = [
+        "ListToolkits",
+        "ListConnections",
+        "Authorize",
+        "DeleteConnection",
+        "ListTools",
+        "Execute",
+    ],
     signals = [],
     requires = [],
     optional = [],
