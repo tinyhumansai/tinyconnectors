@@ -51,7 +51,10 @@ use tinyconnectors_bus::{
 use crate::client::{
     COMPOSIO_API_BASE, ComposioClient, DirectRoute, HttpTransport, ProxyRoute, Route,
 };
-use tinyconnectors_sync::{ProviderContext, ProviderRegistry, SyncLimits, SyncStateStore};
+use tinyconnectors_sync::{
+    ProviderContext, ProviderRegistry, SyncLimits, SyncStateStore, ToolScope, UserScopePref,
+    classify_unknown, find_curated,
+};
 
 use crate::providers::ClientActions;
 use crate::state::FileStateStore;
@@ -220,6 +223,37 @@ impl ConnectorService {
         })
     }
 
+    /// Whether the user's preference permits `action`.
+    ///
+    /// The scope comes from the toolkit's curated catalog when it lists the
+    /// action, and from the verb heuristic otherwise — a toolkit nobody has
+    /// curated still has to obey the preference, or "read only" would mean
+    /// nothing for exactly the integrations least understood.
+    ///
+    /// An action whose toolkit cannot be derived is permitted: it is a slug
+    /// shaped unlike anything Composio publishes, and refusing on that basis
+    /// would break a working action over a naming convention.
+    async fn permits(&self, action: &str) -> TinyBusResult<bool> {
+        let Some(toolkit) = tinyconnectors_sync::toolkit_from_slug(action) else {
+            return Ok(true);
+        };
+        let pref = UserScopePref::load(self.state.as_ref(), &toolkit)
+            .await
+            .map_err(|error| tinybus::Error::failed(error.to_string()))?;
+
+        let scope = self
+            .registry
+            .get(&toolkit)
+            .and_then(|provider| {
+                provider
+                    .curated_tools()
+                    .and_then(|catalog| find_curated(catalog, action).map(|tool| tool.scope))
+            })
+            .unwrap_or_else(|| classify_unknown(action));
+
+        Ok(pref.allows(scope))
+    }
+
     /// The first active connection for `toolkit`.
     async fn first_active_connection(&self, toolkit: &str) -> TinyBusResult<String> {
         let wanted = toolkit.trim().to_ascii_lowercase();
@@ -283,16 +317,61 @@ impl ConnectorService {
         &self,
         request: ComposioListToolsRequest,
     ) -> TinyBusResult<ComposioToolsResponse> {
-        self.client
+        let mut response = self
+            .client
             .list_tools(&request.toolkits, &request.tags)
             .await
-            .map_err(|error| to_bus_error(&error))
+            .map_err(|error| to_bus_error(&error))?;
+
+        if request.apply_user_scopes {
+            let mut allowed = Vec::with_capacity(response.tools.len());
+            for tool in response.tools {
+                if self.permits(&tool.function.name).await? {
+                    allowed.push(tool);
+                }
+            }
+            response.tools = allowed;
+        }
+        Ok(response)
+    }
+
+    async fn get_user_scopes(
+        &self,
+        request: ComposioGetUserScopesRequest,
+    ) -> TinyBusResult<ComposioUserScopesResponse> {
+        let pref = UserScopePref::load(self.state.as_ref(), &request.toolkit)
+            .await
+            .map_err(|error| tinybus::Error::failed(error.to_string()))?;
+        Ok(scopes_response(&request.toolkit, pref))
+    }
+
+    async fn set_user_scopes(
+        &self,
+        request: ComposioSetUserScopesRequest,
+    ) -> TinyBusResult<ComposioUserScopesResponse> {
+        let pref = UserScopePref {
+            read: request.scopes.read,
+            write: request.scopes.write,
+            admin: request.scopes.admin,
+        };
+        pref.save(self.state.as_ref(), &request.toolkit)
+            .await
+            .map_err(|error| tinybus::Error::failed(error.to_string()))?;
+        Ok(scopes_response(&request.toolkit, pref))
     }
 
     async fn execute(
         &self,
         request: ComposioExecuteRequest,
     ) -> TinyBusResult<ComposioExecuteResponse> {
+        // Enforced here rather than trusted from the caller: a preference a
+        // caller could opt out of is not a restriction, it is a suggestion.
+        if !self.permits(&request.tool).await? {
+            return Err(tinybus::Error::failed(format!(
+                "`{}` is not permitted: the scope preference for this toolkit does not allow it",
+                request.tool
+            )));
+        }
         self.client
             .execute(
                 &request.tool,
@@ -496,6 +575,18 @@ impl SyncStateStore for EphemeralStateStore {
             .unwrap_or_else(std::sync::PoisonError::into_inner)
             .insert((namespace.to_string(), key.to_string()), value.clone());
         Ok(())
+    }
+}
+
+/// Render a stored preference as the member's reply.
+fn scopes_response(toolkit: &str, pref: UserScopePref) -> ComposioUserScopesResponse {
+    ComposioUserScopesResponse {
+        toolkit: toolkit.trim().to_ascii_lowercase(),
+        scopes: ComposioUserScopes {
+            read: pref.read,
+            write: pref.write,
+            admin: pref.admin,
+        },
     }
 }
 

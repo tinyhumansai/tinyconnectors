@@ -6,7 +6,7 @@ use super::{CONTRACT_VERSION, binds, is_compatible};
 
 #[test]
 fn the_shipped_contract_version_is_pinned() {
-    assert_eq!(CONTRACT_VERSION, (1, 3));
+    assert_eq!(CONTRACT_VERSION, (1, 4));
 }
 
 #[test]

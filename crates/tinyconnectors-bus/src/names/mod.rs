@@ -155,6 +155,24 @@ pub mod methods {
     /// absent from this list should be surfaced as preview rather than as
     /// something the agent can already act through.
     pub const LIST_AGENT_READY_TOOLKITS: &str = "ListAgentReadyToolkits";
+
+    /// Reads what the user has allowed an agent to do with a toolkit.
+    ///
+    /// Takes a [`crate::ComposioGetUserScopesRequest`] and returns a
+    /// [`crate::ComposioUserScopesResponse`]. A toolkit with nothing stored
+    /// reports the default rather than an absence, so a caller has no unset
+    /// state to handle.
+    pub const GET_USER_SCOPES: &str = "GetUserScopes";
+
+    /// Writes what the user allows an agent to do with a toolkit.
+    ///
+    /// Takes a [`crate::ComposioSetUserScopesRequest`] and returns the stored
+    /// [`crate::ComposioUserScopesResponse`].
+    ///
+    /// The preference is enforced by the module, not by its caller:
+    /// [`LIST_TOOLS`] hides what it forbids and [`EXECUTE`] refuses it. A
+    /// caller cannot opt out of a restriction the user set.
+    pub const SET_USER_SCOPES: &str = "SetUserScopes";
 }
 
 /// Every member of [`INTERFACE`], in the order the interface dispatches them.
