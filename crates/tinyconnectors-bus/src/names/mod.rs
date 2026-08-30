@@ -173,6 +173,22 @@ pub mod methods {
     /// [`LIST_TOOLS`] hides what it forbids and [`EXECUTE`] refuses it. A
     /// caller cannot opt out of a restriction the user set.
     pub const SET_USER_SCOPES: &str = "SetUserScopes";
+
+    /// Reads one batch of records out of a connected account.
+    ///
+    /// Takes a [`crate::ConnectorSyncRequest`] and returns a
+    /// [`crate::ConnectorSyncResponse`].
+    ///
+    /// The module does **not** store what it reads. It hands the caller a
+    /// [`crate::ConnectorRecordBatch`] and the caller writes it to memory — a
+    /// connector knows how to talk to Gmail, memory knows how to store things,
+    /// and neither has to link the other.
+    ///
+    /// A run stops at the item limit, the day's request budget, or the provider
+    /// running out, whichever comes first. Call again while the batch reports
+    /// `complete: false`; the cursor is kept by the module, so a caller does
+    /// not carry one.
+    pub const SYNC: &str = "Sync";
 }
 
 /// Every member of [`INTERFACE`], in the order the interface dispatches them.

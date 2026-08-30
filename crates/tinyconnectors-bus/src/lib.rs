@@ -122,5 +122,8 @@ pub use composio::{
     ComposioUserScopesResponse,
 };
 pub use names::{INTERFACE, METHODS, OBJECT_PATH};
-pub use records::{ConnectorRecord, ConnectorRecordBatch, SyncEvent, SyncStage};
+pub use records::{
+    ConnectorRecord, ConnectorRecordBatch, ConnectorSyncRequest, ConnectorSyncResponse, SyncEvent,
+    SyncStage,
+};
 pub use version::{CONTRACT_VERSION, is_compatible};

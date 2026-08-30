@@ -26,7 +26,10 @@
 
 mod types;
 
-pub use types::{ConnectorRecord, ConnectorRecordBatch, SyncEvent, SyncStage};
+pub use types::{
+    ConnectorRecord, ConnectorRecordBatch, ConnectorSyncRequest, ConnectorSyncResponse, SyncEvent,
+    SyncStage,
+};
 
 #[cfg(test)]
 mod test;

@@ -72,6 +72,54 @@ pub struct ConnectorRecordBatch {
     pub complete: bool,
 }
 
+/// Arguments for running one sync.
+#[derive(Debug, Clone, Default, Serialize, Deserialize)]
+pub struct ConnectorSyncRequest {
+    /// Toolkit to sync.
+    pub toolkit: String,
+    /// Connection to read. `None` uses the toolkit's first active account.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub connection_id: Option<String>,
+    /// Memory source the records belong to. Defaults to
+    /// `<toolkit>:<connection_id>`.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub source_id: Option<String>,
+    /// Most records to produce. `None` takes the module's default.
+    ///
+    /// A bound, not a target: a run stops at whichever of this, the day's
+    /// request budget, and the provider running out comes first.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub max_items: Option<usize>,
+    /// Why the run was started, for the log and the status line.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub reason: Option<String>,
+}
+
+/// What one sync run produced.
+#[derive(Debug, Clone, Default, Serialize, Deserialize)]
+pub struct ConnectorSyncResponse {
+    /// The records to ingest.
+    ///
+    /// Ingesting them is the caller's job. The module reads a connected
+    /// account; the memory engine stores things; neither links the other.
+    pub batch: ConnectorRecordBatch,
+    /// Where the run got to.
+    pub stage: SyncStage,
+    /// Pages the provider was asked for.
+    #[serde(default)]
+    pub pages_read: u32,
+    /// Records skipped because they were already ingested and unchanged.
+    #[serde(default)]
+    pub records_skipped: usize,
+    /// Detail worth surfacing — the failure, when the run stopped on one.
+    ///
+    /// A run that stopped part-way still returns what it read: the caller
+    /// should ingest [`Self::batch`] regardless of this field, and call again
+    /// while [`ConnectorRecordBatch::complete`] is false.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub message: Option<String>,
+}
+
 /// Where a sync run has got to.
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
