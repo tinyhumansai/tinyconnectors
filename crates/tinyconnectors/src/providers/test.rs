@@ -99,3 +99,58 @@ async fn a_refusal_with_no_message_still_says_something() {
         .unwrap_err();
     assert!(error.to_string().contains("reported failure"));
 }
+
+#[tokio::test]
+async fn a_transport_failure_becomes_an_action_failure() {
+    // A provider cannot tell a refused action from an unreachable one apart in
+    // any useful way — both mean the page was not read — so both stop the sync.
+    #[derive(Debug, Default)]
+    struct DeadTransport;
+
+    #[async_trait]
+    impl Transport for DeadTransport {
+        async fn get(&self, path: &str) -> Result<serde_json::Value> {
+            Err(crate::Error::Transport {
+                path: path.to_string(),
+                message: "connection refused".into(),
+            })
+        }
+        async fn post(&self, path: &str, _: &serde_json::Value) -> Result<serde_json::Value> {
+            Err(crate::Error::Transport {
+                path: path.to_string(),
+                message: "connection refused".into(),
+            })
+        }
+        async fn delete(&self, path: &str) -> Result<serde_json::Value> {
+            Err(crate::Error::Transport {
+                path: path.to_string(),
+                message: "connection refused".into(),
+            })
+        }
+    }
+
+    let client = ComposioClient::new(Arc::new(ProxyRoute::new(Arc::new(DeadTransport))));
+    let error = ClientActions::new(client)
+        .run("GMAIL_FETCH_EMAILS", json!({}), "conn_1")
+        .await
+        .unwrap_err();
+
+    assert!(matches!(error, SyncError::Action { .. }));
+    assert!(error.to_string().contains("connection refused"));
+}
+
+#[tokio::test]
+async fn an_invalid_argument_stops_the_action_before_the_call() {
+    let (transport, actions) = actions(json!({ "successful": true, "data": {} }));
+    let error = actions
+        .run(
+            "GMAIL_SEND_EMAIL",
+            json!({ "subject": "no recipient" }),
+            "conn_1",
+        )
+        .await
+        .unwrap_err();
+
+    assert!(matches!(error, SyncError::Action { .. }));
+    assert!(transport.last_body.lock().unwrap().is_none());
+}

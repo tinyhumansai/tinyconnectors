@@ -186,3 +186,37 @@ async fn does_not_retry_a_failure_that_is_not_a_rate_limit() {
     assert!(result.is_err());
     assert_eq!(calls.get(), 1, "a permanent failure must not be retried");
 }
+
+#[tokio::test(start_paused = true)]
+async fn a_rate_limit_that_outlives_every_attempt_becomes_guidance() {
+    // The two halves compose: the retry gives up, and wrapping turns the raw
+    // upstream text into something the user can act on.
+    let result: Result<&str> = authorize_with_rate_limit_retry(|| async {
+        Err(Error::Authorize {
+            toolkit: "instagram".into(),
+            message: "429 too many requests".into(),
+        })
+    })
+    .await;
+
+    let wrapped = wrap_authorize_rate_limit_error("instagram", result.unwrap_err());
+    assert!(matches!(wrapped, Error::OauthRateLimited { .. }));
+    assert!(wrapped.to_string().contains("Business or Creator"));
+}
+
+#[tokio::test(start_paused = true)]
+async fn the_backoff_grows_between_attempts() {
+    // Doubling matters: a fixed short delay retries inside the same rate-limit
+    // window and burns all three attempts for nothing.
+    let started = tokio::time::Instant::now();
+    let _: Result<&str> = authorize_with_rate_limit_retry(|| async {
+        Err(Error::Authorize {
+            toolkit: "instagram".into(),
+            message: "429".into(),
+        })
+    })
+    .await;
+
+    // Two sleeps before the third attempt gives up: 5s then 10s.
+    assert!(started.elapsed() >= std::time::Duration::from_secs(15));
+}
