@@ -4,9 +4,27 @@ use async_trait::async_trait;
 
 use super::github_catalog::CURATED;
 use super::identity::pick;
+use crate::pipeline::{PageSpec, ProviderPage, fetch_page};
 use crate::Result;
 use crate::provider::{ConnectorProvider, ProviderContext, ProviderUserProfile};
 use crate::scope::CuratedTool;
+
+/// How one page of this toolkit is read.
+///
+/// The paths are alternatives, tried in order: Composio wraps provider payloads
+/// inconsistently, and the same field arrives under different names from
+/// different endpoints of the same API.
+const PAGE: PageSpec = PageSpec {
+    action: "GITHUB_SEARCH_ISSUES_AND_PULL_REQUESTS",
+    item_pointers: &["/data/items", "/items", "/data/data/items"],
+    id_paths: &["id", "number", "node_id"],
+    title_paths: &["title"],
+    content_paths: &["body"],
+    url_paths: &["html_url", "url"],
+    version_paths: &["updated_at"],
+    page_size_arg: "per_page",
+    cursor_arg: "page",
+};
 
 /// The action that reads the connected account's identity.
 const PROFILE_ACTION: &str = "GITHUB_GET_THE_AUTHENTICATED_USER";
@@ -47,5 +65,13 @@ impl ConnectorProvider for GithubProvider {
             // not name can still reach it.
             extras: payload,
         })
+    }
+
+    async fn fetch_page(
+        &self,
+        context: &ProviderContext,
+        cursor: Option<&str>,
+    ) -> Result<ProviderPage> {
+        fetch_page(context, cursor, &PAGE).await
     }
 }

@@ -4,9 +4,27 @@ use async_trait::async_trait;
 
 use super::gmail_catalog::CURATED;
 use super::identity::pick;
+use crate::pipeline::{PageSpec, ProviderPage, fetch_page};
 use crate::Result;
 use crate::provider::{ConnectorProvider, ProviderContext, ProviderUserProfile};
 use crate::scope::CuratedTool;
+
+/// How one page of this toolkit is read.
+///
+/// The paths are alternatives, tried in order: Composio wraps provider payloads
+/// inconsistently, and the same field arrives under different names from
+/// different endpoints of the same API.
+const PAGE: PageSpec = PageSpec {
+    action: "GMAIL_FETCH_EMAILS",
+    item_pointers: &["/data/messages", "/data/data/messages", "/messages", "/data/items"],
+    id_paths: &["id", "messageId", "message_id"],
+    title_paths: &["subject", "payload.headers.0.value"],
+    content_paths: &["messageText", "snippet", "body", "preview"],
+    url_paths: &["messageUrl", "webLink"],
+    version_paths: &["historyId", "internalDate"],
+    page_size_arg: "max_results",
+    cursor_arg: "page_token",
+};
 
 /// The action that reads the connected account's identity.
 const PROFILE_ACTION: &str = "GMAIL_GET_PROFILE";
@@ -45,5 +63,13 @@ impl ConnectorProvider for GmailProvider {
             extras: payload,
             ..ProviderUserProfile::default()
         })
+    }
+
+    async fn fetch_page(
+        &self,
+        context: &ProviderContext,
+        cursor: Option<&str>,
+    ) -> Result<ProviderPage> {
+        fetch_page(context, cursor, &PAGE).await
     }
 }

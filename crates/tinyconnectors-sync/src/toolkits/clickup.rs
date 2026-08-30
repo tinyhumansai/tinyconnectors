@@ -4,9 +4,27 @@ use async_trait::async_trait;
 
 use super::clickup_catalog::CURATED;
 use super::identity::pick;
+use crate::pipeline::{PageSpec, ProviderPage, fetch_page};
 use crate::Result;
 use crate::provider::{ConnectorProvider, ProviderContext, ProviderUserProfile};
 use crate::scope::CuratedTool;
+
+/// How one page of this toolkit is read.
+///
+/// The paths are alternatives, tried in order: Composio wraps provider payloads
+/// inconsistently, and the same field arrives under different names from
+/// different endpoints of the same API.
+const PAGE: PageSpec = PageSpec {
+    action: "CLICKUP_GET_FILTERED_TEAM_TASKS",
+    item_pointers: &["/data/tasks", "/tasks", "/data/data/tasks"],
+    id_paths: &["id", "custom_id"],
+    title_paths: &["name"],
+    content_paths: &["description", "text_content"],
+    url_paths: &["url"],
+    version_paths: &["date_updated"],
+    page_size_arg: "page",
+    cursor_arg: "page",
+};
 
 /// The action that reads the connected account's identity.
 const PROFILE_ACTION: &str = "CLICKUP_GET_AUTHORIZED_USER";
@@ -47,5 +65,13 @@ impl ConnectorProvider for ClickupProvider {
             extras: payload,
             ..ProviderUserProfile::default()
         })
+    }
+
+    async fn fetch_page(
+        &self,
+        context: &ProviderContext,
+        cursor: Option<&str>,
+    ) -> Result<ProviderPage> {
+        fetch_page(context, cursor, &PAGE).await
     }
 }
