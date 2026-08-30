@@ -2,11 +2,11 @@
 
 use async_trait::async_trait;
 
-use super::identity::pick;
 use super::gmail_catalog::CURATED;
+use super::identity::pick;
+use crate::Result;
 use crate::provider::{ConnectorProvider, ProviderContext, ProviderUserProfile};
 use crate::scope::CuratedTool;
-use crate::Result;
 
 /// The action that reads the connected account's identity.
 const PROFILE_ACTION: &str = "GMAIL_GET_PROFILE";
@@ -33,10 +33,7 @@ impl ConnectorProvider for GmailProvider {
         Some(900)
     }
 
-    async fn fetch_user_profile(
-        &self,
-        context: &ProviderContext,
-    ) -> Result<ProviderUserProfile> {
+    async fn fetch_user_profile(&self, context: &ProviderContext) -> Result<ProviderUserProfile> {
         let payload = context.run(PROFILE_ACTION, serde_json::json!({})).await?;
         Ok(ProviderUserProfile {
             toolkit: self.toolkit_slug().to_string(),

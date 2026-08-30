@@ -8,10 +8,10 @@ use async_trait::async_trait;
 use serde_json::json;
 
 use super::default_registry;
+use crate::Result;
 use crate::provider::{ActionRunner, ProviderContext, SyncLimits};
 use crate::scope::{ToolScope, classify_unknown, find_curated, toolkit_from_slug};
 use crate::state::SyncStateStore;
-use crate::Result;
 
 #[derive(Debug)]
 struct FixedActions {
@@ -82,7 +82,11 @@ fn every_provider_describes_itself() {
     // shows the user an empty row.
     for provider in default_registry().all() {
         let description = provider.description();
-        assert!(!description.trim().is_empty(), "{}", provider.toolkit_slug());
+        assert!(
+            !description.trim().is_empty(),
+            "{}",
+            provider.toolkit_slug()
+        );
         assert!(description.ends_with('.'), "{}", provider.toolkit_slug());
     }
 }
@@ -161,7 +165,10 @@ async fn gmail_reads_its_identity_from_the_profile_action() {
         .await
         .unwrap();
 
-    assert_eq!(actions.last_action.lock().unwrap().as_deref(), Some("GMAIL_GET_PROFILE"));
+    assert_eq!(
+        actions.last_action.lock().unwrap().as_deref(),
+        Some("GMAIL_GET_PROFILE")
+    );
     assert_eq!(profile.toolkit, "gmail");
     assert_eq!(profile.email.as_deref(), Some("user@example.com"));
     assert_eq!(profile.connection_id.as_deref(), Some("conn_1"));
@@ -190,7 +197,10 @@ async fn github_prefers_the_display_name_and_keeps_the_login() {
 
     assert_eq!(profile.username.as_deref(), Some("octocat"));
     assert_eq!(profile.display_name.as_deref(), Some("The Octocat"));
-    assert_eq!(profile.profile_url.as_deref(), Some("https://github.com/octocat"));
+    assert_eq!(
+        profile.profile_url.as_deref(),
+        Some("https://github.com/octocat")
+    );
 }
 
 #[tokio::test]

@@ -79,8 +79,8 @@ pub fn classify_unknown(slug: &str) -> ToolScope {
     ];
     /// Verbs that only ever read, when they lead the action.
     const READ_VERBS: &[&str] = &[
-        "GET", "LIST", "FETCH", "SEARCH", "READ", "FIND", "QUERY", "RETRIEVE", "DOWNLOAD", "EXPORT",
-        "COUNT", "CHECK",
+        "GET", "LIST", "FETCH", "SEARCH", "READ", "FIND", "QUERY", "RETRIEVE", "DOWNLOAD",
+        "EXPORT", "COUNT", "CHECK",
     ];
     /// Words that make an action mutating.
     const WRITE: &[&str] = &[

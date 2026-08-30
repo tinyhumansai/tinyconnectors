@@ -64,7 +64,10 @@ fn reads_the_verb_rather_than_the_noun() {
     assert_eq!(classify_unknown("GMAIL_LIST_DRAFTS"), ToolScope::Read);
     assert_eq!(classify_unknown("GMAIL_GET_DRAFT"), ToolScope::Read);
     assert_eq!(classify_unknown("NOTION_SEARCH_POSTS"), ToolScope::Read);
-    assert_eq!(classify_unknown("GITHUB_LIST_CREATED_ISSUES"), ToolScope::Read);
+    assert_eq!(
+        classify_unknown("GITHUB_LIST_CREATED_ISSUES"),
+        ToolScope::Read
+    );
 
     // The verb still decides when it is a write one.
     assert_eq!(classify_unknown("GMAIL_DRAFT_REPLY"), ToolScope::Write);
@@ -75,7 +78,10 @@ fn reads_the_verb_rather_than_the_noun() {
 fn a_destructive_word_wins_over_a_reading_verb() {
     // `LIST` leads, but the action removes something.
     assert_eq!(classify_unknown("GMAIL_LIST_AND_DELETE"), ToolScope::Admin);
-    assert_eq!(classify_unknown("GITHUB_GET_AND_REVOKE_TOKEN"), ToolScope::Admin);
+    assert_eq!(
+        classify_unknown("GITHUB_GET_AND_REVOKE_TOKEN"),
+        ToolScope::Admin
+    );
 }
 
 #[test]

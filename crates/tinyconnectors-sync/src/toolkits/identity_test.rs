@@ -11,8 +11,14 @@ fn takes_the_first_path_that_matches() {
     // Order is how a provider says "prefer the display name, fall back to the
     // login" without writing the fallback out by hand.
     let payload = json!({ "login": "octocat", "name": "The Octocat" });
-    assert_eq!(pick(&payload, &["name", "login"]).as_deref(), Some("The Octocat"));
-    assert_eq!(pick(&payload, &["missing", "login"]).as_deref(), Some("octocat"));
+    assert_eq!(
+        pick(&payload, &["name", "login"]).as_deref(),
+        Some("The Octocat")
+    );
+    assert_eq!(
+        pick(&payload, &["missing", "login"]).as_deref(),
+        Some("octocat")
+    );
 }
 
 #[test]
@@ -29,7 +35,10 @@ fn treats_an_empty_string_as_absent() {
     // "not reported" and "reported empty" are the same to a caller picking a
     // label, and an empty string renders as a blank account.
     let payload = json!({ "name": "   ", "login": "octocat" });
-    assert_eq!(pick(&payload, &["name", "login"]).as_deref(), Some("octocat"));
+    assert_eq!(
+        pick(&payload, &["name", "login"]).as_deref(),
+        Some("octocat")
+    );
 }
 
 #[test]

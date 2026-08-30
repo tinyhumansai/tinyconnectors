@@ -4,9 +4,9 @@ use async_trait::async_trait;
 
 use super::identity::pick;
 use super::linear_catalog::CURATED;
+use crate::Result;
 use crate::provider::{ConnectorProvider, ProviderContext, ProviderUserProfile};
 use crate::scope::CuratedTool;
-use crate::Result;
 
 /// The action that reads the connected account's identity.
 const PROFILE_ACTION: &str = "LINEAR_LIST_LINEAR_USERS";
@@ -33,10 +33,7 @@ impl ConnectorProvider for LinearProvider {
         Some(900)
     }
 
-    async fn fetch_user_profile(
-        &self,
-        context: &ProviderContext,
-    ) -> Result<ProviderUserProfile> {
+    async fn fetch_user_profile(&self, context: &ProviderContext) -> Result<ProviderUserProfile> {
         let payload = context.run(PROFILE_ACTION, serde_json::json!({})).await?;
         Ok(ProviderUserProfile {
             toolkit: self.toolkit_slug().to_string(),
