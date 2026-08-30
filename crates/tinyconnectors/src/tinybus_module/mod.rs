@@ -59,7 +59,8 @@ use crate::triggers::TriggerArchive;
 /// that answers every member with a 401.
 ///
 /// ```json
-/// { "route": "proxy",  "base_url": "https://api.example.com", "auth_token": "…" }
+/// { "route": "proxy",  "base_url": "https://api.example.com", "auth_token": "…",
+///   "state_dir": "/var/lib/openhuman" }
 /// { "route": "direct", "api_key": "…", "entity_id": "default" }
 /// ```
 ///
@@ -70,6 +71,13 @@ use crate::triggers::TriggerArchive;
 pub(crate) enum ModuleConfig {
     /// Reach Composio through the `TinyHumans` backend.
     Proxy {
+        /// Directory the module may keep state in, for the trigger archive.
+        ///
+        /// Optional: a host that never enables triggers has no reason to hand
+        /// the module a writable directory, and requiring one would make every
+        /// deployment carry a path it does not use.
+        #[serde(default)]
+        state_dir: Option<std::path::PathBuf>,
         /// Base URL of the connector backend, e.g. `https://api.example.com`.
         base_url: String,
         /// Bearer token for the signed-in user.

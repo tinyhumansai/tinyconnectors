@@ -78,6 +78,9 @@ impl Transport for StubTransport {
 fn service_over(transport: Arc<StubTransport>) -> ConnectorService {
     ConnectorService {
         client: ComposioClient::new(Arc::new(ProxyRoute::new(transport))),
+        // No archive: these tests exercise the backend-facing members. The
+        // history member's own behaviour without one is tested separately.
+        archive: None,
     }
 }
 
