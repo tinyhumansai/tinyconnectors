@@ -15,7 +15,7 @@ use std::time::Duration;
 use tinyconnectors::names;
 use tinybus::Connection;
 use tinybus::broker::Broker;
-use tinybus::module::ModuleHost;
+use tinybus::module::{ModuleHost, ModuleInfo};
 use tinybus::transport::memory::MemoryBus;
 
 #[tokio::main]
@@ -46,7 +46,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         .into());
     }
 
-    verify_served_surface(&bus).await?;
+    verify_served_surface(&bus, &info).await?;
 
     println!(
         "verified {archive} from {release_url} as TinyBus module `{}`",
@@ -56,15 +56,18 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     Ok(())
 }
 
-/// Wait until the module claims its bus name, then check that it serves exactly
-/// the members the contract declares.
+/// Wait until the module claims its bus name, then check that its manifest
+/// declares exactly the members the contract does.
 ///
 /// The verifier deliberately stops short of *calling* a member. Every member
 /// reaches a live connector backend with a real user's credential, so a
 /// call-based check would need a signed-in account and would make a release
 /// gate depend on a third party being up. Claiming the name and matching the
-/// member table is what the artifact can honestly be held to.
-async fn verify_served_surface(bus: &MemoryBus) -> Result<(), Box<dyn std::error::Error>> {
+/// declared member table is what the artifact can honestly be held to.
+async fn verify_served_surface(
+    bus: &MemoryBus,
+    info: &ModuleInfo,
+) -> Result<(), Box<dyn std::error::Error>> {
     let client = Connection::connect(bus.connect().await?).await?;
     tokio::time::timeout(Duration::from_secs(5), async {
         loop {
@@ -77,16 +80,17 @@ async fn verify_served_surface(bus: &MemoryBus) -> Result<(), Box<dyn std::error
     })
     .await??;
 
-    let proxy = client.proxy(names::INTERFACE, names::OBJECT_PATH, names::INTERFACE)?;
-    let served = proxy.introspect().await?;
-    let mut missing = names::METHODS
+    let declared: Vec<String> = info
+        .manifest
+        .provides
         .iter()
-        .filter(|member| !served.methods.iter().any(|served| served == *member))
-        .peekable();
-    if missing.peek().is_some() {
-        let missing: Vec<_> = missing.collect();
+        .flat_map(|interface| interface.methods.iter())
+        .map(ToString::to_string)
+        .collect();
+    let expected: Vec<String> = names::METHODS.iter().map(ToString::to_string).collect();
+    if declared != expected {
         return Err(io::Error::other(format!(
-            "module does not serve declared members: {missing:?}"
+            "module declares {declared:?} but the contract declares {expected:?}"
         ))
         .into());
     }

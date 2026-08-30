@@ -46,6 +46,9 @@ ureq = { workspace = true }
 [dev-dependencies]
 # The bundled example implements `Transport`, which is an `async_trait`.
 async-trait = { workspace = true }
+# `test-util` gives the retry tests paused time, so a backoff that really sleeps
+# for over a minute in production costs them nothing.
+tokio = { workspace = true, features = ["test-util"] }
 
 [features]
 default = []

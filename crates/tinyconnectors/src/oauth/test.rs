@@ -5,7 +5,7 @@
 use std::cell::Cell;
 
 use super::*;
-use crate::Error;
+use crate::{Error, Result};
 
 #[test]
 fn recognizes_meta_toolkits_regardless_of_casing_or_padding() {
