@@ -154,3 +154,19 @@ async fn an_invalid_argument_stops_the_action_before_the_call() {
     assert!(matches!(error, SyncError::Action { .. }));
     assert!(transport.last_body.lock().unwrap().is_none());
 }
+
+#[test]
+fn a_refusal_with_no_usable_message_still_says_something() {
+    // "The provider said no and would not say why" beats an empty string in a
+    // sync log that someone has to read months later.
+    use super::actions::refusal_message;
+
+    assert_eq!(
+        refusal_message(Some("insufficient scope".into())),
+        "insufficient scope"
+    );
+    assert_eq!(refusal_message(Some("  padded  ".into())), "padded");
+    for empty in [None, Some(String::new()), Some("   ".to_string())] {
+        assert_eq!(refusal_message(empty), "the provider reported failure");
+    }
+}

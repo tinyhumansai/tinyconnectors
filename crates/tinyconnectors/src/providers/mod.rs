@@ -15,7 +15,7 @@
 //! becomes an error here — the sync stops rather than recording an empty page
 //! as a complete one.
 
-mod actions;
+pub(crate) mod actions;
 
 pub use actions::ClientActions;
 

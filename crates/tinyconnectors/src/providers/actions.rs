@@ -24,7 +24,7 @@ impl ClientActions {
 /// The execute pipeline formats a message for every failed response, so the
 /// fallback is not expected — but "the provider said no and would not say why"
 /// is still more useful to whoever reads the sync log than an empty string.
-fn refusal_message(error: Option<String>) -> String {
+pub(crate) fn refusal_message(error: Option<String>) -> String {
     error
         .map(|error| error.trim().to_string())
         .filter(|error| !error.is_empty())
