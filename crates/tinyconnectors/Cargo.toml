@@ -26,11 +26,16 @@ tinyconnectors-bus = { workspace = true }
 tinybus = { workspace = true }
 tinybus-module = { workspace = true }
 thiserror = { workspace = true }
+# The OAuth authorize backoff sleeps between attempts. `time` alone: the module
+# runtime comes from `tinybus-module`, which owns the reactor.
+tokio = { workspace = true }
+# Structured diagnostics for the handoff paths, where the interesting failures
+# happen minutes apart in a browser and are otherwise invisible.
+tracing = { workspace = true }
+# Payload round-tripping in the crate-level doc example and the bus adapter.
+serde_json = { workspace = true }
 
 [dev-dependencies]
-tokio = { workspace = true }
-# The GitHub release verifier passes an explicit empty module configuration.
-serde_json = { workspace = true }
 
 [features]
 default = []
