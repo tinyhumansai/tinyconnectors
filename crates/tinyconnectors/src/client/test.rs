@@ -4,6 +4,10 @@
 //! was asked, so a test can assert on the path and the request body — which is
 //! where the interesting behavior is. The paths are a wire contract with the
 //! backend just as much as the payloads are.
+//!
+//! These run the client over [`ProxyRoute`], because that is the route whose
+//! paths and validation they are about. The direct route's own translation and
+//! key-gating are tested beside it, in `route/direct_test.rs`.
 
 #![allow(clippy::unwrap_used, clippy::expect_used, clippy::panic)]
 
@@ -12,7 +16,7 @@ use std::sync::{Arc, Mutex};
 use async_trait::async_trait;
 use serde_json::json;
 
-use super::{ComposioClient, Transport};
+use super::{ComposioClient, ProxyRoute, Transport};
 use crate::{Error, Result};
 
 /// One recorded request.
@@ -88,7 +92,7 @@ impl Transport for FakeTransport {
 #[tokio::test]
 async fn lists_toolkits_from_the_allowlist_path() {
     let transport = FakeTransport::replying(json!({ "toolkits": ["gmail", "notion"] }));
-    let client = ComposioClient::new(transport.clone());
+    let client = ComposioClient::new(Arc::new(ProxyRoute::new(transport.clone())));
 
     let resp = client.list_toolkits().await.unwrap();
     assert_eq!(resp.toolkits, vec!["gmail", "notion"]);
@@ -109,7 +113,7 @@ async fn lists_connections_without_filtering_out_inactive_rows() {
             { "id": "b", "toolkit": "instagram", "status": "PENDING" }
         ]
     }));
-    let client = ComposioClient::new(transport);
+    let client = ComposioClient::new(Arc::new(ProxyRoute::new(transport)));
 
     let resp = client.list_connections().await.unwrap();
     assert_eq!(resp.connections.len(), 2);
@@ -122,7 +126,7 @@ async fn authorize_posts_the_trimmed_toolkit() {
         "connectUrl": "https://composio.dev/oauth/abc",
         "connectionId": "conn_1"
     }));
-    let client = ComposioClient::new(transport.clone());
+    let client = ComposioClient::new(Arc::new(ProxyRoute::new(transport.clone())));
 
     let resp = client.authorize("  notion  ", None).await.unwrap();
     assert_eq!(resp.connection_id, "conn_1");
@@ -138,7 +142,7 @@ async fn authorize_merges_extra_params_into_the_body() {
     let transport = FakeTransport::replying(json!({
         "connectUrl": "u", "connectionId": "c"
     }));
-    let client = ComposioClient::new(transport.clone());
+    let client = ComposioClient::new(Arc::new(ProxyRoute::new(transport.clone())));
 
     client
         .authorize("whatsapp", Some(json!({ "waba_id": "123" })))
@@ -155,7 +159,7 @@ async fn authorize_adds_the_gmail_read_scope_composio_omits() {
     let transport = FakeTransport::replying(json!({
         "connectUrl": "u", "connectionId": "c"
     }));
-    let client = ComposioClient::new(transport.clone());
+    let client = ComposioClient::new(Arc::new(ProxyRoute::new(transport.clone())));
 
     client.authorize("Gmail", None).await.unwrap();
 
@@ -171,7 +175,7 @@ async fn authorize_keeps_caller_scopes_and_does_not_duplicate_required_ones() {
     let transport = FakeTransport::replying(json!({
         "connectUrl": "u", "connectionId": "c"
     }));
-    let client = ComposioClient::new(transport.clone());
+    let client = ComposioClient::new(Arc::new(ProxyRoute::new(transport.clone())));
 
     client
         .authorize(
@@ -202,7 +206,7 @@ async fn authorize_leaves_a_toolkit_with_no_extra_scopes_alone() {
     let transport = FakeTransport::replying(json!({
         "connectUrl": "u", "connectionId": "c"
     }));
-    let client = ComposioClient::new(transport.clone());
+    let client = ComposioClient::new(Arc::new(ProxyRoute::new(transport.clone())));
 
     client.authorize("notion", None).await.unwrap();
 
@@ -213,7 +217,7 @@ async fn authorize_leaves_a_toolkit_with_no_extra_scopes_alone() {
 #[tokio::test]
 async fn authorize_rejects_an_empty_toolkit_without_calling_out() {
     let transport = FakeTransport::replying(json!({}));
-    let client = ComposioClient::new(transport.clone());
+    let client = ComposioClient::new(Arc::new(ProxyRoute::new(transport.clone())));
 
     let error = client.authorize("   ", None).await.unwrap_err();
     assert!(matches!(error, Error::Authorize { .. }));
@@ -223,7 +227,7 @@ async fn authorize_rejects_an_empty_toolkit_without_calling_out() {
 #[tokio::test]
 async fn authorize_refuses_extra_params_that_are_not_an_object() {
     let transport = FakeTransport::replying(json!({}));
-    let client = ComposioClient::new(transport.clone());
+    let client = ComposioClient::new(Arc::new(ProxyRoute::new(transport.clone())));
 
     let error = client
         .authorize("gmail", Some(json!(["not", "an", "object"])))
@@ -239,7 +243,7 @@ async fn authorize_refuses_to_let_extra_params_override_a_reserved_key() {
     // toolkit or credential than the one the caller asked for.
     for key in ["toolkit", "toolkit_version", "auth", "client_id"] {
         let transport = FakeTransport::replying(json!({}));
-        let client = ComposioClient::new(transport.clone());
+        let client = ComposioClient::new(Arc::new(ProxyRoute::new(transport.clone())));
 
         let error = client
             .authorize("gmail", Some(json!({ key: "hijacked" })))
@@ -258,7 +262,7 @@ async fn deletes_a_connection_by_id() {
     let transport = FakeTransport::replying(json!({
         "deleted": true, "memory_chunks_deleted": 12
     }));
-    let client = ComposioClient::new(transport.clone());
+    let client = ComposioClient::new(Arc::new(ProxyRoute::new(transport.clone())));
 
     let resp = client.delete_connection(" conn_9 ").await.unwrap();
     assert!(resp.deleted);
@@ -272,7 +276,7 @@ async fn deletes_a_connection_by_id() {
 #[tokio::test]
 async fn delete_rejects_an_empty_connection_id_without_calling_out() {
     let transport = FakeTransport::replying(json!({}));
-    let client = ComposioClient::new(transport.clone());
+    let client = ComposioClient::new(Arc::new(ProxyRoute::new(transport.clone())));
 
     let error = client.delete_connection("  ").await.unwrap_err();
     assert!(matches!(error, Error::Authorize { .. }));
@@ -285,7 +289,7 @@ async fn delete_rejects_an_empty_connection_id_without_calling_out() {
 #[tokio::test]
 async fn reports_a_transport_failure_unchanged() {
     let transport = FakeTransport::failing("502 bad gateway");
-    let client = ComposioClient::new(transport);
+    let client = ComposioClient::new(Arc::new(ProxyRoute::new(transport)));
 
     let error = client.list_toolkits().await.unwrap_err();
     assert!(matches!(error, Error::Transport { .. }));
@@ -295,7 +299,7 @@ async fn reports_a_transport_failure_unchanged() {
 #[tokio::test]
 async fn reports_an_unexpected_envelope_as_a_decode_failure() {
     let transport = FakeTransport::replying(json!({ "connections": "not-an-array" }));
-    let client = ComposioClient::new(transport);
+    let client = ComposioClient::new(Arc::new(ProxyRoute::new(transport)));
 
     let error = client.list_connections().await.unwrap_err();
     assert!(matches!(error, Error::Decode { .. }));

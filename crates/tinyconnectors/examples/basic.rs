@@ -11,7 +11,7 @@
 use std::sync::Arc;
 
 use async_trait::async_trait;
-use tinyconnectors::client::{ComposioClient, Transport};
+use tinyconnectors::client::{ComposioClient, ProxyRoute, Transport};
 use tinyconnectors::{Result, oauth};
 
 /// A transport that answers from canned JSON, standing in for the backend.
@@ -48,7 +48,7 @@ impl Transport for StubBackend {
 
 #[tokio::main]
 async fn main() -> Result<()> {
-    let client = ComposioClient::new(Arc::new(StubBackend));
+    let client = ComposioClient::new(Arc::new(ProxyRoute::new(Arc::new(StubBackend))));
 
     let toolkits = client.list_toolkits().await?;
     println!("connectable: {}", toolkits.toolkits.join(", "));

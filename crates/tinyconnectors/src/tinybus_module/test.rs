@@ -21,7 +21,7 @@ use tinyconnectors_bus::{
 };
 
 use super::{ConnectorService, ModuleConfig};
-use crate::client::{ComposioClient, Transport};
+use crate::client::{ComposioClient, ProxyRoute, Transport};
 use crate::{Error, Result};
 
 #[derive(Debug, Default)]
@@ -75,7 +75,7 @@ impl Transport for StubTransport {
 
 fn service_over(transport: Arc<StubTransport>) -> ConnectorService {
     ConnectorService {
-        client: ComposioClient::new(transport),
+        client: ComposioClient::new(Arc::new(ProxyRoute::new(transport))),
     }
 }
 
@@ -123,23 +123,58 @@ fn the_served_interface_name_matches_the_contract() {
 }
 
 #[test]
-fn the_module_config_parses_the_host_blob() {
+fn the_module_config_selects_the_proxy_route() {
     let config: ModuleConfig = serde_json::from_value(json!({
+        "route": "proxy",
         "base_url": "https://api.example.com",
         "auth_token": "t0ken"
     }))
     .expect("parses");
-    assert_eq!(config.base_url, "https://api.example.com");
+
+    let route = config.into_route().expect("builds");
+    assert_eq!(route.name(), "proxy");
 }
 
 #[test]
-fn the_module_config_requires_a_credential() {
-    // A missing token must fail at load rather than producing a module that
-    // serves every member with a 401.
-    let result = serde_json::from_value::<ModuleConfig>(json!({
-        "base_url": "https://api.example.com"
-    }));
-    assert!(result.is_err());
+fn the_module_config_selects_the_direct_route() {
+    let config: ModuleConfig = serde_json::from_value(json!({
+        "route": "direct",
+        "api_key": "sk-test"
+    }))
+    .expect("parses");
+
+    // No base_url: production takes Composio's own API base.
+    let route = config.into_route().expect("builds");
+    assert_eq!(route.name(), "direct");
+}
+
+#[test]
+fn the_module_config_requires_the_credential_its_route_needs() {
+    // Failing at load beats producing a module that answers every member with
+    // a 401 an hour later.
+    for blob in [
+        json!({ "route": "proxy", "base_url": "https://api.example.com" }),
+        json!({ "route": "direct" }),
+        json!({ "base_url": "https://api.example.com", "auth_token": "t" }),
+    ] {
+        assert!(
+            serde_json::from_value::<ModuleConfig>(blob.clone()).is_err(),
+            "{blob} must be refused"
+        );
+    }
+}
+
+#[test]
+fn the_module_config_refuses_a_base_url_that_would_leak_the_credential() {
+    let config: ModuleConfig = serde_json::from_value(json!({
+        "route": "proxy",
+        "base_url": "http://127.0.0.1:8080@evil.com",
+        "auth_token": "t0ken"
+    }))
+    .expect("parses");
+
+    let error = config.into_route().expect_err("must refuse");
+    assert!(matches!(error, crate::Error::InsecureBaseUrl { .. }));
 }
 
 #[tokio::test]
