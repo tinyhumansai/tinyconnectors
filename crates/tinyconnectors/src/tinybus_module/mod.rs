@@ -395,20 +395,6 @@ impl ConnectorService {
 
 #[tinybus::interface(name = "ai.tinyhumans.connectors.Composio")]
 impl ConnectorService {
-    async fn list_toolkits(&self) -> TinyBusResult<ComposioToolkitsResponse> {
-        self.client()?
-            .list_toolkits()
-            .await
-            .map_err(|error| to_bus_error(&error))
-    }
-
-    async fn list_connections(&self) -> TinyBusResult<ComposioConnectionsResponse> {
-        self.client()?
-            .list_connections()
-            .await
-            .map_err(|error| to_bus_error(&error))
-    }
-
     /// Install or replace the route this module reaches Composio over.
     ///
     /// A host supplies a route at load time, but its credential does not stand
@@ -442,6 +428,20 @@ impl ConnectorService {
             .write()
             .unwrap_or_else(std::sync::PoisonError::into_inner) = Some(ComposioClient::new(route));
         Ok(ComposioConfigureResponse { route: name })
+    }
+
+    async fn list_toolkits(&self) -> TinyBusResult<ComposioToolkitsResponse> {
+        self.client()?
+            .list_toolkits()
+            .await
+            .map_err(|error| to_bus_error(&error))
+    }
+
+    async fn list_connections(&self) -> TinyBusResult<ComposioConnectionsResponse> {
+        self.client()?
+            .list_connections()
+            .await
+            .map_err(|error| to_bus_error(&error))
     }
 
     async fn authorize(
