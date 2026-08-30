@@ -101,6 +101,75 @@ pub struct ComposioAuthorizeResponse {
     pub connection_id: String,
 }
 
+/// Arguments for reading a connected account's identity.
+#[derive(Debug, Clone, Default, Serialize, Deserialize)]
+pub struct ComposioUserProfileRequest {
+    /// Toolkit whose provider knows how to read the profile.
+    pub toolkit: String,
+    /// Connection to read. `None` uses the toolkit's ambient account.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub connection_id: Option<String>,
+}
+
+/// A connected account's identity, as far as its toolkit reports it.
+///
+/// Every field is optional because the toolkits disagree about which they have:
+/// Gmail knows an email, Slack a workspace and display name, `GitHub` a login.
+/// A caller picking a label falls back through them in that order.
+#[derive(Debug, Clone, Default, Serialize, Deserialize)]
+pub struct ComposioUserProfile {
+    /// Toolkit the profile is for.
+    pub toolkit: String,
+    /// Connection the profile was read through.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub connection_id: Option<String>,
+    /// Human name, when the provider reports one.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub display_name: Option<String>,
+    /// Account email.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub email: Option<String>,
+    /// Login or handle.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub username: Option<String>,
+    /// Avatar image URL.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub avatar_url: Option<String>,
+    /// Link to the account on the provider.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub profile_url: Option<String>,
+    /// Anything toolkit-specific, so a new toolkit's interesting field does not
+    /// require widening this shape and every consumer of it.
+    #[serde(default, skip_serializing_if = "serde_json::Value::is_null")]
+    pub extras: serde_json::Value,
+}
+
+/// Response body of the identity-refresh member.
+#[derive(Debug, Clone, Default, Serialize, Deserialize)]
+pub struct ComposioRefreshIdentitiesResponse {
+    /// One profile per connection that could be read.
+    ///
+    /// A connection whose profile could not be read is simply absent: a refresh
+    /// that failed for one account must still report the others, or one broken
+    /// connection hides every working one.
+    #[serde(default)]
+    pub profiles: Vec<ComposioUserProfile>,
+    /// Connections whose profile could not be read, with the reason.
+    #[serde(default)]
+    pub failures: Vec<ComposioIdentityFailure>,
+}
+
+/// One connection whose identity could not be read.
+#[derive(Debug, Clone, Default, Serialize, Deserialize)]
+pub struct ComposioIdentityFailure {
+    /// Connection that failed.
+    pub connection_id: String,
+    /// Toolkit it belongs to.
+    pub toolkit: String,
+    /// Why the read failed.
+    pub message: String,
+}
+
 /// Response body of `DELETE /agent-integrations/composio/connections/:id`.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ComposioDeleteResponse {
