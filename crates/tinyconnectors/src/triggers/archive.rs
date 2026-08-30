@@ -92,7 +92,10 @@ impl TriggerArchive {
         // that `O_APPEND` alone does not guarantee the two lines will not
         // interleave — which would corrupt both records, since JSONL's one
         // guarantee is that a line is a record.
-        file.lock_exclusive()
+        // Fully qualified: `std::fs::File` grew its own inherent `lock` after
+        // this workspace's declared MSRV, and an unqualified call would silently
+        // switch which one is used depending on the toolchain.
+        FileExt::lock(&file)
             .map_err(|error| failed(format!("could not lock the archive file: {error}")))?;
         line.push('\n');
         let written = file.write_all(line.as_bytes()).and_then(|()| file.flush());
