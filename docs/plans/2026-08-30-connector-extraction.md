@@ -203,16 +203,35 @@ the types exist in two places and can drift.
 
 ## Phase 5 — re-import into the hosts
 
-### `openhuman`
+### `openhuman` — partly landed
 
-1. Depend on `tinyconnectors-bus`; load `tinyconnectors` as a module, passing
+Done, on the `connectors-import` branch:
+
+- `vendor/tinyconnectors` added as a submodule, pinned to `main`.
+- `tinyconnectors-bus` taken as a path dependency; the Composio payload types
+  now come from it instead of `tinymemory-api::host::composio`. **This is the
+  change that ends the type duplication**, and it is the one that could land
+  without anything else.
+- A `TINYCONNECTORS` `ModuleRecord` with the real digests from the v0.3.0
+  `checksum.toml`, `LoadPolicy::Lazy`.
+- `integrations::composio::types::reencode` at the two seams where
+  OpenHuman still implements `tinymemory`'s `ComposioHost`, whose signatures use
+  the parallel copy. A re-encode, not a translation — the shapes are identical —
+  and it is deleted along with the trait in phase 4.
+
+Verified: `cargo check --all-targets` clean.
+
+Still to do — replacing the calls themselves:
+
+1. Load the module and pass the config blob, replacing
    the route it selected as the config blob — `{"route": "proxy", …}` for a
    signed-in user, `{"route": "direct", …}` for one with their own key. The
    existing `composio.mode` config and the keychain lookup stay in OpenHuman;
    they now choose a blob instead of constructing a client.
 2. Replace `integrations::composio::client` with bus calls. Keep the
    `integrations::composio` module path — it is referenced across the crate —
-   but reduce it to an adapter.
+   but reduce it to an adapter. The module now loads without configuration, so
+   a signed-out user still gets `ListCapabilities`.
 3. Keep the RPC controllers in `schemas.rs` / `ops.rs`: they are OpenHuman's
    own public surface. Their handlers become bus calls.
 4. `ComposioTriggerSubscriber` keeps listening for
