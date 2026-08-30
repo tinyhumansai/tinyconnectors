@@ -54,7 +54,7 @@ pub mod state;
 pub mod toolkits;
 
 pub use error::{Error, Result};
-pub use pipeline::{ProviderPage, SyncOutcome, run_sync};
+pub use pipeline::{PageSpec, ProviderPage, SyncOutcome, run_sync};
 pub use prefs::{PREFS_NAMESPACE, UserScopePref};
 pub use provider::{
     ActionRunner, ConnectorProvider, ProviderContext, ProviderRegistry, ProviderUserProfile,

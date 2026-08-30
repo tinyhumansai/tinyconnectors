@@ -24,10 +24,12 @@
 //! connection failing consistently, is the difference between a wasted page and
 //! a wasted mailbox.
 
+mod fetch;
 mod json;
 mod page_size;
 mod run;
 
+pub use fetch::{PageSpec, fetch_page};
 pub use json::{first_array, next_page_token, pick_str};
 pub use page_size::{MIN_PAGE_SIZE, is_payload_too_large, shrink_page_size};
 pub use run::{ProviderPage, SyncOutcome, run_sync};
