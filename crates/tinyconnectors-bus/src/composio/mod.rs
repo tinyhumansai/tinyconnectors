@@ -57,7 +57,10 @@ pub use tools::{
 };
 pub use triggers::{
     ComposioActiveTrigger, ComposioActiveTriggersResponse, ComposioAvailableTrigger,
-    ComposioAvailableTriggerRepo, ComposioAvailableTriggersResponse, ComposioCreateTriggerResponse,
-    ComposioDisableTriggerResponse, ComposioEnableTriggerResponse, ComposioTriggerEvent,
-    ComposioTriggerHistoryEntry, ComposioTriggerHistoryResult, ComposioTriggerMetadata,
+    ComposioAvailableTriggerRepo, ComposioAvailableTriggersResponse, ComposioCreateTriggerRequest,
+    ComposioCreateTriggerResponse, ComposioDisableTriggerRequest, ComposioDisableTriggerResponse,
+    ComposioEnableTriggerRequest, ComposioEnableTriggerResponse,
+    ComposioListAvailableTriggersRequest, ComposioListTriggerHistoryRequest,
+    ComposioListTriggersRequest, ComposioTriggerEvent, ComposioTriggerHistoryEntry,
+    ComposioTriggerHistoryResult, ComposioTriggerMetadata,
 };
