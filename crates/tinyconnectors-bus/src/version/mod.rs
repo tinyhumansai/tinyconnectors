@@ -21,9 +21,17 @@ pub const CONTRACT_VERSION: (u32, u32) = (1, 5);
 ///
 /// ```
 /// # use tinyconnectors_bus::{CONTRACT_VERSION, is_compatible};
+/// let (major, minor) = CONTRACT_VERSION;
+///
+/// // A module serving exactly this contract, or a newer minor, binds.
 /// assert!(is_compatible(CONTRACT_VERSION));
-/// assert!(is_compatible((1, 4)));
-/// assert!(!is_compatible((2, 0)));
+/// assert!(is_compatible((major, minor + 1)));
+///
+/// // An older minor does not: it may not serve every member this host names.
+/// assert!(!is_compatible((major, minor.saturating_sub(1))) || minor == 0);
+///
+/// // A different major never binds.
+/// assert!(!is_compatible((major + 1, 0)));
 /// ```
 #[must_use]
 pub fn is_compatible(module: (u32, u32)) -> bool {
