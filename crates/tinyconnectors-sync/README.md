@@ -45,9 +45,26 @@ is how Gmail archives, and classifying it as merely mutating would let a
 read-and-write user have their mail moved by an action they never consented to.
 Wrong in the cautious direction costs an action; wrong the other way costs mail.
 
-## Status
+## The sync loop
 
-Foundations only so far: `scope` and `state`. The provider registry, the
-per-provider catalogs, the pipelines, and the record post-processing are still
-being migrated — see
-[`docs/plans/2026-08-30-connector-extraction.md`](../../docs/plans/2026-08-30-connector-extraction.md).
+A provider reads exactly one page. The loop is in `pipeline`, because the things
+that stop a sync — a request budget, an item limit, a record already ingested —
+are not a provider's business, and a provider that looped internally would have
+to re-implement all three, differently, once per toolkit.
+
+Two behaviours worth knowing:
+
+- **A run that fails part-way keeps what it read, and saves its cursor.** A
+  connection failing on its fifth page must still ingest its first four, and
+  discarding the cursor would re-read those four on every attempt.
+- **An exhausted budget completes, it does not fail.** The budget did its job;
+  a red status on a connection working exactly as configured is worse than
+  none.
+
+## Toolkits
+
+`gmail`, `github`, `notion`, `linear`, `clickup` — each with its curated
+catalog, its profile action, and a `PageSpec` naming where its records live.
+The specs list alternatives per field because Composio wraps provider payloads
+inconsistently, and the same field arrives under different names from different
+endpoints of one API.
