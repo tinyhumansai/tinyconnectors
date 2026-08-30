@@ -9,8 +9,10 @@ use async_trait::async_trait;
 use super::Route;
 use crate::client::Transport;
 use crate::{
-    ComposioAuthorizeResponse, ComposioConnection, ComposioConnectionsResponse,
-    ComposioDeleteResponse, ComposioExecuteResponse, ComposioToolkitsResponse,
+    ComposioActiveTriggersResponse, ComposioAuthorizeResponse, ComposioAvailableTriggersResponse,
+    ComposioConnection, ComposioConnectionsResponse, ComposioCreateTriggerResponse,
+    ComposioDeleteResponse, ComposioDisableTriggerResponse, ComposioEnableTriggerResponse,
+    ComposioExecuteResponse, ComposioGithubReposResponse, ComposioToolkitsResponse,
     ComposioToolsResponse, Error, Result,
 };
 
@@ -115,6 +117,21 @@ impl DirectRoute {
                 // would let an intermittent outage reset a genuinely bad key's
                 // tally and reopen the gate on every blip.
             }
+        }
+    }
+
+    /// Refuse a member this route cannot honestly serve.
+    ///
+    /// Every trigger member lands here. A trigger is a webhook subscription,
+    /// and a webhook has to arrive somewhere: the proxy backend HMAC-verifies
+    /// deliveries and fans them out over the user's sockets, while this module
+    /// has no socket and no public endpoint. A direct-mode subscription would
+    /// be created successfully and then deliver to nobody — a silent failure
+    /// the user would only notice as an automation that never fires.
+    fn unsupported(&self, member: &'static str) -> Error {
+        Error::UnsupportedByRoute {
+            route: self.name(),
+            member,
         }
     }
 
@@ -301,13 +318,57 @@ impl Route for DirectRoute {
 
     async fn delete_connection(&self, _connection_id: &str) -> Result<ComposioDeleteResponse> {
         // The proxy route's delete also clears memory sourced from the
-        // connection, which is a TinyHumans concern Composio knows nothing
+        // connection, which is a `TinyHumans` concern Composio knows nothing
         // about. Wiring a bare v3 delete here would silently drop that half and
         // leave the user's synced content behind after they disconnected.
-        Err(Error::UnsupportedByRoute {
-            route: self.name(),
-            member: "DeleteConnection",
-        })
+        Err(self.unsupported("DeleteConnection"))
+    }
+
+    async fn list_github_repos(
+        &self,
+        _connection_id: Option<&str>,
+    ) -> Result<ComposioGithubReposResponse> {
+        // Only ever used to pick a repository for a GitHub-scoped trigger, and
+        // triggers are unavailable here. Offering the picker without the thing
+        // it picks for would be a dead end.
+        Err(self.unsupported("ListGithubRepos"))
+    }
+
+    async fn list_available_triggers(
+        &self,
+        _toolkit: &str,
+        _connection_id: Option<&str>,
+    ) -> Result<ComposioAvailableTriggersResponse> {
+        Err(self.unsupported("ListAvailableTriggers"))
+    }
+
+    async fn list_triggers(
+        &self,
+        _toolkit: Option<&str>,
+    ) -> Result<ComposioActiveTriggersResponse> {
+        Err(self.unsupported("ListTriggers"))
+    }
+
+    async fn create_trigger(
+        &self,
+        _slug: &str,
+        _connection_id: Option<&str>,
+        _trigger_config: Option<serde_json::Value>,
+    ) -> Result<ComposioCreateTriggerResponse> {
+        Err(self.unsupported("CreateTrigger"))
+    }
+
+    async fn enable_trigger(
+        &self,
+        _connection_id: &str,
+        _slug: &str,
+        _trigger_config: Option<serde_json::Value>,
+    ) -> Result<ComposioEnableTriggerResponse> {
+        Err(self.unsupported("EnableTrigger"))
+    }
+
+    async fn disable_trigger(&self, _trigger_id: &str) -> Result<ComposioDisableTriggerResponse> {
+        Err(self.unsupported("DisableTrigger"))
     }
 }
 
