@@ -128,12 +128,32 @@ pub(crate) enum RouteConfig {
 /// A member that does need a route says so when it is called, naming what is
 /// missing. That is a worse error than a load failure only if you assume every
 /// caller wanted a route; most callers of the capability members did not.
-#[derive(Debug, Clone, Default, Deserialize)]
-#[serde(default)]
+#[derive(Debug, Clone, Default)]
 pub(crate) struct ModuleConfig {
     /// How to reach Composio, when the host has said.
-    #[serde(flatten)]
     route: Option<RouteConfig>,
+}
+
+impl<'de> Deserialize<'de> for ModuleConfig {
+    /// Absent `route` means unconfigured; present but malformed is an error.
+    ///
+    /// Hand-written because the obvious `#[serde(flatten)] Option<RouteConfig>`
+    /// gets this exactly wrong: it turns a *malformed* route into `None`, so a
+    /// blob naming `"proxy"` with a misspelled `auth_token` would load as an
+    /// unconfigured module and silently answer every connector member with
+    /// "no route configured". A typo would disable connectors and look like a
+    /// deliberate choice.
+    fn deserialize<D: serde::Deserializer<'de>>(
+        deserializer: D,
+    ) -> std::result::Result<Self, D::Error> {
+        let value = serde_json::Value::deserialize(deserializer)?;
+        if !value.get("route").is_some_and(|route| !route.is_null()) {
+            return Ok(Self { route: None });
+        }
+        RouteConfig::deserialize(value)
+            .map(|route| Self { route: Some(route) })
+            .map_err(serde::de::Error::custom)
+    }
 }
 
 impl ModuleConfig {

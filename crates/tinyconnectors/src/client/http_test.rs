@@ -33,12 +33,23 @@ fn loopback_server(response_body: &'static str) -> (String, mpsc::Receiver<Strin
         };
         let mut reader = BufReader::new(&stream);
         let mut request = String::new();
+        let mut content_length = 0usize;
         loop {
             let mut line = String::new();
             if reader.read_line(&mut line).unwrap_or(0) == 0 || line == "\r\n" {
                 break;
             }
+            if let Some(value) = line.to_ascii_lowercase().strip_prefix("content-length:") {
+                content_length = value.trim().parse().unwrap_or(0);
+            }
             request.push_str(&line);
+        }
+
+        // Drain the body before replying. Answering a POST without reading its
+        // body makes the client see a connection reset instead of the response.
+        if content_length > 0 {
+            let mut body = vec![0u8; content_length];
+            let _ = std::io::Read::read_exact(&mut reader, &mut body);
         }
         let _ = sender.send(request);
 
