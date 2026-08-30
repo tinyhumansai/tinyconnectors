@@ -252,12 +252,90 @@ fn a_known_action_resolves_through_its_catalog() {
 }
 
 #[test]
-fn no_toolkit_ingests_anything_yet_and_the_matrix_says_so() {
-    // The pipelines are the next part of the migration. Reporting
-    // `initial_sync: true` here would promise a sync that never runs.
+fn every_toolkit_reports_a_complete_capability_row() {
     for row in default_registry().capabilities().capabilities {
         assert!(row.curated_tools, "{}", row.toolkit);
         assert!(row.tool_execution, "{}", row.toolkit);
         assert!(row.user_profile, "{}", row.toolkit);
+        assert!(row.initial_sync, "{}", row.toolkit);
+        assert!(row.periodic_sync, "{}", row.toolkit);
+        assert!(row.memory_ingest, "{}", row.toolkit);
     }
+}
+
+#[tokio::test]
+async fn every_toolkit_reads_a_page_into_records() {
+    // The payload shapes differ per toolkit, so each is given the envelope its
+    // own spec names. What is checked is that the spec and the reader agree.
+    let payloads = [
+        (
+            "gmail",
+            json!({ "data": { "messages": [{ "id": "m1", "subject": "Hi", "snippet": "there" }] } }),
+        ),
+        (
+            "github",
+            json!({ "data": { "items": [{ "id": 7, "title": "A bug", "body": "steps" }] } }),
+        ),
+        (
+            "notion",
+            json!({ "data": { "results": [{ "id": "p1", "title": "Notes", "content": "text" }] } }),
+        ),
+        (
+            "linear",
+            json!({ "data": { "issues": [{ "id": "i1", "title": "Task", "description": "do it" }] } }),
+        ),
+        (
+            "clickup",
+            json!({ "data": { "tasks": [{ "id": "t1", "name": "Chore", "description": "soon" }] } }),
+        ),
+    ];
+
+    for (toolkit, payload) in payloads {
+        let (_actions, context) = context(toolkit, payload);
+        let page = default_registry()
+            .get(toolkit)
+            .unwrap()
+            .fetch_page(&context, None)
+            .await
+            .unwrap();
+
+        assert_eq!(page.records.len(), 1, "{toolkit} read no record");
+        assert!(!page.records[0].item_id.is_empty(), "{toolkit} has no id");
+        assert!(!page.records[0].title.is_empty(), "{toolkit} has no title");
+        assert!(!page.records[0].content.is_empty(), "{toolkit} has no body");
+    }
+}
+
+#[tokio::test]
+async fn every_toolkit_asks_its_own_fetch_action() {
+    for toolkit in ["gmail", "github", "notion", "linear", "clickup"] {
+        let (actions, context) = context(toolkit, json!({}));
+        default_registry()
+            .get(toolkit)
+            .unwrap()
+            .fetch_page(&context, None)
+            .await
+            .unwrap();
+
+        let action = actions.last_action.lock().unwrap().clone().unwrap();
+        assert_eq!(
+            crate::scope::toolkit_from_slug(&action).as_deref(),
+            Some(toolkit),
+            "{toolkit} fetches with {action}, which belongs to another toolkit"
+        );
+    }
+}
+
+#[tokio::test]
+async fn a_github_numeric_id_becomes_a_record_id() {
+    // GitHub reports ids as numbers; a dedupe key has to be a string, and
+    // dropping the record for its type would lose every issue.
+    let (_actions, context) = context("github", json!({ "data": { "items": [{ "id": 42 }] } }));
+    let page = default_registry()
+        .get("github")
+        .unwrap()
+        .fetch_page(&context, None)
+        .await
+        .unwrap();
+    assert_eq!(page.records[0].item_id, "42");
 }

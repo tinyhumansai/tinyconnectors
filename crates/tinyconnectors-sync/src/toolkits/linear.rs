@@ -3,9 +3,9 @@
 use async_trait::async_trait;
 
 use super::identity::pick;
-use crate::pipeline::{PageSpec, ProviderPage, fetch_page};
 use super::linear_catalog::CURATED;
 use crate::Result;
+use crate::pipeline::{PageSpec, ProviderPage, fetch_page};
 use crate::provider::{ConnectorProvider, ProviderContext, ProviderUserProfile};
 use crate::scope::CuratedTool;
 
@@ -16,7 +16,12 @@ use crate::scope::CuratedTool;
 /// different endpoints of the same API.
 const PAGE: PageSpec = PageSpec {
     action: "LINEAR_LIST_LINEAR_ISSUES",
-    item_pointers: &["/data/issues", "/issues", "/data/data/issues", "/data/nodes"],
+    item_pointers: &[
+        "/data/issues",
+        "/issues",
+        "/data/data/issues",
+        "/data/nodes",
+    ],
     id_paths: &["id", "identifier"],
     title_paths: &["title"],
     content_paths: &["description", "descriptionData"],

@@ -4,8 +4,8 @@ use async_trait::async_trait;
 
 use super::gmail_catalog::CURATED;
 use super::identity::pick;
-use crate::pipeline::{PageSpec, ProviderPage, fetch_page};
 use crate::Result;
+use crate::pipeline::{PageSpec, ProviderPage, fetch_page};
 use crate::provider::{ConnectorProvider, ProviderContext, ProviderUserProfile};
 use crate::scope::CuratedTool;
 
@@ -16,7 +16,12 @@ use crate::scope::CuratedTool;
 /// different endpoints of the same API.
 const PAGE: PageSpec = PageSpec {
     action: "GMAIL_FETCH_EMAILS",
-    item_pointers: &["/data/messages", "/data/data/messages", "/messages", "/data/items"],
+    item_pointers: &[
+        "/data/messages",
+        "/data/data/messages",
+        "/messages",
+        "/data/items",
+    ],
     id_paths: &["id", "messageId", "message_id"],
     title_paths: &["subject", "payload.headers.0.value"],
     content_paths: &["messageText", "snippet", "body", "preview"],

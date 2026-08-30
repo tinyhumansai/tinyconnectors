@@ -3,9 +3,9 @@
 use async_trait::async_trait;
 
 use super::identity::pick;
-use crate::pipeline::{PageSpec, ProviderPage, fetch_page};
 use super::notion_catalog::CURATED;
 use crate::Result;
+use crate::pipeline::{PageSpec, ProviderPage, fetch_page};
 use crate::provider::{ConnectorProvider, ProviderContext, ProviderUserProfile};
 use crate::scope::CuratedTool;
 

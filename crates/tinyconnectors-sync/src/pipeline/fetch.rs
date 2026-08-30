@@ -11,8 +11,8 @@ use tinyconnectors_bus::ConnectorRecord;
 
 use super::json::{first_array, next_page_token, pick_str};
 use super::run::ProviderPage;
-use crate::provider::ProviderContext;
 use crate::Result;
+use crate::provider::ProviderContext;
 
 /// How one toolkit's page read is shaped.
 #[derive(Debug, Clone, Copy)]
@@ -82,8 +82,7 @@ fn page_from(payload: &Value, spec: &PageSpec) -> ProviderPage {
             // Falls back to the whole item: a record with no recognizable body
             // field still carries something an agent can read, which beats
             // ingesting an empty one.
-            content: pick_str(item, spec.content_paths)
-                .unwrap_or_else(|| item.to_string()),
+            content: pick_str(item, spec.content_paths).unwrap_or_else(|| item.to_string()),
             mime: Some("text/plain".to_string()),
             url: pick_str(item, spec.url_paths),
             updated_at_ms: None,

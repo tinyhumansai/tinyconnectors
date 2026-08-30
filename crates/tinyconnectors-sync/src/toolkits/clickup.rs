@@ -4,8 +4,8 @@ use async_trait::async_trait;
 
 use super::clickup_catalog::CURATED;
 use super::identity::pick;
-use crate::pipeline::{PageSpec, ProviderPage, fetch_page};
 use crate::Result;
+use crate::pipeline::{PageSpec, ProviderPage, fetch_page};
 use crate::provider::{ConnectorProvider, ProviderContext, ProviderUserProfile};
 use crate::scope::CuratedTool;
 

@@ -74,7 +74,10 @@ fn collects_a_version_only_when_the_item_reports_one() {
 #[test]
 fn reads_the_next_cursor_from_the_envelope() {
     let payload = json!({ "messages": [], "nextPageToken": "p2" });
-    assert_eq!(page_from(&payload, &SPEC).next_cursor.as_deref(), Some("p2"));
+    assert_eq!(
+        page_from(&payload, &SPEC).next_cursor.as_deref(),
+        Some("p2")
+    );
 }
 
 #[test]

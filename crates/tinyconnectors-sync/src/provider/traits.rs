@@ -1,11 +1,11 @@
 //! The provider trait and its value types.
 
+use super::context::ProviderContext;
+use crate::Result;
+use crate::pipeline::ProviderPage;
+use crate::scope::CuratedTool;
 use async_trait::async_trait;
 use serde::{Deserialize, Serialize};
-use super::context::ProviderContext;
-use crate::pipeline::ProviderPage;
-use crate::Result;
-use crate::scope::CuratedTool;
 
 /// Why a sync run was started.
 ///

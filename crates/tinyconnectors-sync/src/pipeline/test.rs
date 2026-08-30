@@ -59,7 +59,11 @@ fn reads_a_page_token_from_any_envelope_shape() {
         json!({ "data": { "data": { "nextPageToken": "t" } } }),
         json!({ "next_page_token": "t" }),
     ] {
-        assert_eq!(next_page_token(&envelope).as_deref(), Some("t"), "{envelope}");
+        assert_eq!(
+            next_page_token(&envelope).as_deref(),
+            Some("t"),
+            "{envelope}"
+        );
     }
 }
 
@@ -222,10 +226,8 @@ fn context(store: Arc<MemoryStore>, max_items: usize) -> ProviderContext {
 
 #[tokio::test]
 async fn pages_until_the_provider_runs_out() {
-    let provider = ScriptedProvider::new(vec![
-        page(&["m1", "m2"], Some("p2")),
-        page(&["m3"], None),
-    ]);
+    let provider =
+        ScriptedProvider::new(vec![page(&["m1", "m2"], Some("p2")), page(&["m3"], None)]);
     let store = Arc::new(MemoryStore::default());
 
     let outcome = run_sync(&provider, &context(store, 100), SyncReason::Manual)

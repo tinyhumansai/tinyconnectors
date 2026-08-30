@@ -2,9 +2,9 @@
 
 use tinyconnectors_bus::{ConnectorRecord, ConnectorRecordBatch, SyncStage};
 
+use crate::Result;
 use crate::provider::{ConnectorProvider, ProviderContext, SyncReason};
 use crate::state::SyncState;
-use crate::Result;
 
 /// One page as a provider read it.
 #[derive(Debug, Clone, Default, PartialEq, Eq)]
