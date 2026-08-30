@@ -347,9 +347,11 @@ impl ConnectorService {
         request: ComposioAuthorizeRequest,
     ) -> TinyBusResult<ComposioAuthorizeResponse> {
         let toolkit = request.toolkit.clone();
+        // Resolved once, outside the retry: a missing route is not something a
+        // second attempt fixes.
+        let client = self.client()?;
         let result = crate::oauth::authorize_with_rate_limit_retry(|| {
-            self.client()?
-                .authorize(&request.toolkit, request.extra_params.clone())
+            client.authorize(&request.toolkit, request.extra_params.clone())
         })
         .await;
 
