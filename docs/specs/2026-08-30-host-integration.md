@@ -1,6 +1,7 @@
 # Host integration
 
-**Status:** accepted, blocked on a release. Implements phase 5 of
+**Status:** accepted; the vocabulary swap and module record have landed.
+Implements phase 5 of
 [the extraction plan](../plans/2026-08-30-connector-extraction.md).
 
 ## What a host has to do
@@ -36,11 +37,15 @@ without a release.
 
 ## 2. Loading the module
 
-**This is what the work is blocked on.** OpenHuman's `ModuleRecord` carries a
-release URL and a SHA-256 per platform archive, and the loader verifies the
-digest before initializing. Those digests can only come from a real release —
-run the `release.yml` workflow (`workflow_dispatch`, `minor`), then read them
-off the published `checksum.toml`.
+OpenHuman's `ModuleRecord` carries a release URL and a SHA-256 per platform
+archive, and the loader verifies the digest before initializing. Those digests
+come from a real release: run the `release.yml` workflow
+(`workflow_dispatch`), then read them off the published `checksum.toml`. This
+is done for v0.3.0.
+
+**The module loads with no configuration**, so `LoadPolicy::Lazy` is safe even
+for a signed-out user: the capability members answer, and a member that needs a
+route says which one is missing when it is called.
 
 The record follows the shape of `TINYMCP` in
 `src/openhuman/modules/registry.rs`:
