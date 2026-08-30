@@ -1,4 +1,4 @@
-//! The ClickUp provider.
+//! The `ClickUp` provider.
 
 use async_trait::async_trait;
 
@@ -11,7 +11,7 @@ use crate::scope::CuratedTool;
 /// The action that reads the connected account's identity.
 const PROFILE_ACTION: &str = "CLICKUP_GET_AUTHORIZED_USER";
 
-/// ClickUp as a connector toolkit.
+/// `ClickUp` as a connector toolkit.
 #[derive(Debug, Default, Clone, Copy)]
 pub struct ClickupProvider;
 
@@ -22,7 +22,7 @@ impl ConnectorProvider for ClickupProvider {
     }
 
     fn description(&self) -> &'static str {
-        "Read ClickUp tasks and spaces, and ingest them as memory."
+        "Read `ClickUp` tasks and spaces, and ingest them as memory."
     }
 
     fn curated_tools(&self) -> Option<&'static [CuratedTool]> {

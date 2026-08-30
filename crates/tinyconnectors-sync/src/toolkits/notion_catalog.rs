@@ -7,7 +7,7 @@ use crate::scope::{CuratedTool, ToolScope};
 /// Composio publishes far more than this. The long tail is edge-case
 /// administration an agent never plans for, and offering all of it makes the
 /// model's tool list worse, not better.
-pub const CURATED: &[CuratedTool] = &[
+pub(super) const CURATED: &[CuratedTool] = &[
     CuratedTool {
         slug: "NOTION_SEARCH_NOTION_PAGE",
         scope: ToolScope::Read,

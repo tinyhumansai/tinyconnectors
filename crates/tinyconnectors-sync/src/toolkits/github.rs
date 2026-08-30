@@ -46,7 +46,6 @@ impl ConnectorProvider for GithubProvider {
             // The whole payload, so a caller wanting a field this shape does
             // not name can still reach it.
             extras: payload,
-            ..ProviderUserProfile::default()
         })
     }
 }
