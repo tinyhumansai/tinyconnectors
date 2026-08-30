@@ -123,9 +123,70 @@ impl ComposioClient {
 
         merge_required_oauth_scopes(&mut body, toolkit);
 
+        // Clear abandoned handoffs first, for the toolkits where they cost
+        // something. See `clear_stale_handoffs`.
+        let cleared = self.clear_stale_handoffs(toolkit).await;
+        if cleared > 0 {
+            tracing::info!(
+                toolkit = %toolkit,
+                cleared,
+                "[connectors][oauth] cleared stale handoffs before authorizing"
+            );
+        }
+
         self.route
             .authorize(toolkit, &serde_json::Value::Object(body))
             .await
+    }
+
+    /// Delete this toolkit's abandoned handoff rows, and report how many went.
+    ///
+    /// Only for Meta-hosted toolkits, and only because of how they fail: every
+    /// authorize creates a connection row immediately, in a non-active state, and
+    /// Instagram and Facebook share an OAuth host that returns HTTP 429 once too
+    /// many sessions exist in a short window. A user who clicks Connect, hesitates
+    /// and clicks again is the ordinary way to get there — and the rate limit then
+    /// blocks the retry that would have worked.
+    ///
+    /// **Best-effort on purpose.** Every failure here is swallowed and logged: the
+    /// user asked to connect an account, and refusing to start the handoff because
+    /// the *cleanup* failed would turn a possible rate limit into a certain
+    /// failure. The count is returned rather than the errors for the same reason —
+    /// no caller has anything to do with them.
+    async fn clear_stale_handoffs(&self, toolkit: &str) -> u32 {
+        if !crate::oauth::is_meta_oauth_toolkit(toolkit) {
+            return 0;
+        }
+
+        let wanted = toolkit.trim().to_ascii_lowercase();
+        let Ok(response) = self.route.list_connections().await else {
+            tracing::warn!(
+                toolkit = %toolkit,
+                "[connectors][oauth] could not list connections to clear stale handoffs; \
+                 continuing to authorize"
+            );
+            return 0;
+        };
+
+        let mut cleared = 0;
+        for connection in response.connections {
+            if connection.normalized_toolkit() != wanted
+                || connection.is_active()
+                || !crate::oauth::is_clearable_oauth_status(&connection.status)
+            {
+                continue;
+            }
+            match self.route.delete_connection(&connection.id).await {
+                Ok(_) => cleared += 1,
+                Err(error) => tracing::warn!(
+                    toolkit = %toolkit,
+                    connection_id = %connection.id,
+                    %error,
+                    "[connectors][oauth] could not clear a stale handoff; continuing"
+                ),
+            }
+        }
+        cleared
     }
 
     /// Disconnect a connection.
