@@ -22,6 +22,7 @@
 //!
 //! - [`scope`] — how invasive an action is, and the curated catalogs that keep
 //!   a toolkit's sixty-odd actions from all reaching the agent.
+//! - [`prefs`] — what the user has allowed an agent to do with each toolkit.
 //! - [`provider`] — what a connector knows about one toolkit, and the registry
 //!   that looks one up by slug.
 //! - [`state`] — per-connection cursors, dedupe sets, and the daily request
@@ -43,12 +44,14 @@
 //! ```
 
 mod error;
+pub mod prefs;
 pub mod provider;
 pub mod scope;
 pub mod state;
 pub mod toolkits;
 
 pub use error::{Error, Result};
+pub use prefs::{PREFS_NAMESPACE, UserScopePref};
 pub use provider::{
     ActionRunner, ConnectorProvider, ProviderContext, ProviderRegistry, ProviderUserProfile,
     SyncLimits, SyncReason,
