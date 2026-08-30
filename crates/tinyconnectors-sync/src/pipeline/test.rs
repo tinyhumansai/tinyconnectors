@@ -223,8 +223,10 @@ fn context(store: Arc<MemoryStore>, max_items: usize) -> ProviderContext {
 
 #[tokio::test]
 async fn pages_until_the_provider_runs_out() {
-    let provider =
-        ScriptedProvider::new(vec![page(&["m1", "m2"], Some("p2")), page(&["m3"], None)]);
+    let provider = ScriptedProvider::new(vec![
+        Ok(page(&["m1", "m2"], Some("p2"))),
+        Ok(page(&["m3"], None)),
+    ]);
     let store = Arc::new(MemoryStore::default());
 
     let outcome = run_sync(&provider, &context(store, 100), SyncReason::Manual)
