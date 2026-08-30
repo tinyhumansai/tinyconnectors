@@ -305,12 +305,13 @@ impl ConnectorService {
 
     // The registry is in memory: there is nothing to await. `async` is the
     // shape the interface macro dispatches, not a claim about the work.
-    #[allow(clippy::unused_async_trait_impl)]
+    #[allow(clippy::unused_async, clippy::unused_async_trait_impl)]
     async fn list_capabilities(&self) -> TinyBusResult<ComposioCapabilitiesResponse> {
         Ok(self.registry.capabilities())
     }
 
-    #[allow(clippy::unused_async_trait_impl)] // Same: reads the registry.
+    // Same: reads the registry.
+    #[allow(clippy::unused_async, clippy::unused_async_trait_impl)]
     async fn list_agent_ready_toolkits(&self) -> TinyBusResult<ComposioAgentReadyToolkitsResponse> {
         Ok(ComposioAgentReadyToolkitsResponse {
             toolkits: self.registry.agent_ready_toolkits(),
