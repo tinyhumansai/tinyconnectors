@@ -56,7 +56,7 @@ async fn the_proxy_route_reads_the_payload_out_of_the_backend_envelope() {
         "success": true,
         "data": { "toolkits": ["gmail", "slack"] },
     })));
-    let route = ProxyRoute::new(transport);
+    let route = ProxyRoute::new(transport as Arc<dyn Transport>);
 
     let response = route.list_toolkits().await.expect("decodes");
     assert_eq!(response.toolkits, vec!["gmail", "slack"]);
@@ -70,7 +70,7 @@ async fn an_unwrapped_reply_is_still_decoded_as_the_payload() {
     let transport = Arc::new(FakeTransport::replying(json!({
         "toolkits": ["gmail"],
     })));
-    let route = ProxyRoute::new(transport);
+    let route = ProxyRoute::new(transport as Arc<dyn Transport>);
 
     let response = route.list_toolkits().await.expect("decodes");
     assert_eq!(response.toolkits, vec!["gmail"]);
@@ -86,7 +86,7 @@ async fn a_failed_envelope_is_an_error_carrying_what_the_backend_said() {
         "success": false,
         "error": "Toolkit `notion` is not enabled for this account",
     })));
-    let route = ProxyRoute::new(transport);
+    let route = ProxyRoute::new(transport as Arc<dyn Transport>);
 
     let error = route.list_toolkits().await.unwrap_err().to_string();
     assert!(error.contains("notion"), "{error}");
@@ -96,7 +96,7 @@ async fn a_failed_envelope_is_an_error_carrying_what_the_backend_said() {
 #[tokio::test]
 async fn a_successful_envelope_with_no_data_is_an_error_rather_than_an_empty_answer() {
     let transport = Arc::new(FakeTransport::replying(json!({ "success": true })));
-    let route = ProxyRoute::new(transport);
+    let route = ProxyRoute::new(transport as Arc<dyn Transport>);
 
     let error = route.list_toolkits().await.unwrap_err().to_string();
     assert!(error.contains("no data"), "{error}");
