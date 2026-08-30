@@ -38,6 +38,21 @@ pub struct ComposioToolFunction {
     pub output_parameters: Option<serde_json::Value>,
 }
 
+/// Arguments for listing a toolkit's tools.
+#[derive(Debug, Clone, Default, Serialize, Deserialize)]
+pub struct ComposioListToolsRequest {
+    /// Toolkit slugs to list tools for. Empty means every connected toolkit,
+    /// which is a large answer — callers normally name what they need.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub toolkits: Vec<String>,
+    /// Composio action tags to filter by.
+    ///
+    /// OR semantics: more tags broaden the result rather than narrowing it,
+    /// which is the opposite of what the word "filter" suggests.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub tags: Vec<String>,
+}
+
 /// Response body of `GET /agent-integrations/composio/tools`.
 #[derive(Debug, Clone, Default, Serialize, Deserialize)]
 pub struct ComposioToolsResponse {

@@ -6,7 +6,9 @@
 
 mod types;
 
-pub use types::{ComposioToolFunction, ComposioToolSchema, ComposioToolsResponse};
+pub use types::{
+    ComposioListToolsRequest, ComposioToolFunction, ComposioToolSchema, ComposioToolsResponse,
+};
 
 #[cfg(test)]
 mod test;

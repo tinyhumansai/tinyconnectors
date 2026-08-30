@@ -2,6 +2,23 @@
 
 use serde::{Deserialize, Serialize};
 
+/// Arguments for running one action.
+#[derive(Debug, Clone, Default, Serialize, Deserialize)]
+pub struct ComposioExecuteRequest {
+    /// Action slug, e.g. `"GMAIL_SEND_EMAIL"`.
+    pub tool: String,
+    /// Action arguments. Must be a JSON object when present.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub arguments: Option<serde_json::Value>,
+    /// Connection to run against.
+    ///
+    /// `None` uses the ambient account for the toolkit, which is only
+    /// unambiguous when the user has exactly one. Name the connection whenever
+    /// the caller knows which it means.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub connection_id: Option<String>,
+}
+
 /// Response body of `POST /agent-integrations/composio/execute`.
 #[derive(Debug, Clone, Default, Serialize, Deserialize)]
 pub struct ComposioExecuteResponse {

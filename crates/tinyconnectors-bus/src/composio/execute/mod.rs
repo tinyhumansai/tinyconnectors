@@ -6,7 +6,7 @@
 
 mod types;
 
-pub use types::ComposioExecuteResponse;
+pub use types::{ComposioExecuteRequest, ComposioExecuteResponse};
 
 #[cfg(test)]
 mod test;

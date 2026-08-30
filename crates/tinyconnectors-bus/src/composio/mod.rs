@@ -44,13 +44,15 @@ pub use connections::{
     ComposioAuthorizeRequest, ComposioAuthorizeResponse, ComposioConnection,
     ComposioConnectionsResponse, ComposioDeleteConnectionRequest, ComposioDeleteResponse,
 };
-pub use execute::ComposioExecuteResponse;
+pub use execute::{ComposioExecuteRequest, ComposioExecuteResponse};
 pub use github::{ComposioGithubRepo, ComposioGithubReposResponse};
 pub use toolkits::{
     ComposioAgentReadyToolkitsResponse, ComposioCapabilitiesResponse, ComposioCapability,
     ComposioToolkitCatalogEntry, ComposioToolkitsResponse,
 };
-pub use tools::{ComposioToolFunction, ComposioToolSchema, ComposioToolsResponse};
+pub use tools::{
+    ComposioListToolsRequest, ComposioToolFunction, ComposioToolSchema, ComposioToolsResponse,
+};
 pub use triggers::{
     ComposioActiveTrigger, ComposioActiveTriggersResponse, ComposioAvailableTrigger,
     ComposioAvailableTriggerRepo, ComposioAvailableTriggersResponse, ComposioCreateTriggerResponse,
