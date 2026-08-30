@@ -66,6 +66,19 @@ pub enum Error {
         message: String,
     },
 
+    /// The trigger archive could not be read or written.
+    ///
+    /// A delivery that cannot be archived is still delivered — the archive is a
+    /// record, not the mechanism — so this surfaces on the history member
+    /// rather than silently dropping a webhook.
+    #[error("trigger archive at {path} failed: {message}")]
+    Archive {
+        /// Path the operation was for.
+        path: String,
+        /// What went wrong.
+        message: String,
+    },
+
     /// The selected route does not offer this operation.
     ///
     /// The two routes are not equivalent, and pretending otherwise is worse

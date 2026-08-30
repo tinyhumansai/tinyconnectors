@@ -39,6 +39,7 @@
 //! - `src/oauth/` holds the account-linking policy.
 //! - `src/execute/` holds the action pipeline: argument preparation, the retry
 //!   policies, and failure classification.
+//! - `src/triggers/` holds the archive of webhook deliveries.
 //! - `tinybus_module` adapts the public behavior to `TinyBus` and exports the
 //!   module descriptor, embedded manifest, and initialization entrypoint.
 //!
@@ -70,6 +71,7 @@ mod error;
 pub mod execute;
 pub mod oauth;
 mod tinybus_module;
+pub mod triggers;
 
 pub use error::{Error, Result};
 
