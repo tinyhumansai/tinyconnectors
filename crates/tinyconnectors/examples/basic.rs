@@ -7,7 +7,7 @@
 //! cargo run --example basic
 //! ```
 
-use template::{Result, greet};
+use tinyconnectors::{Result, greet};
 
 fn main() -> Result<()> {
     println!("{}", greet("Rust")?);

@@ -1,15 +1,15 @@
 [package]
-name = "template"
+name = "tinyconnectors"
 version.workspace = true
 edition.workspace = true
 rust-version.workspace = true
 license.workspace = true
 repository.workspace = true
-description = "A production-ready template for installable TinyBus modules."
-documentation = "https://docs.rs/template"
+description = "OAuth connector integrations (Composio and future backends) as an installable TinyBus module."
+documentation = "https://docs.rs/tinyconnectors"
 readme = "../../README.md"
-keywords = ["tinybus", "module", "plugin", "template"]
-categories = ["development-tools"]
+keywords = ["tinybus", "oauth", "composio", "connectors"]
+categories = ["api-bindings"]
 publish = false
 
 [lib]
@@ -20,9 +20,9 @@ crate-type = ["rlib", "cdylib"]
 [dependencies]
 # The wire contract: member names, payload types, and the contract version.
 # Re-exported wholesale from `src/lib.rs` so a consumer takes one dependency
-# rather than two, and so `template::GreetRequest` and
-# `template_bus::GreetRequest` are the same type.
-template-bus = { workspace = true }
+# rather than two, and so `tinyconnectors::GreetRequest` and
+# `tinyconnectors_bus::GreetRequest` are the same type.
+tinyconnectors-bus = { workspace = true }
 tinybus = { workspace = true }
 tinybus-module = { workspace = true }
 thiserror = { workspace = true }
