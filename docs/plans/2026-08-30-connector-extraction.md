@@ -154,6 +154,36 @@ lands, as a minor contract bump.
 
 ## Phase 4 — retire `ComposioHost` from tinymemory
 
+> **Ordering correction.** This plan originally put phase 4 before phase 5.
+> That is wrong, and attempting it showed why: deleting the Composio tree from
+> `tinymemory-core` does not compile, because five things outside that tree
+> still call into it —
+>
+> | caller | what it calls |
+> | --- | --- |
+> | `engine/sync.rs` | `run_composio_connection`, `run_gmail_backfill`, `run_slack_search_backfill`, `syncable_composio_toolkits` |
+> | `sources/reconcile.rs` | `scan_active_sync_targets` |
+> | `sources/sync.rs` | `ComposioUsage` |
+> | `store/entities.rs` | `is_self_identity_any_toolkit`, `IdentityKind` |
+> | `sync/workspace/periodic.rs` | the Composio scheduler |
+> | `sources/readers/mod.rs` | `ComposioReader` for `SourceKind::Composio` |
+>
+> These are behaviours to be **replaced**, not removed: something still has to
+> reconcile a user's Composio sources and run their Gmail backfill. After phase
+> 5 that something is the host, calling the module. Until then, deleting them
+> deletes the feature.
+>
+> So: **phase 5 first, then phase 4.** Phase 4 then becomes what it was always
+> supposed to be — a pure deletion of code nothing calls.
+>
+> One detail worth carrying: `SourceKind::Composio` should *stay*. Memory still
+> holds such sources; it just no longer reads them. `sources::readers::reader_for`
+> becomes `-> Option<Box<dyn SourceReader>>` returning `None` for that kind —
+> an `Option` rather than a reader that always errors, because "memory does not
+> read this kind" is a routing fact a caller acts on, while a perpetually
+> failing reader looks like a broken integration.
+
+
 `tinymemory-core/src/composio_host.rs` is a global `RwLock<Option<Arc<dyn
 ComposioHost>>>` that memory sync reaches through to call Composio. After
 phase 3 there is nothing in tinymemory that needs it.
@@ -199,8 +229,8 @@ it needs connections and execute, not the trigger or catalog surface.
 
 ## Sequencing note
 
-Phases 2 and 3 are independent and can run in parallel; both must land before
-phase 4, and phase 4 before phase 5 for either host.
+Phases 2 and 3 are independent and both landed. **Phase 5 must precede phase
+4** — see the correction at the top of phase 4.
 
 Both open design questions are settled — records out rather than memory writes,
 and routing in the module with selection in the host — and the memory-read seam
