@@ -25,6 +25,9 @@
 //! - [`prefs`] — what the user has allowed an agent to do with each toolkit.
 //! - [`pipeline`] — the loop around a provider's page: cursors, budgets, item
 //!   limits, and dedupe.
+//! - [`clean`] — cutting quoted chains and boilerplate out of a body before it
+//!   is ingested, so a mailbox's worth of identical footers does not dominate
+//!   every search run over the result.
 //! - [`provider`] — what a connector knows about one toolkit, and the registry
 //!   that looks one up by slug.
 //! - [`state`] — per-connection cursors, dedupe sets, and the daily request
@@ -45,6 +48,7 @@
 //! assert_eq!(toolkit_from_slug("GMAIL_SEND_EMAIL").as_deref(), Some("gmail"));
 //! ```
 
+pub mod clean;
 mod error;
 pub mod pipeline;
 pub mod prefs;
@@ -53,6 +57,7 @@ pub mod scope;
 pub mod state;
 pub mod toolkits;
 
+pub use clean::clean_body;
 pub use error::{Error, Result};
 pub use pipeline::{PageSpec, ProviderPage, SyncOutcome, run_sync};
 pub use prefs::{PREFS_NAMESPACE, UserScopePref};
