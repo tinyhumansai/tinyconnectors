@@ -70,7 +70,7 @@ pub struct ComposioConnectionsResponse {
 pub struct ComposioAuthorizeRequest {
     /// Toolkit slug to authorize. Must be on the backend allowlist.
     pub toolkit: String,
-    /// Extra body fields for toolkits that need them — a WhatsApp Business
+    /// Extra body fields for toolkits that need them — a `WhatsApp` Business
     /// account id, for instance.
     ///
     /// Keys the backend derives itself are refused rather than merged: a value

@@ -71,7 +71,7 @@ impl ComposioClient {
     ///
     /// `extra_params` is merged into the request body for toolkits that need
     /// fields Composio would otherwise reject the authorization without — a
-    /// WhatsApp Business account id, for instance. Keys the backend derives
+    /// `WhatsApp` Business account id, for instance. Keys the backend derives
     /// itself are refused rather than silently dropped.
     ///
     /// The returned URL is the handoff: the user opens it, and the connection

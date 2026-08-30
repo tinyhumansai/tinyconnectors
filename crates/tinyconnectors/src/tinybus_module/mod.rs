@@ -33,15 +33,18 @@ use tinyconnectors_bus::{
 use crate::client::{ComposioClient, HttpTransport};
 
 /// Configuration the host hands the module at load time.
+///
+/// Reachable only through `module_export!`, which names the type in the ABI
+/// entrypoint it generates; nothing re-exports it from the crate root.
 #[derive(Debug, Clone, Deserialize)]
-pub struct ModuleConfig {
+pub(crate) struct ModuleConfig {
     /// Base URL of the connector backend, e.g. `https://api.example.com`.
-    pub base_url: String,
+    pub(crate) base_url: String,
     /// Bearer token for the signed-in user.
     ///
     /// Never logged and never returned through a member — see
     /// `HttpTransport`'s hand-written `Debug`.
-    pub auth_token: String,
+    pub(crate) auth_token: String,
 }
 
 struct ConnectorService {
@@ -51,11 +54,11 @@ struct ConnectorService {
 #[tinybus::interface(name = "ai.tinyhumans.connectors.Composio")]
 impl ConnectorService {
     async fn list_toolkits(&self) -> TinyBusResult<ComposioToolkitsResponse> {
-        self.client.list_toolkits().await.map_err(to_bus_error)
+        self.client.list_toolkits().await.map_err(|error| to_bus_error(&error))
     }
 
     async fn list_connections(&self) -> TinyBusResult<ComposioConnectionsResponse> {
-        self.client.list_connections().await.map_err(to_bus_error)
+        self.client.list_connections().await.map_err(|error| to_bus_error(&error))
     }
 
     async fn authorize(
@@ -71,7 +74,7 @@ impl ConnectorService {
 
         result
             .map_err(|error| crate::oauth::wrap_authorize_rate_limit_error(&toolkit, error))
-            .map_err(to_bus_error)
+            .map_err(|error| to_bus_error(&error))
     }
 
     async fn delete_connection(
@@ -81,12 +84,12 @@ impl ConnectorService {
         self.client
             .delete_connection(&request.connection_id)
             .await
-            .map_err(to_bus_error)
+            .map_err(|error| to_bus_error(&error))
     }
 }
 
 /// Flatten a crate error onto the bus.
-fn to_bus_error(error: crate::Error) -> tinybus::Error {
+fn to_bus_error(error: &crate::Error) -> tinybus::Error {
     tinybus::Error::failed(error.to_string())
 }
 
