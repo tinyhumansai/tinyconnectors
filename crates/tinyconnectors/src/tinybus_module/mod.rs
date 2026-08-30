@@ -36,15 +36,21 @@ use std::sync::Arc;
 use serde::Deserialize;
 use tinybus::{Connection, Result as TinyBusResult};
 use tinyconnectors_bus::{
-    ComposioAuthorizeRequest, ComposioAuthorizeResponse, ComposioConnectionsResponse,
-    ComposioDeleteConnectionRequest, ComposioDeleteResponse, ComposioExecuteRequest,
-    ComposioExecuteResponse, ComposioListToolsRequest, ComposioToolkitsResponse,
-    ComposioToolsResponse, names,
+    ComposioActiveTriggersResponse, ComposioAuthorizeRequest, ComposioAuthorizeResponse,
+    ComposioAvailableTriggersResponse, ComposioConnectionsResponse, ComposioCreateTriggerRequest,
+    ComposioCreateTriggerResponse, ComposioDeleteConnectionRequest, ComposioDeleteResponse,
+    ComposioDisableTriggerRequest, ComposioDisableTriggerResponse, ComposioEnableTriggerRequest,
+    ComposioEnableTriggerResponse, ComposioExecuteRequest, ComposioExecuteResponse,
+    ComposioGithubReposResponse, ComposioListAvailableTriggersRequest,
+    ComposioListGithubReposRequest, ComposioListToolsRequest, ComposioListTriggerHistoryRequest,
+    ComposioListTriggersRequest, ComposioToolkitsResponse, ComposioToolsResponse,
+    ComposioTriggerHistoryResult, names,
 };
 
 use crate::client::{
     COMPOSIO_API_BASE, ComposioClient, DirectRoute, HttpTransport, ProxyRoute, Route,
 };
+use crate::triggers::TriggerArchive;
 
 /// Configuration the host hands the module at load time.
 ///
@@ -123,6 +129,13 @@ impl ModuleConfig {
 
 struct ConnectorService {
     client: ComposioClient,
+    /// The archive of webhook deliveries, when the host gave the module a
+    /// directory to keep state in.
+    ///
+    /// Optional because a host that never enables triggers has no reason to
+    /// hand the module a writable directory. Asking for one unconditionally
+    /// would make every deployment carry a path it does not use.
+    archive: Option<TriggerArchive>,
 }
 
 #[tinybus::interface(name = "ai.tinyhumans.connectors.Composio")]
@@ -190,6 +203,88 @@ impl ConnectorService {
             .await
             .map_err(|error| to_bus_error(&error))
     }
+
+    async fn list_github_repos(
+        &self,
+        request: ComposioListGithubReposRequest,
+    ) -> TinyBusResult<ComposioGithubReposResponse> {
+        self.client
+            .list_github_repos(request.connection_id.as_deref())
+            .await
+            .map_err(|error| to_bus_error(&error))
+    }
+
+    async fn list_available_triggers(
+        &self,
+        request: ComposioListAvailableTriggersRequest,
+    ) -> TinyBusResult<ComposioAvailableTriggersResponse> {
+        self.client
+            .list_available_triggers(&request.toolkit, request.connection_id.as_deref())
+            .await
+            .map_err(|error| to_bus_error(&error))
+    }
+
+    async fn list_triggers(
+        &self,
+        request: ComposioListTriggersRequest,
+    ) -> TinyBusResult<ComposioActiveTriggersResponse> {
+        self.client
+            .list_triggers(request.toolkit.as_deref())
+            .await
+            .map_err(|error| to_bus_error(&error))
+    }
+
+    async fn create_trigger(
+        &self,
+        request: ComposioCreateTriggerRequest,
+    ) -> TinyBusResult<ComposioCreateTriggerResponse> {
+        self.client
+            .create_trigger(
+                &request.slug,
+                request.connection_id.as_deref(),
+                request.trigger_config,
+            )
+            .await
+            .map_err(|error| to_bus_error(&error))
+    }
+
+    async fn enable_trigger(
+        &self,
+        request: ComposioEnableTriggerRequest,
+    ) -> TinyBusResult<ComposioEnableTriggerResponse> {
+        self.client
+            .enable_trigger(
+                &request.connection_id,
+                &request.slug,
+                request.trigger_config,
+            )
+            .await
+            .map_err(|error| to_bus_error(&error))
+    }
+
+    async fn disable_trigger(
+        &self,
+        request: ComposioDisableTriggerRequest,
+    ) -> TinyBusResult<ComposioDisableTriggerResponse> {
+        self.client
+            .disable_trigger(&request.trigger_id)
+            .await
+            .map_err(|error| to_bus_error(&error))
+    }
+
+    async fn list_trigger_history(
+        &self,
+        request: ComposioListTriggerHistoryRequest,
+    ) -> TinyBusResult<ComposioTriggerHistoryResult> {
+        let archive = self.archive.as_ref().ok_or_else(|| {
+            tinybus::Error::failed(
+                "trigger history is unavailable: the module was loaded without a `state_dir`",
+            )
+        })?;
+        archive
+            .list_recent(request.limit)
+            .map_err(|error| to_bus_error(&error))
+    }
 }
 
 /// Flatten a crate error onto the bus.
@@ -226,6 +321,13 @@ tinybus_module::module_export! {
         "DeleteConnection",
         "ListTools",
         "Execute",
+        "ListGithubRepos",
+        "ListAvailableTriggers",
+        "ListTriggers",
+        "CreateTrigger",
+        "EnableTrigger",
+        "DisableTrigger",
+        "ListTriggerHistory",
     ],
     signals = [],
     requires = [],
