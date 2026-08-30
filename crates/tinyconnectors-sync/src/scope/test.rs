@@ -57,6 +57,42 @@ fn checks_destructive_verbs_before_mutating_ones() {
 }
 
 #[test]
+fn reads_the_verb_rather_than_the_noun() {
+    // `GMAIL_LIST_DRAFTS` is a read: the noun is `DRAFTS`, the verb is `LIST`.
+    // A plain substring scan calls it a write and hides it from a read-only
+    // user — found by the curated catalogs disagreeing with the heuristic.
+    assert_eq!(classify_unknown("GMAIL_LIST_DRAFTS"), ToolScope::Read);
+    assert_eq!(classify_unknown("GMAIL_GET_DRAFT"), ToolScope::Read);
+    assert_eq!(classify_unknown("NOTION_SEARCH_POSTS"), ToolScope::Read);
+    assert_eq!(classify_unknown("GITHUB_LIST_CREATED_ISSUES"), ToolScope::Read);
+
+    // The verb still decides when it is a write one.
+    assert_eq!(classify_unknown("GMAIL_DRAFT_REPLY"), ToolScope::Write);
+    assert_eq!(classify_unknown("GMAIL_CREATE_DRAFT"), ToolScope::Write);
+}
+
+#[test]
+fn a_destructive_word_wins_over_a_reading_verb() {
+    // `LIST` leads, but the action removes something.
+    assert_eq!(classify_unknown("GMAIL_LIST_AND_DELETE"), ToolScope::Admin);
+    assert_eq!(classify_unknown("GITHUB_GET_AND_REVOKE_TOKEN"), ToolScope::Admin);
+}
+
+#[test]
+fn finds_the_verb_past_a_multi_segment_toolkit_name() {
+    // Splitting on the first underscore would take `TEAMS` as the verb.
+    assert_eq!(
+        classify_unknown("MICROSOFT_TEAMS_LIST_DRAFTS"),
+        ToolScope::Read
+    );
+    assert_eq!(
+        classify_unknown("ONE_DRIVE_LIST_SHARED_ITEMS"),
+        ToolScope::Admin,
+        "SHARED still reads as destructive wherever it appears"
+    );
+}
+
+#[test]
 fn is_case_insensitive() {
     assert_eq!(classify_unknown("gmail_delete_email"), ToolScope::Admin);
     assert_eq!(classify_unknown("gmail_send_email"), ToolScope::Write);
