@@ -18,8 +18,10 @@ use serde_json::json;
 use super::*;
 use crate::client::route::Route;
 use crate::{
-    ComposioAuthorizeResponse, ComposioConnectionsResponse, ComposioDeleteResponse,
-    ComposioExecuteResponse, ComposioToolkitsResponse, ComposioToolsResponse, Error, Result,
+    ComposioActiveTriggersResponse, ComposioAuthorizeResponse, ComposioAvailableTriggersResponse,
+    ComposioConnectionsResponse, ComposioCreateTriggerResponse, ComposioDeleteResponse,
+    ComposioDisableTriggerResponse, ComposioEnableTriggerResponse, ComposioExecuteResponse,
+    ComposioGithubReposResponse, ComposioToolkitsResponse, ComposioToolsResponse, Error, Result,
 };
 
 // ── prepare ─────────────────────────────────────────────────────────
@@ -342,6 +344,38 @@ impl Route for ScriptedRoute {
         unimplemented!("not exercised by the execute tests")
     }
     async fn delete_connection(&self, _: &str) -> Result<ComposioDeleteResponse> {
+        unimplemented!("not exercised by the execute tests")
+    }
+    async fn list_github_repos(&self, _: Option<&str>) -> Result<ComposioGithubReposResponse> {
+        unimplemented!("not exercised by the execute tests")
+    }
+    async fn list_available_triggers(
+        &self,
+        _: &str,
+        _: Option<&str>,
+    ) -> Result<ComposioAvailableTriggersResponse> {
+        unimplemented!("not exercised by the execute tests")
+    }
+    async fn list_triggers(&self, _: Option<&str>) -> Result<ComposioActiveTriggersResponse> {
+        unimplemented!("not exercised by the execute tests")
+    }
+    async fn create_trigger(
+        &self,
+        _: &str,
+        _: Option<&str>,
+        _: Option<serde_json::Value>,
+    ) -> Result<ComposioCreateTriggerResponse> {
+        unimplemented!("not exercised by the execute tests")
+    }
+    async fn enable_trigger(
+        &self,
+        _: &str,
+        _: &str,
+        _: Option<serde_json::Value>,
+    ) -> Result<ComposioEnableTriggerResponse> {
+        unimplemented!("not exercised by the execute tests")
+    }
+    async fn disable_trigger(&self, _: &str) -> Result<ComposioDisableTriggerResponse> {
         unimplemented!("not exercised by the execute tests")
     }
 
