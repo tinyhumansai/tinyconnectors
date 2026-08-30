@@ -20,8 +20,15 @@ use tinyconnectors_bus::{
     ComposioDeleteConnectionRequest, ComposioDeleteResponse, ComposioExecuteRequest,
     ComposioExecuteResponse, ComposioGetUserScopesRequest, ComposioListToolsRequest,
     ComposioSetUserScopesRequest, ComposioToolkitsResponse, ComposioToolsResponse,
-    ComposioUserScopes, ComposioUserScopesResponse, ConnectorSyncRequest, ConnectorSyncResponse,
-    SyncStage, names,
+    ComposioActiveTriggersResponse, ComposioAgentReadyToolkitsResponse,
+    ComposioAvailableTriggersResponse, ComposioCapabilitiesResponse, ComposioCreateTriggerRequest,
+    ComposioCreateTriggerResponse, ComposioDisableTriggerRequest, ComposioDisableTriggerResponse,
+    ComposioEnableTriggerRequest, ComposioEnableTriggerResponse, ComposioGithubReposResponse,
+    ComposioListAvailableTriggersRequest, ComposioListGithubReposRequest,
+    ComposioListTriggerHistoryRequest, ComposioListTriggersRequest,
+    ComposioRefreshIdentitiesResponse, ComposioTriggerHistoryResult, ComposioUserProfile,
+    ComposioUserProfileRequest, ComposioUserScopes, ComposioUserScopesResponse,
+    ConnectorSyncRequest, ConnectorSyncResponse, SyncStage, names,
 };
 
 use super::{ConnectorService, ModuleConfig};
@@ -650,4 +657,351 @@ async fn rejects_an_empty_toolkit_over_the_bus() -> tinybus::Result<()> {
     };
     assert!(error.to_string().contains("toolkit must not be empty"));
     Ok(())
+}
+
+
+// ── capability and identity members ──────────────────────────────────
+
+#[tokio::test]
+async fn reports_the_capability_matrix_without_touching_the_backend()
+-> tinybus::Result<()> {
+    // It describes the compiled build, so it must answer with no session and
+    // no request — that is what lets a UI tell "you cannot connect this" apart
+    // from "you can connect it, but nothing will read it yet".
+    let transport = StubTransport::replying(json!({}));
+    let (_serving, _client, proxy, _bus) = proxy_to(service_over(transport.clone())).await?;
+
+    let reply: ComposioCapabilitiesResponse =
+        proxy.call(names::methods::LIST_CAPABILITIES, ()).await?;
+
+    assert!(!reply.capabilities.is_empty());
+    assert!(reply.capabilities.iter().any(|row| row.toolkit == "gmail"));
+    assert!(
+        transport.last_body.lock().unwrap().is_none(),
+        "no request may be made"
+    );
+    Ok(())
+}
+
+#[tokio::test]
+async fn reports_which_toolkits_are_agent_ready() -> tinybus::Result<()> {
+    let transport = StubTransport::replying(json!({}));
+    let (_serving, _client, proxy, _bus) = proxy_to(service_over(transport)).await?;
+
+    let reply: ComposioAgentReadyToolkitsResponse = proxy
+        .call(names::methods::LIST_AGENT_READY_TOOLKITS, ())
+        .await?;
+
+    assert!(reply.toolkits.contains(&"gmail".to_string()));
+    // Sorted, so a UI list does not reshuffle between calls.
+    let mut sorted = reply.toolkits.clone();
+    sorted.sort();
+    assert_eq!(reply.toolkits, sorted);
+    Ok(())
+}
+
+#[tokio::test]
+async fn reads_a_connected_account_s_identity() -> tinybus::Result<()> {
+    let transport = StubTransport::replying(json!({
+        "successful": true,
+        "data": { "emailAddress": "user@example.com" }
+    }));
+    let (_serving, _client, proxy, _bus) = proxy_to(service_over(transport)).await?;
+
+    let reply: ComposioUserProfile = proxy
+        .call(
+            names::methods::GET_USER_PROFILE,
+            (ComposioUserProfileRequest {
+                toolkit: "gmail".into(),
+                connection_id: Some("conn_1".into()),
+            },),
+        )
+        .await?;
+
+    assert_eq!(reply.toolkit, "gmail");
+    assert_eq!(reply.email.as_deref(), Some("user@example.com"));
+    Ok(())
+}
+
+#[tokio::test]
+async fn a_profile_for_a_toolkit_with_no_provider_names_the_toolkit()
+-> tinybus::Result<()> {
+    let transport = StubTransport::replying(json!({}));
+    let (_serving, _client, proxy, _bus) = proxy_to(service_over(transport)).await?;
+
+    let result = proxy
+        .call::<ComposioUserProfile>(
+            names::methods::GET_USER_PROFILE,
+            (ComposioUserProfileRequest {
+                toolkit: "dropbox".into(),
+                connection_id: Some("conn_1".into()),
+            },),
+        )
+        .await;
+
+    let Err(error) = result else {
+        return Err(tinybus::Error::failed("an unknown toolkit returned a profile"));
+    };
+    assert!(error.to_string().contains("dropbox"));
+    Ok(())
+}
+
+#[tokio::test]
+async fn a_refresh_reports_the_broken_connections_beside_the_working_ones()
+-> tinybus::Result<()> {
+    // A refresh exists to find the broken ones, so one of them must not hide
+    // the rest by failing the whole call.
+    let transport = StubTransport::replying(json!({
+        "connections": [
+            { "id": "c1", "toolkit": "gmail", "status": "ACTIVE" },
+            { "id": "c2", "toolkit": "dropbox", "status": "ACTIVE" },
+            { "id": "c3", "toolkit": "gmail", "status": "PENDING" }
+        ]
+    }));
+    let (_serving, _client, proxy, _bus) = proxy_to(service_over(transport)).await?;
+
+    let reply: ComposioRefreshIdentitiesResponse =
+        proxy.call(names::methods::REFRESH_ALL_IDENTITIES, ()).await?;
+
+    // gmail has a provider; dropbox does not; the pending row is skipped.
+    assert_eq!(reply.profiles.len(), 1);
+    assert_eq!(reply.failures.len(), 1);
+    assert_eq!(reply.failures[0].toolkit, "dropbox");
+    Ok(())
+}
+
+#[tokio::test]
+async fn falls_back_to_the_first_active_connection_for_a_toolkit()
+-> tinybus::Result<()> {
+    let transport = StubTransport::replying(json!({
+        "connections": [
+            { "id": "c1", "toolkit": "gmail", "status": "PENDING" },
+            { "id": "c2", "toolkit": "gmail", "status": "ACTIVE" }
+        ]
+    }));
+    let (_serving, _client, proxy, _bus) = proxy_to(service_over(transport)).await?;
+
+    // No connection named: the pending row must not be chosen.
+    let result = proxy
+        .call::<ComposioUserProfile>(
+            names::methods::GET_USER_PROFILE,
+            (ComposioUserProfileRequest {
+                toolkit: "gmail".into(),
+                connection_id: None,
+            },),
+        )
+        .await;
+    // The stub answers the profile action with the connection list, which has
+    // no identity fields — the point is that it got as far as calling it.
+    assert!(result.is_ok(), "an active connection should have been chosen");
+    Ok(())
+}
+
+#[tokio::test]
+async fn a_toolkit_with_no_active_connection_says_so() -> tinybus::Result<()> {
+    let transport = StubTransport::replying(json!({ "connections": [] }));
+    let (_serving, _client, proxy, _bus) = proxy_to(service_over(transport)).await?;
+
+    let result = proxy
+        .call::<ComposioUserProfile>(
+            names::methods::GET_USER_PROFILE,
+            (ComposioUserProfileRequest {
+                toolkit: "gmail".into(),
+                connection_id: None,
+            },),
+        )
+        .await;
+
+    let Err(error) = result else {
+        return Err(tinybus::Error::failed("a profile came back with no connection"));
+    };
+    assert!(error.to_string().contains("no active connection"));
+    Ok(())
+}
+
+// ── trigger members ──────────────────────────────────────────────────
+
+#[tokio::test]
+async fn serves_the_github_repository_listing() -> tinybus::Result<()> {
+    let transport = StubTransport::replying(json!({
+        "connectionId": "c1",
+        "repositories": [{ "owner": "a", "repo": "b", "fullName": "a/b" }]
+    }));
+    let (_serving, _client, proxy, _bus) = proxy_to(service_over(transport)).await?;
+
+    let reply: ComposioGithubReposResponse = proxy
+        .call(
+            names::methods::LIST_GITHUB_REPOS,
+            (ComposioListGithubReposRequest {
+                connection_id: Some("c1".into()),
+            },),
+        )
+        .await?;
+    assert_eq!(reply.repositories[0].full_name, "a/b");
+    Ok(())
+}
+
+#[tokio::test]
+async fn serves_the_trigger_catalog_and_the_active_list() -> tinybus::Result<()> {
+    let transport = StubTransport::replying(json!({
+        "triggers": [{
+            "slug": "GMAIL_NEW_GMAIL_MESSAGE", "scope": "static",
+            "id": "t1", "toolkit": "gmail", "connectionId": "c1"
+        }]
+    }));
+    let (_serving, _client, proxy, _bus) = proxy_to(service_over(transport)).await?;
+
+    let available: ComposioAvailableTriggersResponse = proxy
+        .call(
+            names::methods::LIST_AVAILABLE_TRIGGERS,
+            (ComposioListAvailableTriggersRequest {
+                toolkit: "gmail".into(),
+                connection_id: None,
+            },),
+        )
+        .await?;
+    assert_eq!(available.triggers.len(), 1);
+
+    let active: ComposioActiveTriggersResponse = proxy
+        .call(
+            names::methods::LIST_TRIGGERS,
+            (ComposioListTriggersRequest {
+                toolkit: Some("gmail".into()),
+            },),
+        )
+        .await?;
+    assert_eq!(active.triggers[0].id, "t1");
+    Ok(())
+}
+
+#[tokio::test]
+async fn creates_enables_and_disables_a_trigger() -> tinybus::Result<()> {
+    let transport = StubTransport::replying(json!({
+        "triggerId": "t1", "slug": "GMAIL_NEW_GMAIL_MESSAGE",
+        "connectionId": "c1", "deleted": true
+    }));
+    let (_serving, _client, proxy, _bus) = proxy_to(service_over(transport)).await?;
+
+    let created: ComposioCreateTriggerResponse = proxy
+        .call(
+            names::methods::CREATE_TRIGGER,
+            (ComposioCreateTriggerRequest {
+                slug: "GMAIL_NEW_GMAIL_MESSAGE".into(),
+                connection_id: Some("c1".into()),
+                trigger_config: Some(json!({ "labelIds": ["INBOX"] })),
+            },),
+        )
+        .await?;
+    assert_eq!(created.trigger_id, "t1");
+
+    let enabled: ComposioEnableTriggerResponse = proxy
+        .call(
+            names::methods::ENABLE_TRIGGER,
+            (ComposioEnableTriggerRequest {
+                connection_id: "c1".into(),
+                slug: "GMAIL_NEW_GMAIL_MESSAGE".into(),
+                trigger_config: None,
+            },),
+        )
+        .await?;
+    assert_eq!(enabled.connection_id, "c1");
+
+    let disabled: ComposioDisableTriggerResponse = proxy
+        .call(
+            names::methods::DISABLE_TRIGGER,
+            (ComposioDisableTriggerRequest {
+                trigger_id: "t1".into(),
+            },),
+        )
+        .await?;
+    assert!(disabled.deleted);
+    Ok(())
+}
+
+#[tokio::test]
+async fn trigger_history_without_a_state_dir_explains_itself() -> tinybus::Result<()> {
+    // Rather than an empty list, which reads as "no trigger ever fired".
+    let transport = StubTransport::replying(json!({}));
+    let (_serving, _client, proxy, _bus) = proxy_to(service_over(transport)).await?;
+
+    let result = proxy
+        .call::<ComposioTriggerHistoryResult>(
+            names::methods::LIST_TRIGGER_HISTORY,
+            (ComposioListTriggerHistoryRequest { limit: Some(5) },),
+        )
+        .await;
+
+    let Err(error) = result else {
+        return Err(tinybus::Error::failed("history answered with no archive"));
+    };
+    assert!(error.to_string().contains("state_dir"));
+    Ok(())
+}
+
+// ── config ───────────────────────────────────────────────────────────
+
+#[test]
+fn the_direct_route_accepts_a_loopback_base_url_for_testing() {
+    let config: ModuleConfig = serde_json::from_value(json!({
+        "route": "direct",
+        "api_key": "sk-test",
+        "entity_id": "e1",
+        "base_url": "http://127.0.0.1:8080"
+    }))
+    .expect("parses");
+    assert_eq!(config.into_route().expect("builds").name(), "direct");
+}
+
+#[test]
+fn a_state_dir_is_optional_on_both_routes() {
+    for blob in [
+        json!({ "route": "proxy", "base_url": "https://api.example.com", "auth_token": "t" }),
+        json!({ "route": "direct", "api_key": "k" }),
+    ] {
+        let config: ModuleConfig = serde_json::from_value(blob.clone()).expect("parses");
+        assert!(config.state_dir().is_none(), "{blob}");
+    }
+}
+
+#[test]
+fn a_named_state_dir_is_carried_through() {
+    let config: ModuleConfig = serde_json::from_value(json!({
+        "route": "proxy",
+        "base_url": "https://api.example.com",
+        "auth_token": "t",
+        "state_dir": "/var/lib/openhuman"
+    }))
+    .expect("parses");
+    assert_eq!(
+        config.state_dir().map(std::path::Path::to_path_buf),
+        Some(std::path::PathBuf::from("/var/lib/openhuman"))
+    );
+}
+
+#[test]
+fn an_unrecognized_sync_reason_is_treated_as_manual() {
+    // The reason is a log line and a status label. Failing a sync over one
+    // would break a working integration for a cosmetic field.
+    use tinyconnectors_sync::SyncReason;
+    assert_eq!(super::sync_reason(Some("scheduled")), SyncReason::Scheduled);
+    assert_eq!(super::sync_reason(Some("trigger")), SyncReason::Trigger);
+    assert_eq!(
+        super::sync_reason(Some("initial_connect")),
+        SyncReason::InitialConnect
+    );
+    assert_eq!(super::sync_reason(Some("nonsense")), SyncReason::Manual);
+    assert_eq!(super::sync_reason(None), SyncReason::Manual);
+}
+
+#[tokio::test]
+async fn the_ephemeral_state_store_round_trips() {
+    // The fallback for a host that named no directory: sync state that lives
+    // only as long as the module.
+    use tinyconnectors_sync::SyncStateStore;
+    let store = super::EphemeralStateStore::default();
+
+    assert!(store.get("ns", "k").await.unwrap().is_none());
+    store.set("ns", "k", &json!({ "a": 1 })).await.unwrap();
+    assert_eq!(store.get("ns", "k").await.unwrap().unwrap()["a"], 1);
+    assert!(store.get("other", "k").await.unwrap().is_none());
 }
