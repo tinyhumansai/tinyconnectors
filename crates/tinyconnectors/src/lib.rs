@@ -67,6 +67,7 @@
 
 pub mod client;
 mod error;
+pub mod execute;
 pub mod oauth;
 mod tinybus_module;
 
