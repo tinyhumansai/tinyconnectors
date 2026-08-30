@@ -30,6 +30,11 @@ struct Call {
 #[derive(Debug, Default)]
 struct FakeTransport {
     reply: Mutex<serde_json::Value>,
+    /// Replies keyed by a substring of the path, tried before `reply`.
+    ///
+    /// The OAuth pre-clean makes three different calls in one `authorize`, and
+    /// answering all of them with one envelope tests the wrong thing.
+    by_path: Mutex<Vec<(String, serde_json::Value)>>,
     fail: Mutex<Option<String>>,
     calls: Mutex<Vec<Call>>,
 }
@@ -65,6 +70,11 @@ impl FakeTransport {
                 path: path.to_string(),
                 message,
             });
+        }
+        for (needle, value) in self.by_path.lock().unwrap().iter() {
+            if path.contains(needle.as_str()) {
+                return Ok(value.clone());
+            }
         }
         Ok(self.reply.lock().unwrap().clone())
     }
@@ -227,7 +237,12 @@ async fn clears_abandoned_meta_handoffs_before_authorizing() {
             { "id": "live", "toolkit": "instagram", "status": "ACTIVE" },
             { "id": "other", "toolkit": "gmail", "status": "PENDING" }
         ]
-    }));
+    }))
+    .answering(
+        "/authorize",
+        json!({ "connectUrl": "u", "connectionId": "c" }),
+    )
+    .answering("/connections/", json!({ "deleted": true }));
     let client = ComposioClient::new(Arc::new(ProxyRoute::new(transport.clone())));
 
     client.authorize("instagram", None).await.unwrap();
