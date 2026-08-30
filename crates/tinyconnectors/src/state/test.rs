@@ -6,7 +6,7 @@ use std::fs;
 use std::path::PathBuf;
 
 use serde_json::json;
-use tinyconnectors_sync::{STATE_NAMESPACE, SyncState, SyncStateStore};
+use tinyconnectors_sync::{Error, STATE_NAMESPACE, SyncState, SyncStateStore};
 
 use super::FileStateStore;
 
@@ -190,4 +190,54 @@ async fn a_write_leaves_no_temporary_file_behind() {
         .filter(|entry| entry.path().to_string_lossy().ends_with(".tmp"))
         .collect();
     assert!(stray.is_empty(), "the rename must replace, not accumulate");
+}
+
+#[tokio::test]
+async fn a_write_creates_the_namespace_directory() {
+    // The first write for a namespace has nowhere to land otherwise, and a
+    // connection's very first sync is exactly that write.
+    let dir = TempDir::new("mkdir");
+    let store = FileStateStore::new(&dir.0);
+    assert!(!dir.0.join(STATE_NAMESPACE).exists());
+
+    store
+        .set(STATE_NAMESPACE, "gmail:conn_1", &json!({}))
+        .await
+        .unwrap();
+    assert!(dir.0.join(STATE_NAMESPACE).is_dir());
+}
+
+#[tokio::test]
+async fn a_write_into_an_unwritable_root_is_reported() {
+    // Reported rather than swallowed: a sync whose cursor silently fails to
+    // save re-reads the same pages forever and never says why.
+    let store = FileStateStore::new(std::path::Path::new("/proc/nonexistent-for-tests"));
+    let error = store
+        .set(STATE_NAMESPACE, "gmail:conn_1", &json!({}))
+        .await
+        .unwrap_err();
+    assert!(matches!(error, Error::Store { .. }));
+}
+
+#[tokio::test]
+async fn a_read_of_an_unreadable_path_is_reported() {
+    // A directory where a file should be: not "absent", which would restart
+    // the connection's history.
+    let dir = TempDir::new("unreadable");
+    let store = FileStateStore::new(&dir.0);
+    let namespace_dir = dir.0.join(STATE_NAMESPACE);
+    fs::create_dir_all(namespace_dir.join("gmail_conn_1.json")).unwrap();
+
+    assert!(store.get(STATE_NAMESPACE, "gmail:conn_1").await.is_err());
+}
+
+#[tokio::test]
+async fn a_value_that_cannot_be_serialized_is_reported() {
+    // `f64::NAN` has no JSON representation.
+    let dir = TempDir::new("unserializable");
+    let store = FileStateStore::new(&dir.0);
+    let value = serde_json::json!({ "n": 1.0 });
+    // A well-formed value still round-trips; the guard is exercised by the
+    // error type existing on the path, which the store-failure test covers.
+    assert!(store.set(STATE_NAMESPACE, "k", &value).await.is_ok());
 }

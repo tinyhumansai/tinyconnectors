@@ -198,3 +198,58 @@ fn writes_land_in_the_current_day_file() {
     assert_eq!(contents.lines().count(), 1, "one line per delivery");
     assert!(contents.ends_with('\n'), "every record is a complete line");
 }
+
+#[test]
+fn opening_under_an_unwritable_root_is_reported() {
+    // Reported at load, not at the first delivery weeks later.
+    let error = TriggerArchive::open(std::path::Path::new("/proc/nonexistent-for-tests"))
+        .expect_err("must refuse");
+    assert!(matches!(error, crate::Error::Archive { .. }));
+    assert!(error.to_string().contains("archive directory"));
+}
+
+#[test]
+fn recording_into_a_removed_archive_is_reported() {
+    // A delivery that cannot be archived is still delivered — the archive is a
+    // record, not the mechanism — but the failure must not be silent.
+    let (dir, archive) = archive("removed");
+    fs::remove_dir_all(&dir.0).expect("removes the directory");
+
+    let error = archive
+        .record("gmail", "T", "evt-0", "u", &json!({}))
+        .expect_err("must report");
+    assert!(matches!(error, crate::Error::Archive { .. }));
+}
+
+#[test]
+fn listing_a_removed_archive_is_reported() {
+    let (dir, archive) = archive("removed-list");
+    fs::remove_dir_all(&dir.0).expect("removes the directory");
+    assert!(archive.list_recent(None).is_err());
+}
+
+#[test]
+fn reads_across_more_than_one_day_file() {
+    // Newest day first, then newest within the day: the ordering that makes
+    // "the last twenty" mean what a user expects.
+    let (_dir, archive) = archive("multiday");
+    archive
+        .record("gmail", "T", "today-0", "u", &json!({}))
+        .expect("records");
+
+    // A file for an earlier day, written directly.
+    let older = archive.archive_dir().join("2000-01-01.jsonl");
+    let entry = json!({
+        "received_at_ms": 1, "toolkit": "gmail", "trigger": "T",
+        "metadata_id": "old-0", "metadata_uuid": "u", "payload": {}
+    });
+    fs::write(&older, format!("{entry}\n")).expect("writes");
+
+    let history = archive.list_recent(None).expect("reads");
+    let ids: Vec<_> = history
+        .entries
+        .iter()
+        .map(|entry| entry.metadata_id.as_str())
+        .collect();
+    assert_eq!(ids, ["today-0", "old-0"]);
+}
