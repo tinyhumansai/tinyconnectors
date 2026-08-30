@@ -54,8 +54,8 @@ use crate::client::{
     COMPOSIO_API_BASE, ComposioClient, DirectRoute, HttpTransport, ProxyRoute, Route,
 };
 use tinyconnectors_sync::{
-    ProviderContext, ProviderRegistry, SyncLimits, SyncStateStore, UserScopePref, classify_unknown,
-    find_curated,
+    ProviderContext, ProviderRegistry, SyncLimits, SyncReason, SyncStateStore, UserScopePref,
+    classify_unknown, find_curated, run_sync,
 };
 
 use crate::providers::ClientActions;
