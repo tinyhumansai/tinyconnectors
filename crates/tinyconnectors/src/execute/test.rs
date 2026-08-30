@@ -387,9 +387,16 @@ async fn a_reported_provider_failure_is_not_an_error() {
     // The call reached the provider and got a real answer. Only a call that
     // never completed is an `Err`.
     let route = ScriptedRoute::new(vec![failed_response("insufficient scope")]);
-    let response = execute_action(route.as_ref(), "GMAIL_SEND_EMAIL", None, None)
-        .await
-        .unwrap();
+    let response = execute_action(
+        route.as_ref(),
+        "GMAIL_SEND_EMAIL",
+        // A valid call: the point is that the *provider* refused it, not that
+        // local validation did.
+        Some(json!({ "to": "a@b.com" })),
+        None,
+    )
+    .await
+    .unwrap();
 
     assert!(!response.successful);
     let error = response.error.unwrap();
