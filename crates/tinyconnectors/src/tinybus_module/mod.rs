@@ -62,11 +62,11 @@ use crate::providers::ClientActions;
 use crate::state::FileStateStore;
 use crate::triggers::TriggerArchive;
 
-/// Configuration the host hands the module at load time.
+/// How to reach Composio, when the host has said.
 ///
-/// Tagged by `route`, so the two variants cannot be confused and a blob missing
-/// the credential its route needs fails at load rather than producing a module
-/// that answers every member with a 401.
+/// Tagged by `route`, so the two variants cannot be confused and a blob naming
+/// a route without that route's credential is refused rather than producing a
+/// client that answers every call with a 401.
 ///
 /// ```json
 /// { "route": "proxy",  "base_url": "https://api.example.com", "auth_token": "…",
@@ -78,7 +78,7 @@ use crate::triggers::TriggerArchive;
 /// entrypoint it generates; nothing re-exports it from the crate root.
 #[derive(Debug, Clone, Deserialize)]
 #[serde(tag = "route", rename_all = "snake_case")]
-pub(crate) enum ModuleConfig {
+pub(crate) enum RouteConfig {
     /// Reach Composio through the `TinyHumans` backend.
     Proxy {
         /// Directory the module may keep state in, for the trigger archive.
@@ -116,7 +116,64 @@ pub(crate) enum ModuleConfig {
     },
 }
 
+/// Configuration the host hands the module at load time.
+///
+/// Every field is optional, and an empty blob is valid. That is deliberate: a
+/// module that refuses to load without a credential cannot be loaded by a host
+/// that discovers modules generically, and — more importantly — cannot answer
+/// the members that need no credential at all. `ListCapabilities` describes the
+/// compiled build, and a signed-out user deciding what to connect is exactly
+/// who needs it.
+///
+/// A member that does need a route says so when it is called, naming what is
+/// missing. That is a worse error than a load failure only if you assume every
+/// caller wanted a route; most callers of the capability members did not.
+#[derive(Debug, Clone, Default)]
+pub(crate) struct ModuleConfig {
+    /// How to reach Composio, when the host has said.
+    route: Option<RouteConfig>,
+}
+
+impl<'de> Deserialize<'de> for ModuleConfig {
+    /// Absent `route` means unconfigured; present but malformed is an error.
+    ///
+    /// Hand-written because the obvious `#[serde(flatten)] Option<RouteConfig>`
+    /// gets this exactly wrong: it turns a *malformed* route into `None`, so a
+    /// blob naming `"proxy"` with a misspelled `auth_token` would load as an
+    /// unconfigured module and silently answer every connector member with
+    /// "no route configured". A typo would disable connectors and look like a
+    /// deliberate choice.
+    fn deserialize<D: serde::Deserializer<'de>>(
+        deserializer: D,
+    ) -> std::result::Result<Self, D::Error> {
+        let value = serde_json::Value::deserialize(deserializer)?;
+        if value.get("route").is_none_or(serde_json::Value::is_null) {
+            return Ok(Self { route: None });
+        }
+        RouteConfig::deserialize(value)
+            .map(|route| Self { route: Some(route) })
+            .map_err(serde::de::Error::custom)
+    }
+}
+
 impl ModuleConfig {
+    /// The directory the module may keep state in, if the host named one.
+    fn state_dir(&self) -> Option<&std::path::Path> {
+        self.route.as_ref().and_then(RouteConfig::state_dir)
+    }
+
+    /// Build the route this configuration selects, if it selects one.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`crate::Error::InsecureBaseUrl`] if the configured base URL
+    /// would send the credential somewhere it must not go.
+    fn into_route(self) -> crate::Result<Option<Arc<dyn Route>>> {
+        self.route.map(RouteConfig::into_route).transpose()
+    }
+}
+
+impl RouteConfig {
     /// The directory the module may keep state in, if the host named one.
     fn state_dir(&self) -> Option<&std::path::Path> {
         match self {
@@ -160,7 +217,13 @@ impl ModuleConfig {
 }
 
 struct ConnectorService {
-    client: ComposioClient,
+    /// The Composio client, when the host configured a route.
+    ///
+    /// `None` is a module loaded with no configuration — which is allowed, so
+    /// the capability members can answer. Everything that talks to Composio
+    /// goes through [`ConnectorService::client`], which explains what is
+    /// missing rather than failing obscurely.
+    client: Option<ComposioClient>,
     /// The archive of webhook deliveries, when the host gave the module a
     /// directory to keep state in.
     ///
@@ -180,6 +243,16 @@ struct ConnectorService {
 }
 
 impl ConnectorService {
+    /// The client, or an error naming what the host did not configure.
+    fn client(&self) -> TinyBusResult<&ComposioClient> {
+        self.client.as_ref().ok_or_else(|| {
+            tinybus::Error::failed(
+                "this module was loaded without a connector route: pass a `route` of \
+                 \"proxy\" or \"direct\" in its configuration to reach Composio",
+            )
+        })
+    }
+
     /// Assemble the context one provider needs for one call.
     fn context(&self, toolkit: &str, connection_id: &str) -> ProviderContext {
         ProviderContext {
@@ -259,7 +332,7 @@ impl ConnectorService {
     /// The first active connection for `toolkit`.
     async fn first_active_connection(&self, toolkit: &str) -> TinyBusResult<String> {
         let wanted = toolkit.trim().to_ascii_lowercase();
-        self.client
+        self.client()?
             .list_connections()
             .await
             .map_err(|error| to_bus_error(&error))?
@@ -276,14 +349,14 @@ impl ConnectorService {
 #[tinybus::interface(name = "ai.tinyhumans.connectors.Composio")]
 impl ConnectorService {
     async fn list_toolkits(&self) -> TinyBusResult<ComposioToolkitsResponse> {
-        self.client
+        self.client()?
             .list_toolkits()
             .await
             .map_err(|error| to_bus_error(&error))
     }
 
     async fn list_connections(&self) -> TinyBusResult<ComposioConnectionsResponse> {
-        self.client
+        self.client()?
             .list_connections()
             .await
             .map_err(|error| to_bus_error(&error))
@@ -294,9 +367,11 @@ impl ConnectorService {
         request: ComposioAuthorizeRequest,
     ) -> TinyBusResult<ComposioAuthorizeResponse> {
         let toolkit = request.toolkit.clone();
+        // Resolved once, outside the retry: a missing route is not something a
+        // second attempt fixes.
+        let client = self.client()?;
         let result = crate::oauth::authorize_with_rate_limit_retry(|| {
-            self.client
-                .authorize(&request.toolkit, request.extra_params.clone())
+            client.authorize(&request.toolkit, request.extra_params.clone())
         })
         .await;
 
@@ -309,7 +384,7 @@ impl ConnectorService {
         &self,
         request: ComposioDeleteConnectionRequest,
     ) -> TinyBusResult<ComposioDeleteResponse> {
-        self.client
+        self.client()?
             .delete_connection(&request.connection_id)
             .await
             .map_err(|error| to_bus_error(&error))
@@ -320,7 +395,7 @@ impl ConnectorService {
         request: ComposioListToolsRequest,
     ) -> TinyBusResult<ComposioToolsResponse> {
         let mut response = self
-            .client
+            .client()?
             .list_tools(&request.toolkits, &request.tags)
             .await
             .map_err(|error| to_bus_error(&error))?;
@@ -422,7 +497,7 @@ impl ConnectorService {
                 request.tool
             )));
         }
-        self.client
+        self.client()?
             .execute(
                 &request.tool,
                 request.arguments,
@@ -463,7 +538,7 @@ impl ConnectorService {
 
     async fn refresh_all_identities(&self) -> TinyBusResult<ComposioRefreshIdentitiesResponse> {
         let connections = self
-            .client
+            .client()?
             .list_connections()
             .await
             .map_err(|error| to_bus_error(&error))?
@@ -492,7 +567,7 @@ impl ConnectorService {
         &self,
         request: ComposioListGithubReposRequest,
     ) -> TinyBusResult<ComposioGithubReposResponse> {
-        self.client
+        self.client()?
             .list_github_repos(request.connection_id.as_deref())
             .await
             .map_err(|error| to_bus_error(&error))
@@ -502,7 +577,7 @@ impl ConnectorService {
         &self,
         request: ComposioListAvailableTriggersRequest,
     ) -> TinyBusResult<ComposioAvailableTriggersResponse> {
-        self.client
+        self.client()?
             .list_available_triggers(&request.toolkit, request.connection_id.as_deref())
             .await
             .map_err(|error| to_bus_error(&error))
@@ -512,7 +587,7 @@ impl ConnectorService {
         &self,
         request: ComposioListTriggersRequest,
     ) -> TinyBusResult<ComposioActiveTriggersResponse> {
-        self.client
+        self.client()?
             .list_triggers(request.toolkit.as_deref())
             .await
             .map_err(|error| to_bus_error(&error))
@@ -522,7 +597,7 @@ impl ConnectorService {
         &self,
         request: ComposioCreateTriggerRequest,
     ) -> TinyBusResult<ComposioCreateTriggerResponse> {
-        self.client
+        self.client()?
             .create_trigger(
                 &request.slug,
                 request.connection_id.as_deref(),
@@ -536,7 +611,7 @@ impl ConnectorService {
         &self,
         request: ComposioEnableTriggerRequest,
     ) -> TinyBusResult<ComposioEnableTriggerResponse> {
-        self.client
+        self.client()?
             .enable_trigger(
                 &request.connection_id,
                 &request.slug,
@@ -550,7 +625,7 @@ impl ConnectorService {
         &self,
         request: ComposioDisableTriggerRequest,
     ) -> TinyBusResult<ComposioDisableTriggerResponse> {
-        self.client
+        self.client()?
             .disable_trigger(&request.trigger_id)
             .await
             .map_err(|error| to_bus_error(&error))
@@ -671,12 +746,15 @@ async fn setup(connection: Connection, config: ModuleConfig) -> TinyBusResult<()
 
     let route = config.into_route().map_err(|error| to_bus_error(&error))?;
     tracing::info!(
-        route = route.name(),
+        route = route.as_ref().map_or("none", |route| route.name()),
         archiving_triggers = archive.is_some(),
         "[connectors] serving connector surface"
     );
-    let client = ComposioClient::new(route);
+    let client = route.map(ComposioClient::new);
     let service = ConnectorService {
+        // A module with no route still answers the capability members, so the
+        // action runner is built over a client that reports the missing route
+        // if a provider ever reaches it.
         actions: Arc::new(ClientActions::new(client.clone())),
         // A host that named no state directory gets an in-memory store: profile
         // and capability members need none, and a sync run without persistence

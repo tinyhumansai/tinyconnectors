@@ -6,15 +6,20 @@ use tinyconnectors_sync::{ActionRunner, Error as SyncError, Result as SyncResult
 use crate::client::ComposioClient;
 
 /// Runs provider actions through this module's Composio client.
+///
+/// The client is optional because the module loads without one: a host that
+/// only wants the capability members should not have to supply a credential.
+/// A provider that then tries to run an action gets a named refusal rather than
+/// a module that would not load at all.
 #[derive(Debug, Clone)]
 pub struct ClientActions {
-    client: ComposioClient,
+    client: Option<ComposioClient>,
 }
 
 impl ClientActions {
-    /// Build a runner over `client`.
+    /// Build a runner over `client`, or over nothing.
     #[must_use]
-    pub fn new(client: ComposioClient) -> Self {
+    pub fn new(client: Option<ComposioClient>) -> Self {
         Self { client }
     }
 }
@@ -39,8 +44,12 @@ impl ActionRunner for ClientActions {
         arguments: serde_json::Value,
         connection_id: &str,
     ) -> SyncResult<serde_json::Value> {
-        let response = self
-            .client
+        let client = self.client.as_ref().ok_or_else(|| SyncError::Action {
+            action: action.to_string(),
+            message: "this module was loaded without a connector route".to_string(),
+        })?;
+
+        let response = client
             .execute(action, Some(arguments), Some(connection_id))
             .await
             .map_err(|error| SyncError::Action {

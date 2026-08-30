@@ -106,10 +106,10 @@ impl Transport for StubTransport {
 fn service_over(transport: Arc<StubTransport>) -> ConnectorService {
     let client = ComposioClient::new(Arc::new(ProxyRoute::new(transport)));
     ConnectorService {
-        actions: Arc::new(crate::providers::ClientActions::new(client.clone())),
+        actions: Arc::new(crate::providers::ClientActions::new(Some(client.clone()))),
         state: Arc::new(super::EphemeralStateStore::default()),
         registry: crate::providers::default_registry(),
-        client,
+        client: Some(client),
         // No archive: these tests exercise the backend-facing members. The
         // history member's own behaviour without one is tested separately.
         archive: None,
@@ -160,6 +160,45 @@ fn the_served_interface_name_matches_the_contract() {
 }
 
 #[test]
+fn a_module_with_no_configuration_loads() {
+    // A module that refuses to load without a credential cannot answer the
+    // members that need none — and `ListCapabilities` is exactly what a
+    // signed-out user deciding what to connect needs.
+    let config: ModuleConfig = serde_json::from_value(json!({})).expect("parses");
+    assert!(config.into_route().expect("builds").is_none());
+}
+
+#[tokio::test]
+async fn an_unconfigured_module_answers_the_capability_members() -> tinybus::Result<()> {
+    let (_serving, proxy) = serve_via_setup(ModuleConfig::default()).await?;
+
+    let reply: ComposioCapabilitiesResponse =
+        proxy.call(names::methods::LIST_CAPABILITIES, ()).await?;
+    assert!(!reply.capabilities.is_empty());
+    Ok(())
+}
+
+#[tokio::test]
+async fn an_unconfigured_module_says_what_is_missing() -> tinybus::Result<()> {
+    // Rather than an obscure failure, or a call that silently does nothing.
+    let (_serving, proxy) = serve_via_setup(ModuleConfig::default()).await?;
+
+    let result = proxy
+        .call::<ComposioToolkitsResponse>(names::methods::LIST_TOOLKITS, ())
+        .await;
+
+    let Err(error) = result else {
+        return Err(tinybus::Error::failed(
+            "an unconfigured module listed toolkits",
+        ));
+    };
+    let rendered = error.to_string();
+    assert!(rendered.contains("route"), "{rendered}");
+    assert!(rendered.contains("proxy"), "{rendered}");
+    Ok(())
+}
+
+#[test]
 fn the_module_config_selects_the_proxy_route() {
     let config: ModuleConfig = serde_json::from_value(json!({
         "route": "proxy",
@@ -168,7 +207,7 @@ fn the_module_config_selects_the_proxy_route() {
     }))
     .expect("parses");
 
-    let route = config.into_route().expect("builds");
+    let route = config.into_route().expect("builds").expect("has a route");
     assert_eq!(route.name(), "proxy");
 }
 
@@ -181,7 +220,7 @@ fn the_module_config_selects_the_direct_route() {
     .expect("parses");
 
     // No base_url: production takes Composio's own API base.
-    let route = config.into_route().expect("builds");
+    let route = config.into_route().expect("builds").expect("has a route");
     assert_eq!(route.name(), "direct");
 }
 
@@ -192,13 +231,18 @@ fn the_module_config_requires_the_credential_its_route_needs() {
     for blob in [
         json!({ "route": "proxy", "base_url": "https://api.example.com" }),
         json!({ "route": "direct" }),
-        json!({ "base_url": "https://api.example.com", "auth_token": "t" }),
     ] {
         assert!(
             serde_json::from_value::<ModuleConfig>(blob.clone()).is_err(),
-            "{blob} must be refused"
+            "{blob} names a route without its credential and must be refused"
         );
     }
+
+    // A blob with no `route` at all is not an error — it is an unconfigured
+    // module, which is allowed.
+    let config: ModuleConfig =
+        serde_json::from_value(json!({ "base_url": "https://api.example.com" })).expect("parses");
+    assert!(config.into_route().expect("builds").is_none());
 }
 
 #[test]
@@ -976,7 +1020,14 @@ fn the_direct_route_accepts_a_loopback_base_url_for_testing() {
         "base_url": "http://127.0.0.1:8080"
     }))
     .expect("parses");
-    assert_eq!(config.into_route().expect("builds").name(), "direct");
+    assert_eq!(
+        config
+            .into_route()
+            .expect("builds")
+            .expect("has a route")
+            .name(),
+        "direct"
+    );
 }
 
 #[test]
