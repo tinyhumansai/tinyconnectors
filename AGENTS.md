@@ -73,12 +73,13 @@ else.
 
 ### The two-crate split
 
-`crates/template-bus` holds every type that crosses the bus and the names of the
+`crates/tinyconnectors-bus` holds every type that crosses the bus and the names of the
 members that carry them. It has no transport, no runtime, and no behavior, and
 CI asserts it stays that way. A host that only makes calls depends on it alone.
 
-`crates/template` depends on it and re-exports all of it, so
-`template::GreetRequest` and `template_bus::GreetRequest` are the *same* type
+`crates/tinyconnectors` depends on it and re-exports all of it, so
+`tinyconnectors::ComposioConnection` and `tinyconnectors_bus::ComposioConnection`
+are the *same* type
 rather than structural twins. That direction is load-bearing: a parallel set of
 payload types for hosts would mean a conversion at every call site that nothing
 checks.
@@ -115,8 +116,13 @@ broad ones.
 
 Keep public exports centralized in each crate's `src/lib.rs` so downstream users
 have one predictable surface. Put shared error variants in
-`crates/template/src/error/mod.rs` and return the crate-wide `Result<T>` from
-fallible public APIs.
+`crates/tinyconnectors/src/error/mod.rs` and return the crate-wide `Result<T>`
+from fallible public APIs.
+
+`names::METHODS` describes what the module *serves*, never what is planned. A
+constant for a member nothing answers reaches a host as a runtime "unknown
+method", which is worse than the member not existing. Add a member and its
+implementation together, and bump `CONTRACT_VERSION`'s minor component.
 
 ## Build And Test
 
@@ -134,8 +140,12 @@ Supporting commands:
 
 - `cargo fmt --all` — format before committing.
 - `cargo test <filter>` — run a focused subset while iterating.
-- `cargo test -p template-bus` — run one crate's suite.
-- `cargo run -p template --example basic` — run the bundled example.
+- `cargo test -p tinyconnectors-bus` — run one crate's suite.
+- `cargo run -p tinyconnectors --example basic` — drive the client over a stub
+  backend; needs no credential.
+- `cargo run -p tinyconnectors --example verify_module -- target/debug/libtinyconnectors.so`
+  — load a built module through the real TinyBus loader and check its declared
+  members against `names::METHODS`.
 - `cargo doc --no-deps --all-features` — build the rustdoc CI also builds with
   `RUSTDOCFLAGS="-D warnings"`.
 - `cargo test --doc` — run doctests alone when editing documentation examples.
@@ -186,7 +196,7 @@ add one:
 - gate anything optional behind a Cargo feature, documented in `Cargo.toml`;
 - declare it once in the root `[workspace.dependencies]` when more than one
   crate needs it, and take it with `{ workspace = true }`;
-- never add one to `crates/template-bus` that pulls in a transport, an async
+- never add one to `crates/tinyconnectors-bus` that pulls in a transport, an async
   runtime, an HTTP client, or a native library — CI fails the build if you do;
 - leave a comment above the entry explaining *why* the crate is needed and what
   uses it — see the existing entries for the expected tone;
@@ -296,7 +306,7 @@ Releases run from `.github/workflows/release.yml` via a manual
 an interrupted release after its version commit and tag exist. The workflow
 re-runs the full validation suite, computes the next version, updates
 the root `[workspace.package]` version and `Cargo.lock`, commits and tags
-`vX.Y.Z`, builds `crates/template` as a TinyBus module for every supported
+`vX.Y.Z`, builds `crates/tinyconnectors` as a TinyBus module for every supported
 platform, pushes, and creates an immutable GitHub release with installable
 native packages.
 
