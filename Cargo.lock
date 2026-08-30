@@ -907,6 +907,7 @@ dependencies = [
  "tinybus",
  "tinybus-module",
  "tinyconnectors-bus",
+ "tinyconnectors-sync",
  "tokio",
  "tracing",
  "ureq",

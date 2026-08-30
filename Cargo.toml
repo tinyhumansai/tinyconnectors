@@ -31,9 +31,11 @@ repository = "https://github.com/tinyhumansai/tinyconnectors"
 # release, and a pinned requirement here would stop resolving the moment it did.
 # Nothing in this workspace is published, so the path is the whole address.
 tinyconnectors-bus = { path = "crates/tinyconnectors-bus" }
-# The sync pipelines. Separate from the module crate so the loadable module does
-# not grow a sync dependency it does not serve, and so the pipelines can be
-# taken on their own by a host that only ingests.
+# The provider registry and the sync pipelines. The module crate depends on it
+# for the capability and profile members, which are answered from what the
+# registered providers know. It stays a separate crate so a host that only
+# ingests can take the pipelines without the module, and so the pipelines keep
+# their own dependency rules — no transport, no memory.
 tinyconnectors-sync = { path = "crates/tinyconnectors-sync" }
 # TinyBus defines the message types, interface macro, and frozen module ABI
 # used by the generated integration. Socket and CLI features are unnecessary

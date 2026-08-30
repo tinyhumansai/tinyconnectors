@@ -23,6 +23,9 @@ crate-type = ["rlib", "cdylib"]
 # rather than two, and so `tinyconnectors::ComposioConnection` and
 # `tinyconnectors_bus::ComposioConnection` are the same type.
 tinyconnectors-bus = { workspace = true }
+# The provider registry, which answers the capability and profile members: what
+# this build knows how to do for a toolkit is a property of its providers.
+tinyconnectors-sync = { workspace = true }
 tinybus = { workspace = true }
 tinybus-module = { workspace = true }
 thiserror = { workspace = true }

@@ -70,6 +70,7 @@ pub mod client;
 mod error;
 pub mod execute;
 pub mod oauth;
+pub mod providers;
 mod tinybus_module;
 pub mod triggers;
 
