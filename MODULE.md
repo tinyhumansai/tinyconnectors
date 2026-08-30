@@ -1,15 +1,33 @@
-# Template TinyBus Module
+# TinyConnectors TinyBus Module
 
-This package contains the native `template` module for TinyBus module ABI
+This package contains the native `tinyconnectors` module for TinyBus module ABI
 v1. Install only the archive matching the host operating system and
 architecture.
 
-The module claims `ai.tinyhumans.template.Greeting`, serves the object at
-`/ai/tinyhumans/template/Greeting`, and provides the `Greet` method. The
-method accepts a `GreetRequest` and returns a `GreetResponse` carrying
-`Hello, <name>!`; empty names are rejected. Both payload types, the interface
-name, the object path, and the member names are published as the `template-bus`
-crate, so a host names them from a library rather than by string literal.
+The module claims `ai.tinyhumans.connectors.Composio`, serves the object at
+`/ai/tinyhumans/connectors/Composio`, and provides `ListToolkits`,
+`ListConnections`, `Authorize`, and `DeleteConnection`. Every payload type, the
+interface name, the object path, and the member names are published as the
+`tinyconnectors-bus` crate, so a host names them from a library rather than by
+string literal.
+
+## Configuration
+
+The module requires a JSON configuration blob at load time:
+
+```json
+{ "base_url": "https://api.example.com", "auth_token": "<user session token>" }
+```
+
+It holds no Composio API key and calls Composio nowhere. Every request goes to
+`base_url`, which owns the key, the billing margin, the toolkit allowlist, and
+the HMAC verification of inbound webhooks. `auth_token` authenticates the
+signed-in user to that backend and is the host's to supply — the module never
+reads a credential from the environment or anywhere else, never logs it, and
+never returns it through a member. Loading without both fields fails, rather
+than producing a module that answers every call with a 401.
+
+## Installing
 
 The archive contains one `.so`, `.dylib`, or `.dll` plus `modules.toml`. Keep
 those files together when copying them into a TinyBus module directory. The
@@ -22,8 +40,8 @@ archive. Install directly from a tagged release with:
 
 ```sh
 tinybus modules load-github \
-  https://github.com/tinyhumansai/rust-template/releases/tag/v0.1.5 \
-  template-0.1.5-ubuntu-24.04-x86_64.tar.gz \
+  https://github.com/tinyhumansai/tinyconnectors/releases/tag/v0.1.5 \
+  tinyconnectors-0.1.5-ubuntu-24.04-x86_64.tar.gz \
   <archive-sha256>
 ```
 
