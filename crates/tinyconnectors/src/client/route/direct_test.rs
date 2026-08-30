@@ -314,3 +314,110 @@ async fn a_success_clears_the_failure_count() {
     ));
     assert_eq!(transport.calls(), before_gate);
 }
+
+#[tokio::test]
+async fn lists_v3_tools_into_the_function_calling_envelope() {
+    // v3 rows are the function itself, not the `{type, function}` envelope a
+    // model expects, so the route wraps them.
+    let transport = FakeTransport::replying(json!({
+        "items": [{
+            "slug": "GMAIL_SEND_EMAIL",
+            "description": "Send an email",
+            "input_parameters": { "type": "object" },
+            "output_parameters": { "type": "object" }
+        }]
+    }));
+    let tools = route(transport)
+        .list_tools(&["gmail".to_string()], &[])
+        .await
+        .unwrap();
+
+    assert_eq!(tools.tools.len(), 1);
+    assert_eq!(tools.tools[0].kind, "function");
+    assert_eq!(tools.tools[0].function.name, "GMAIL_SEND_EMAIL");
+    assert!(tools.tools[0].function.parameters.is_some());
+    assert!(tools.tools[0].function.output_parameters.is_some());
+}
+
+#[tokio::test]
+async fn drops_a_tool_row_with_no_name() {
+    let transport = FakeTransport::replying(json!({ "items": [{ "description": "no slug" }] }));
+    let tools = route(transport).list_tools(&[], &[]).await.unwrap();
+    assert!(tools.tools.is_empty());
+}
+
+#[tokio::test]
+async fn executes_and_reshapes_a_v3_result() {
+    let transport = FakeTransport::replying(json!({
+        "successful": true,
+        "data": { "messageId": "m-1" }
+    }));
+    let response = route(transport.clone())
+        .execute("GMAIL_SEND_EMAIL", &json!({ "to": "a@b.com" }), Some("c1"))
+        .await
+        .unwrap();
+
+    assert!(response.successful);
+    assert_eq!(response.data["messageId"], "m-1");
+    // Direct mode carries no billing margin: the user pays Composio, not us.
+    assert!((response.cost_usd - 0.0).abs() < f64::EPSILON);
+    // Composio renders no compact markdown; callers fall back to `data`.
+    assert!(response.markdown_formatted.is_none());
+
+    let body = transport.last_body.lock().unwrap().clone().unwrap();
+    assert_eq!(body["connected_account_id"], "c1");
+    assert_eq!(body["entity_id"], "entity-1");
+}
+
+#[tokio::test]
+async fn treats_a_v3_result_with_no_verdict_as_successful() {
+    // v3 answers a plain result for some actions. Defaulting to failure would
+    // report a completed action as broken.
+    let transport = FakeTransport::replying(json!({ "messageId": "m-1" }));
+    let response = route(transport)
+        .execute("GMAIL_SEND_EMAIL", &json!({}), None)
+        .await
+        .unwrap();
+
+    assert!(response.successful);
+    assert_eq!(response.data["messageId"], "m-1");
+}
+
+#[tokio::test]
+async fn carries_a_v3_failure_through() {
+    let transport = FakeTransport::replying(json!({
+        "successful": false,
+        "error": "insufficient scope"
+    }));
+    let response = route(transport)
+        .execute("GMAIL_SEND_EMAIL", &json!({}), None)
+        .await
+        .unwrap();
+
+    assert!(!response.successful);
+    assert_eq!(response.error.as_deref(), Some("insufficient scope"));
+}
+
+#[tokio::test]
+async fn authorize_keeps_a_connection_id_when_v3_supplies_one() {
+    let transport = FakeTransport::replying(json!({
+        "redirect_url": "https://composio.dev/oauth/z",
+        "connectedAccountId": "ca_7"
+    }));
+    let response = route(transport)
+        .authorize("gmail", &json!({ "toolkit": "gmail" }))
+        .await
+        .unwrap();
+
+    assert_eq!(response.connection_id, "ca_7");
+}
+
+#[tokio::test]
+async fn a_successful_call_clears_the_gate_for_later_calls() {
+    let transport = FakeTransport::replying(json!({ "items": [] }));
+    let direct = route(transport.clone());
+
+    assert!(direct.list_connections().await.is_ok());
+    assert!(direct.list_connections().await.is_ok());
+    assert_eq!(transport.calls(), 2, "no gate ever closed");
+}
