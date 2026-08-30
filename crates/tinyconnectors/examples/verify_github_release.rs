@@ -32,6 +32,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         // Placeholders: the verifier checks the served surface, not a live
         // call, but the module will not load without them.
         serde_json::json!({
+            "route": "proxy",
             "base_url": "https://verify.invalid",
             "auth_token": "verify-only-not-a-credential",
         }),

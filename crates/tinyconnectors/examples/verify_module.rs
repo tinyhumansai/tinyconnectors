@@ -17,12 +17,13 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let broker = Broker::new();
     let broker_task = broker.spawn(bus.clone());
     let module_host = ModuleHost::new(broker);
-    // The module refuses to load without a backend URL and a credential, which
-    // is the point: it never invents its own. These are placeholders — the
-    // verifier checks the served surface, not a live call.
+    // The module refuses to load without a route and the credential that route
+    // needs, which is the point: it never invents its own. These are
+    // placeholders — the verifier checks the served surface, not a live call.
     let info = module_host.load_file_with_config(
         &module,
         serde_json::json!({
+            "route": "proxy",
             "base_url": "https://verify.invalid",
             "auth_token": "verify-only-not-a-credential",
         }),
