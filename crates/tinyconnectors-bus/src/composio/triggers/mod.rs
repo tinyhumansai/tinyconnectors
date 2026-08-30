@@ -27,10 +27,9 @@ mod types;
 
 pub use types::{
     ComposioActiveTrigger, ComposioActiveTriggersResponse, ComposioAvailableTrigger,
-    ComposioAvailableTriggerRepo, ComposioAvailableTriggersResponse,
-    ComposioCreateTriggerResponse, ComposioDisableTriggerResponse, ComposioEnableTriggerResponse,
-    ComposioTriggerEvent, ComposioTriggerHistoryEntry, ComposioTriggerHistoryResult,
-    ComposioTriggerMetadata,
+    ComposioAvailableTriggerRepo, ComposioAvailableTriggersResponse, ComposioCreateTriggerResponse,
+    ComposioDisableTriggerResponse, ComposioEnableTriggerResponse, ComposioTriggerEvent,
+    ComposioTriggerHistoryEntry, ComposioTriggerHistoryResult, ComposioTriggerMetadata,
 };
 
 #[cfg(test)]

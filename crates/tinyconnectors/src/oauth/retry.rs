@@ -2,7 +2,9 @@
 
 use std::time::Duration;
 
-use super::status::{is_authorize_rate_limited, is_meta_oauth_toolkit, meta_oauth_rate_limit_message};
+use super::status::{
+    is_authorize_rate_limited, is_meta_oauth_toolkit, meta_oauth_rate_limit_message,
+};
 use crate::{Error, Result};
 
 /// How many times an authorize call is attempted before the rate limit is

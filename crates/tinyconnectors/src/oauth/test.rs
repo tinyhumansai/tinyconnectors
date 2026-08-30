@@ -10,10 +10,7 @@ use crate::{Error, Result};
 #[test]
 fn recognizes_meta_toolkits_regardless_of_casing_or_padding() {
     for toolkit in ["instagram", "Instagram", " FACEBOOK ", "facebook"] {
-        assert!(
-            is_meta_oauth_toolkit(toolkit),
-            "{toolkit:?} is Meta-hosted"
-        );
+        assert!(is_meta_oauth_toolkit(toolkit), "{toolkit:?} is Meta-hosted");
     }
 }
 

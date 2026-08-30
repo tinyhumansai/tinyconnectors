@@ -100,14 +100,14 @@ pub mod version;
 pub use composio::{
     ComposioActiveTrigger, ComposioActiveTriggersResponse, ComposioAgentReadyToolkitsResponse,
     ComposioAuthorizeRequest, ComposioAuthorizeResponse, ComposioAvailableTrigger,
-    ComposioAvailableTriggerRepo,
-    ComposioAvailableTriggersResponse, ComposioCapabilitiesResponse, ComposioCapability,
-    ComposioConnection, ComposioConnectionsResponse, ComposioCreateTriggerResponse,
-    ComposioDeleteConnectionRequest, ComposioDeleteResponse, ComposioDisableTriggerResponse, ComposioEnableTriggerResponse,
-    ComposioExecuteResponse, ComposioGithubRepo, ComposioGithubReposResponse,
-    ComposioToolFunction, ComposioToolSchema, ComposioToolkitCatalogEntry,
-    ComposioToolkitsResponse, ComposioToolsResponse, ComposioTriggerEvent,
-    ComposioTriggerHistoryEntry, ComposioTriggerHistoryResult, ComposioTriggerMetadata,
+    ComposioAvailableTriggerRepo, ComposioAvailableTriggersResponse, ComposioCapabilitiesResponse,
+    ComposioCapability, ComposioConnection, ComposioConnectionsResponse,
+    ComposioCreateTriggerResponse, ComposioDeleteConnectionRequest, ComposioDeleteResponse,
+    ComposioDisableTriggerResponse, ComposioEnableTriggerResponse, ComposioExecuteResponse,
+    ComposioGithubRepo, ComposioGithubReposResponse, ComposioToolFunction, ComposioToolSchema,
+    ComposioToolkitCatalogEntry, ComposioToolkitsResponse, ComposioToolsResponse,
+    ComposioTriggerEvent, ComposioTriggerHistoryEntry, ComposioTriggerHistoryResult,
+    ComposioTriggerMetadata,
 };
 pub use names::{INTERFACE, METHODS, OBJECT_PATH};
 pub use version::{CONTRACT_VERSION, is_compatible};

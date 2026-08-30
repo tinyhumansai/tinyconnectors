@@ -111,7 +111,9 @@ fn declared_methods_match_the_dispatch_table() {
 #[test]
 fn the_served_interface_name_matches_the_contract() {
     assert_eq!(
-        service_over(StubTransport::replying(json!({}))).name().to_string(),
+        service_over(StubTransport::replying(json!({})))
+            .name()
+            .to_string(),
         names::INTERFACE
     );
 }
@@ -229,7 +231,10 @@ async fn reports_a_backend_failure_to_the_caller() -> tinybus::Result<()> {
     // host sees only "call failed".
     let rendered = error.to_string();
     assert!(rendered.contains("502 bad gateway"), "{rendered}");
-    assert!(rendered.contains("/agent-integrations/composio/toolkits"), "{rendered}");
+    assert!(
+        rendered.contains("/agent-integrations/composio/toolkits"),
+        "{rendered}"
+    );
     Ok(())
 }
 

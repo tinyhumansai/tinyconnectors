@@ -44,7 +44,10 @@ fn errors_are_available_to_consumers() {
         toolkit: "gmail".into(),
         message: "invalid scope".into(),
     };
-    assert_eq!(error.to_string(), "authorize failed for gmail: invalid scope");
+    assert_eq!(
+        error.to_string(),
+        "authorize failed for gmail: invalid scope"
+    );
 }
 
 #[test]

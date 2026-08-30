@@ -56,8 +56,8 @@
 //! # Ok::<(), serde_json::Error>(())
 //! ```
 
-mod error;
 pub mod client;
+mod error;
 pub mod oauth;
 mod tinybus_module;
 
@@ -71,13 +71,13 @@ pub use tinyconnectors_bus;
 pub use tinyconnectors_bus::{
     CONTRACT_VERSION, ComposioActiveTrigger, ComposioActiveTriggersResponse,
     ComposioAgentReadyToolkitsResponse, ComposioAuthorizeRequest, ComposioAuthorizeResponse,
-    ComposioAvailableTrigger, ComposioAvailableTriggerRepo, ComposioAvailableTriggersResponse, ComposioCapabilitiesResponse,
-    ComposioCapability, ComposioConnection, ComposioConnectionsResponse,
-    ComposioCreateTriggerResponse, ComposioDeleteConnectionRequest, ComposioDeleteResponse, ComposioDisableTriggerResponse,
-    ComposioEnableTriggerResponse, ComposioExecuteResponse, ComposioGithubRepo,
-    ComposioGithubReposResponse, ComposioToolFunction, ComposioToolSchema,
-    ComposioToolkitCatalogEntry, ComposioToolkitsResponse, ComposioToolsResponse,
-    ComposioTriggerEvent, ComposioTriggerHistoryEntry, ComposioTriggerHistoryResult,
-    ComposioTriggerMetadata, INTERFACE, METHODS, OBJECT_PATH, composio, is_compatible, names,
-    version,
+    ComposioAvailableTrigger, ComposioAvailableTriggerRepo, ComposioAvailableTriggersResponse,
+    ComposioCapabilitiesResponse, ComposioCapability, ComposioConnection,
+    ComposioConnectionsResponse, ComposioCreateTriggerResponse, ComposioDeleteConnectionRequest,
+    ComposioDeleteResponse, ComposioDisableTriggerResponse, ComposioEnableTriggerResponse,
+    ComposioExecuteResponse, ComposioGithubRepo, ComposioGithubReposResponse, ComposioToolFunction,
+    ComposioToolSchema, ComposioToolkitCatalogEntry, ComposioToolkitsResponse,
+    ComposioToolsResponse, ComposioTriggerEvent, ComposioTriggerHistoryEntry,
+    ComposioTriggerHistoryResult, ComposioTriggerMetadata, INTERFACE, METHODS, OBJECT_PATH,
+    composio, is_compatible, names, version,
 };

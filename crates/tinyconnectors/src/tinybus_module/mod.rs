@@ -64,7 +64,8 @@ impl ConnectorService {
     ) -> TinyBusResult<ComposioAuthorizeResponse> {
         let toolkit = request.toolkit.clone();
         let result = crate::oauth::authorize_with_rate_limit_retry(|| {
-            self.client.authorize(&request.toolkit, request.extra_params.clone())
+            self.client
+                .authorize(&request.toolkit, request.extra_params.clone())
         })
         .await;
 

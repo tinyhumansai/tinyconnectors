@@ -45,7 +45,12 @@ impl FakeTransport {
         })
     }
 
-    fn record(&self, verb: &'static str, path: &str, body: Option<&serde_json::Value>) -> Result<serde_json::Value> {
+    fn record(
+        &self,
+        verb: &'static str,
+        path: &str,
+        body: Option<&serde_json::Value>,
+    ) -> Result<serde_json::Value> {
         self.calls.lock().unwrap().push(Call {
             verb,
             path: path.to_string(),
@@ -261,10 +266,7 @@ async fn deletes_a_connection_by_id() {
 
     let call = &transport.calls()[0];
     assert_eq!(call.verb, "DELETE");
-    assert_eq!(
-        call.path,
-        "/agent-integrations/composio/connections/conn_9"
-    );
+    assert_eq!(call.path, "/agent-integrations/composio/connections/conn_9");
 }
 
 #[tokio::test]
@@ -298,7 +300,9 @@ async fn reports_an_unexpected_envelope_as_a_decode_failure() {
     let error = client.list_connections().await.unwrap_err();
     assert!(matches!(error, Error::Decode { .. }));
     assert!(
-        error.to_string().contains("/agent-integrations/composio/connections"),
+        error
+            .to_string()
+            .contains("/agent-integrations/composio/connections"),
         "the failing path belongs in the message: {error}"
     );
 }

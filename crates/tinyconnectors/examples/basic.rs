@@ -62,7 +62,10 @@ async fn main() -> Result<()> {
         } else if oauth::is_meta_oauth_toolkit(&connection.toolkit)
             && oauth::is_clearable_oauth_status(&connection.status)
         {
-            println!("clearing stale {} handoff before retrying", connection.toolkit);
+            println!(
+                "clearing stale {} handoff before retrying",
+                connection.toolkit
+            );
             client.delete_connection(&connection.id).await?;
         }
     }

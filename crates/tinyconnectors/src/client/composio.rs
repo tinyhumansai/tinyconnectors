@@ -160,11 +160,7 @@ impl ComposioClient {
         decode(path, value)
     }
 
-    async fn post<T: DeserializeOwned>(
-        &self,
-        path: &str,
-        body: &serde_json::Value,
-    ) -> Result<T> {
+    async fn post<T: DeserializeOwned>(&self, path: &str, body: &serde_json::Value) -> Result<T> {
         let value = self.transport.post(path, body).await?;
         decode(path, value)
     }
@@ -190,7 +186,10 @@ fn required_oauth_scopes_for_toolkit(toolkit: &str) -> &'static [&'static str] {
 /// Additive on purpose: a caller that already asked for scopes keeps them, and
 /// a duplicate is not appended. Nothing is ever removed — narrowing a caller's
 /// request here would break a connection they were relying on.
-fn merge_required_oauth_scopes(body: &mut serde_json::Map<String, serde_json::Value>, toolkit: &str) {
+fn merge_required_oauth_scopes(
+    body: &mut serde_json::Map<String, serde_json::Value>,
+    toolkit: &str,
+) {
     let required = required_oauth_scopes_for_toolkit(toolkit);
     if required.is_empty() {
         return;
