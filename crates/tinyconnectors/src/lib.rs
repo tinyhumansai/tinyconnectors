@@ -7,12 +7,19 @@
 //! host — `openhuman`, `tinycortex` — gains connectors by loading a binary
 //! rather than by compiling them in.
 //!
-//! # Backends
+//! # Backends and routes
 //!
 //! Composio is the connector backend today. It is not assumed to be the only
 //! one: its vocabulary is namespaced under [`tinyconnectors_bus::composio`], and
 //! policy that is not Composio-specific — the OAuth handoff rules in [`oauth`],
 //! for instance — is written without reference to it.
+//!
+//! Composio itself is reachable two ways, and the module implements both:
+//! proxied through the TinyHumans backend, or directly with a user-supplied API
+//! key. Which one to use is host policy, stated in the module configuration
+//! blob — see [`client::route`]. The two are not equivalent, and a member the
+//! live route cannot answer says so with [`Error::UnsupportedByRoute`] rather
+//! than returning an empty result that reads like an answer.
 //!
 //! # Layout
 //!

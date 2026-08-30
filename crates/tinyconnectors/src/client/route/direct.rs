@@ -229,12 +229,11 @@ impl Route for DirectRoute {
         let path = "/connected_accounts/link";
         let value = self.call(self.transport.post(path, &request)).await?;
 
-        let connect_url = field(&value, &["redirectUrl", "redirect_url", "connectUrl"]).ok_or(
-            Error::Decode {
+        let connect_url =
+            field(&value, &["redirectUrl", "redirect_url", "connectUrl"]).ok_or(Error::Decode {
                 path: path.to_string(),
                 message: "link response carried no redirect URL".to_string(),
-            },
-        )?;
+            })?;
 
         Ok(ComposioAuthorizeResponse {
             connect_url,

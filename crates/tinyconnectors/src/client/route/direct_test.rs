@@ -141,7 +141,10 @@ async fn translates_v3_connected_accounts_into_connections() {
     // The object-wrapped toolkit is unwrapped, not dropped.
     assert_eq!(connection.toolkit, "gmail");
     assert!(connection.is_active());
-    assert_eq!(connection.account_email.as_deref(), Some("user@example.com"));
+    assert_eq!(
+        connection.account_email.as_deref(),
+        Some("user@example.com")
+    );
 }
 
 #[tokio::test]

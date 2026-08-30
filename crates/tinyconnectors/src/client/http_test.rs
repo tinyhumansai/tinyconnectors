@@ -87,7 +87,8 @@ fn debug_output_never_carries_the_credential() {
     assert!(!rendered.contains("super-secret-token"), "{rendered}");
     assert!(rendered.contains("api.example.com"));
 
-    let direct = HttpTransport::api_key("https://backend.composio.dev/api/v3", "sk-secret").unwrap();
+    let direct =
+        HttpTransport::api_key("https://backend.composio.dev/api/v3", "sk-secret").unwrap();
     let rendered = format!("{direct:?}");
     assert!(!rendered.contains("sk-secret"), "{rendered}");
 }
@@ -95,7 +96,10 @@ fn debug_output_never_carries_the_credential() {
 #[test]
 fn each_scheme_sends_the_header_its_route_expects() {
     let bearer = HttpTransport::bearer("https://api.example.com", "t0ken").unwrap();
-    assert_eq!(bearer.auth_header(), ("authorization", "Bearer t0ken".into()));
+    assert_eq!(
+        bearer.auth_header(),
+        ("authorization", "Bearer t0ken".into())
+    );
 
     let direct = HttpTransport::api_key("https://backend.composio.dev/api/v3", "sk-1").unwrap();
     assert_eq!(direct.auth_header(), ("x-api-key", "sk-1".into()));

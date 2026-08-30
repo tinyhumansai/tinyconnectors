@@ -173,7 +173,10 @@ fn to_bus_error(error: &crate::Error) -> tinybus::Error {
 
 async fn setup(connection: Connection, config: ModuleConfig) -> TinyBusResult<()> {
     let route = config.into_route().map_err(|error| to_bus_error(&error))?;
-    tracing::info!(route = route.name(), "[connectors] serving connector surface");
+    tracing::info!(
+        route = route.name(),
+        "[connectors] serving connector surface"
+    );
     let service = ConnectorService {
         client: ComposioClient::new(route),
     };

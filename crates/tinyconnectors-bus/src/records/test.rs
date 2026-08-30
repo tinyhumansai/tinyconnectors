@@ -149,7 +149,10 @@ fn every_stage_has_a_stable_snake_case_wire_name() {
         (SyncStage::Failed, "failed"),
     ] {
         assert_eq!(stage.as_str(), name);
-        assert_eq!(serde_json::to_value(stage).expect("serializes"), json!(name));
+        assert_eq!(
+            serde_json::to_value(stage).expect("serializes"),
+            json!(name)
+        );
     }
 }
 
