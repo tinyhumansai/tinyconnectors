@@ -2,9 +2,7 @@
 
 use std::sync::Arc;
 
-use serde::de::DeserializeOwned;
-
-use super::transport::Transport;
+use super::route::Route;
 use crate::{
     ComposioAuthorizeResponse, ComposioConnectionsResponse, ComposioDeleteResponse,
     ComposioToolkitsResponse, Error, Result,
@@ -21,35 +19,38 @@ const GMAIL_REQUIRED_OAUTH_SCOPES: &[&str] = &["https://www.googleapis.com/auth/
 
 const OAUTH_SCOPES_FIELD: &str = "oauth_scopes";
 
-/// A client for the backend-proxied Composio operations.
+/// The Composio operations, over whichever route the host selected.
+///
+/// This type holds the policy that is true regardless of route — argument
+/// validation, the reserved-key refusal, the required-scope merge — and hands
+/// the call to a [`Route`] that knows its own paths and response shapes. That
+/// split is what keeps every caller above from branching on mode.
 #[derive(Debug, Clone)]
 pub struct ComposioClient {
-    transport: Arc<dyn Transport>,
+    route: Arc<dyn Route>,
 }
 
 impl ComposioClient {
-    /// Build a client over `transport`.
+    /// Build a client over `route`.
     #[must_use]
-    pub fn new(transport: Arc<dyn Transport>) -> Self {
-        Self { transport }
+    pub fn new(route: Arc<dyn Route>) -> Self {
+        Self { route }
     }
 
-    /// The transport, for a caller that needs a bespoke call on the same
-    /// connection pool and credential.
+    /// Which route this client was built on, `"proxy"` or `"direct"`.
     #[must_use]
-    pub fn transport(&self) -> &Arc<dyn Transport> {
-        &self.transport
+    pub fn route_name(&self) -> &'static str {
+        self.route.name()
     }
 
     /// List the toolkits the backend allowlist currently enables.
     ///
     /// # Errors
     ///
-    /// Returns [`Error::Transport`] if the request fails, or [`Error::Decode`]
-    /// if the response does not match the expected envelope.
+    /// Returns [`Error::UnsupportedByRoute`] on the direct route, which has no
+    /// allowlist to report, and otherwise a transport or decode failure.
     pub async fn list_toolkits(&self) -> Result<ComposioToolkitsResponse> {
-        tracing::debug!("[connectors][composio] list_toolkits");
-        self.get("/agent-integrations/composio/toolkits").await
+        self.route.list_toolkits().await
     }
 
     /// List the caller's connections, active or not.
@@ -63,8 +64,7 @@ impl ComposioClient {
     /// Returns [`Error::Transport`] if the request fails, or [`Error::Decode`]
     /// if the response does not match the expected envelope.
     pub async fn list_connections(&self) -> Result<ComposioConnectionsResponse> {
-        tracing::debug!("[connectors][composio] list_connections");
-        self.get("/agent-integrations/composio/connections").await
+        self.route.list_connections().await
     }
 
     /// Begin an OAuth handoff for `toolkit`.
@@ -121,11 +121,9 @@ impl ComposioClient {
 
         merge_required_oauth_scopes(&mut body, toolkit);
 
-        self.post(
-            "/agent-integrations/composio/authorize",
-            &serde_json::Value::Object(body),
-        )
-        .await
+        self.route
+            .authorize(toolkit, &serde_json::Value::Object(body))
+            .await
     }
 
     /// Disconnect a connection.
@@ -136,8 +134,8 @@ impl ComposioClient {
     /// # Errors
     ///
     /// Returns [`Error::Authorize`] if `connection_id` is empty,
-    /// [`Error::Transport`] if the request fails, and [`Error::Decode`] on an
-    /// unexpected envelope.
+    /// [`Error::UnsupportedByRoute`] on the direct route, and otherwise a
+    /// transport or decode failure.
     pub async fn delete_connection(&self, connection_id: &str) -> Result<ComposioDeleteResponse> {
         let connection_id = connection_id.trim();
         if connection_id.is_empty() {
