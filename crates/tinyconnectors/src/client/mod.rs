@@ -9,10 +9,21 @@
 //! acquired the host's way — a Bearer JWT here, something else in the next host.
 //!
 //! Baking one host's auth into this crate would make it that host's library.
-//! [`Transport`] is the seam instead: the host implements three verbs, and
-//! [`ComposioClient`] spells the paths and parses the envelopes on top. A test
-//! implements the same three verbs over a fixture map, which is why the client
-//! tests below need no network.
+//! [`Transport`] is the seam instead: the host implements three verbs, and the
+//! layers above spell the paths and parse the envelopes. A test implements the
+//! same three verbs over a fixture map, which is why the client tests need no
+//! network.
+//!
+//! # Two routes, one client
+//!
+//! Composio is reachable two ways — proxied through the TinyHumans backend, or
+//! directly with a user-supplied API key — and they differ in base URL, auth
+//! header, paths, *and* response shape. [`Route`] absorbs all four differences;
+//! [`ComposioClient`] holds the policy that is the same either way and calls
+//! through it. Nothing above this module branches on which route is live.
+//!
+//! Selecting a route is host policy, stated in the module configuration blob.
+//! See [`route`] for why the two are not equivalent.
 //!
 //! # What the client does not do
 //!
@@ -22,10 +33,12 @@
 
 mod composio;
 mod http;
+mod route;
 mod transport;
 
 pub use composio::ComposioClient;
 pub use http::HttpTransport;
+pub use route::{DirectRoute, ProxyRoute, Route, direct::COMPOSIO_API_BASE};
 pub use transport::Transport;
 
 #[cfg(test)]
