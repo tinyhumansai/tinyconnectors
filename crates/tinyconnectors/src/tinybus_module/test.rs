@@ -1032,3 +1032,185 @@ async fn the_ephemeral_state_store_round_trips() {
     assert_eq!(store.get("ns", "k").await.unwrap().unwrap()["a"], 1);
     assert!(store.get("other", "k").await.unwrap().is_none());
 }
+
+// ── setup ────────────────────────────────────────────────────────────
+
+/// A scratch directory that removes itself.
+struct TempDir(std::path::PathBuf);
+
+impl TempDir {
+    fn new(name: &str) -> Self {
+        let path = std::env::temp_dir().join(format!(
+            "tinyconnectors-module-{name}-{}-{:?}",
+            std::process::id(),
+            std::thread::current().id()
+        ));
+        let _ = std::fs::remove_dir_all(&path);
+        std::fs::create_dir_all(&path).expect("scratch directory");
+        Self(path)
+    }
+}
+
+impl Drop for TempDir {
+    fn drop(&mut self) {
+        let _ = std::fs::remove_dir_all(&self.0);
+    }
+}
+
+/// Stand the module up the way the loader does: through `setup`.
+async fn serve_via_setup(config: ModuleConfig) -> tinybus::Result<(Connection, tinybus::Proxy)> {
+    let bus = MemoryBus::new();
+    Broker::new().spawn(bus.clone());
+
+    let serving = Connection::connect(bus.connect().await?).await?;
+    super::setup(serving.clone(), config).await?;
+
+    let client = Connection::connect(bus.connect().await?).await?;
+    let proxy = client.proxy(names::INTERFACE, names::OBJECT_PATH, names::INTERFACE)?;
+    // The client connection is returned so the caller holds it; the serving one
+    // owns the bus name and must outlive the proxy.
+    Ok((serving, proxy))
+}
+
+#[tokio::test]
+async fn setup_serves_the_interface_over_the_bus() -> tinybus::Result<()> {
+    let dir = TempDir::new("setup");
+    let config: ModuleConfig = serde_json::from_value(json!({
+        "route": "proxy",
+        "base_url": "https://api.example.invalid",
+        "auth_token": "t0ken",
+        "state_dir": dir.0,
+    }))
+    .expect("parses");
+
+    let (_serving, proxy) = serve_via_setup(config).await?;
+
+    // A member that needs no network proves the whole path stood up: config
+    // parsed, archive opened, route built, object served, name claimed.
+    let reply: ComposioCapabilitiesResponse =
+        proxy.call(names::methods::LIST_CAPABILITIES, ()).await?;
+    assert!(!reply.capabilities.is_empty());
+    Ok(())
+}
+
+#[tokio::test]
+async fn setup_on_the_direct_route_serves_too() -> tinybus::Result<()> {
+    let config: ModuleConfig = serde_json::from_value(json!({
+        "route": "direct",
+        "api_key": "sk-test",
+    }))
+    .expect("parses");
+
+    let (_serving, proxy) = serve_via_setup(config).await?;
+    let reply: ComposioAgentReadyToolkitsResponse = proxy
+        .call(names::methods::LIST_AGENT_READY_TOOLKITS, ())
+        .await?;
+    assert!(!reply.toolkits.is_empty());
+    Ok(())
+}
+
+#[tokio::test]
+async fn setup_refuses_a_state_dir_it_cannot_use() -> tinybus::Result<()> {
+    // Failing at load beats failing on the first trigger, weeks later.
+    let config: ModuleConfig = serde_json::from_value(json!({
+        "route": "proxy",
+        "base_url": "https://api.example.invalid",
+        "auth_token": "t0ken",
+        "state_dir": "/proc/nonexistent-for-tests",
+    }))
+    .expect("parses");
+
+    assert!(serve_via_setup(config).await.is_err());
+    Ok(())
+}
+
+#[tokio::test]
+async fn setup_refuses_a_base_url_that_would_leak_the_credential() -> tinybus::Result<()> {
+    let config: ModuleConfig = serde_json::from_value(json!({
+        "route": "proxy",
+        "base_url": "http://127.0.0.1:8080@evil.com",
+        "auth_token": "t0ken",
+    }))
+    .expect("parses");
+
+    assert!(serve_via_setup(config).await.is_err());
+    Ok(())
+}
+
+#[tokio::test]
+async fn trigger_history_reads_the_archive_the_host_gave_it() -> tinybus::Result<()> {
+    let dir = TempDir::new("history");
+    let config: ModuleConfig = serde_json::from_value(json!({
+        "route": "proxy",
+        "base_url": "https://api.example.invalid",
+        "auth_token": "t0ken",
+        "state_dir": dir.0,
+    }))
+    .expect("parses");
+
+    // A delivery recorded through the same archive the module opened.
+    let archive = crate::triggers::TriggerArchive::open(&dir.0).expect("opens");
+    archive
+        .record(
+            "gmail",
+            "GMAIL_NEW_GMAIL_MESSAGE",
+            "evt-1",
+            "u",
+            &json!({ "s": 1 }),
+        )
+        .expect("records");
+
+    let (_serving, proxy) = serve_via_setup(config).await?;
+    let reply: ComposioTriggerHistoryResult = proxy
+        .call(
+            names::methods::LIST_TRIGGER_HISTORY,
+            (ComposioListTriggerHistoryRequest { limit: Some(10) },),
+        )
+        .await?;
+
+    assert_eq!(reply.entries.len(), 1);
+    assert_eq!(reply.entries[0].metadata_id, "evt-1");
+    Ok(())
+}
+
+#[tokio::test]
+async fn a_named_state_dir_persists_the_scope_preference() {
+    // The difference between the two stores, observable: a preference written
+    // through one module instance is read back by the next.
+    let dir = TempDir::new("persist");
+    let store = super::state_store(Some(&dir.0));
+    tinyconnectors_sync::UserScopePref {
+        read: true,
+        write: false,
+        admin: false,
+    }
+    .save(store.as_ref(), "gmail")
+    .await
+    .expect("saves");
+
+    let reopened = super::state_store(Some(&dir.0));
+    let pref = tinyconnectors_sync::UserScopePref::load(reopened.as_ref(), "gmail")
+        .await
+        .expect("loads");
+    assert!(!pref.write, "the choice survived the module restart");
+}
+
+#[tokio::test]
+async fn an_unnamed_state_dir_keeps_nothing_between_instances() {
+    // Documented, not accidental: a host that means to sync should name one.
+    let store = super::state_store(None);
+    tinyconnectors_sync::UserScopePref {
+        read: true,
+        write: false,
+        admin: false,
+    }
+    .save(store.as_ref(), "gmail")
+    .await
+    .expect("saves");
+
+    let fresh = super::state_store(None);
+    let pref = tinyconnectors_sync::UserScopePref::load(fresh.as_ref(), "gmail")
+        .await
+        .expect("loads");
+    assert!(pref.write, "a new instance starts from the default");
+}
