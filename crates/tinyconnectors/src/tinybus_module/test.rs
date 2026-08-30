@@ -18,8 +18,9 @@ use tinybus::{Connection, Interface};
 use tinyconnectors_bus::{
     ComposioAuthorizeRequest, ComposioAuthorizeResponse, ComposioConnectionsResponse,
     ComposioDeleteConnectionRequest, ComposioDeleteResponse, ComposioExecuteRequest,
-    ComposioExecuteResponse, ComposioListToolsRequest, ComposioToolkitsResponse,
-    ComposioToolsResponse, names,
+    ComposioExecuteResponse, ComposioGetUserScopesRequest, ComposioListToolsRequest,
+    ComposioSetUserScopesRequest, ComposioToolkitsResponse, ComposioToolsResponse,
+    ComposioUserScopes, ComposioUserScopesResponse, names,
 };
 
 use super::{ConnectorService, ModuleConfig};
@@ -273,7 +274,7 @@ async fn serves_the_tool_catalog_over_a_real_bus() -> tinybus::Result<()> {
             names::methods::LIST_TOOLS,
             (ComposioListToolsRequest {
                 toolkits: vec!["gmail".into()],
-                tags: Vec::new(),
+                ..ComposioListToolsRequest::default()
             },),
         )
         .await?;
@@ -311,6 +312,155 @@ async fn runs_an_action_over_the_bus() -> tinybus::Result<()> {
     let body = transport.last_body.lock().unwrap().clone().unwrap();
     assert_eq!(body["connectionId"], "conn_1");
     assert_eq!(body["tool"], "GMAIL_SEND_EMAIL");
+    Ok(())
+}
+
+#[tokio::test]
+async fn hides_an_action_the_scope_preference_forbids() -> tinybus::Result<()> {
+    // A listing is what an agent picks from. Showing it an action it will then
+    // be refused wastes a turn and reads to the model as a malfunction.
+    let transport = StubTransport::replying(json!({
+        "tools": [
+            { "function": { "name": "GMAIL_FETCH_EMAILS" } },
+            { "function": { "name": "GMAIL_SEND_EMAIL" } },
+            { "function": { "name": "GMAIL_DELETE_MESSAGE" } }
+        ]
+    }));
+    let (_serving, _client, proxy, _bus) = proxy_to(service_over(transport)).await?;
+
+    // The default preference: read and write, but not admin.
+    let reply: ComposioToolsResponse = proxy
+        .call(
+            names::methods::LIST_TOOLS,
+            (ComposioListToolsRequest::default(),),
+        )
+        .await?;
+
+    let names_offered: Vec<_> = reply
+        .tools
+        .iter()
+        .map(|tool| tool.function.name.as_str())
+        .collect();
+    assert_eq!(names_offered, ["GMAIL_FETCH_EMAILS", "GMAIL_SEND_EMAIL"]);
+    Ok(())
+}
+
+#[tokio::test]
+async fn shows_the_whole_catalog_when_the_caller_asks_for_it() -> tinybus::Result<()> {
+    // A settings screen rendering the choices is not an agent about to act.
+    let transport = StubTransport::replying(json!({
+        "tools": [{ "function": { "name": "GMAIL_DELETE_MESSAGE" } }]
+    }));
+    let (_serving, _client, proxy, _bus) = proxy_to(service_over(transport)).await?;
+
+    let reply: ComposioToolsResponse = proxy
+        .call(
+            names::methods::LIST_TOOLS,
+            (ComposioListToolsRequest {
+                apply_user_scopes: false,
+                ..ComposioListToolsRequest::default()
+            },),
+        )
+        .await?;
+    assert_eq!(reply.tools.len(), 1);
+    Ok(())
+}
+
+#[tokio::test]
+async fn refuses_to_run_an_action_the_scope_preference_forbids() -> tinybus::Result<()> {
+    // Enforced by the module, not trusted from the caller: a preference a
+    // caller could opt out of is a suggestion, not a restriction.
+    let transport = StubTransport::replying(json!({ "successful": true }));
+    let (_serving, _client, proxy, _bus) = proxy_to(service_over(transport.clone())).await?;
+
+    let result = proxy
+        .call::<ComposioExecuteResponse>(
+            names::methods::EXECUTE,
+            (ComposioExecuteRequest {
+                tool: "GMAIL_DELETE_MESSAGE".into(),
+                arguments: None,
+                connection_id: None,
+            },),
+        )
+        .await;
+
+    let Err(error) = result else {
+        return Err(tinybus::Error::failed("a forbidden action ran"));
+    };
+    assert!(error.to_string().contains("not permitted"));
+    assert!(
+        transport.last_body.lock().unwrap().is_none(),
+        "nothing may reach the backend"
+    );
+    Ok(())
+}
+
+#[tokio::test]
+async fn a_scope_preference_round_trips_and_then_permits_the_action() -> tinybus::Result<()> {
+    let transport = StubTransport::replying(json!({ "successful": true, "data": {} }));
+    let (_serving, _client, proxy, _bus) = proxy_to(service_over(transport)).await?;
+
+    let stored: ComposioUserScopesResponse = proxy
+        .call(
+            names::methods::SET_USER_SCOPES,
+            (ComposioSetUserScopesRequest {
+                toolkit: "Gmail".into(),
+                scopes: ComposioUserScopes {
+                    read: true,
+                    write: true,
+                    admin: true,
+                },
+            },),
+        )
+        .await?;
+    assert_eq!(stored.toolkit, "gmail", "the key is normalized");
+    assert!(stored.scopes.admin);
+
+    let read_back: ComposioUserScopesResponse = proxy
+        .call(
+            names::methods::GET_USER_SCOPES,
+            (ComposioGetUserScopesRequest {
+                toolkit: "gmail".into(),
+            },),
+        )
+        .await?;
+    assert!(read_back.scopes.admin);
+
+    // And the action the default forbade now runs.
+    let reply: ComposioExecuteResponse = proxy
+        .call(
+            names::methods::EXECUTE,
+            (ComposioExecuteRequest {
+                tool: "GMAIL_DELETE_MESSAGE".into(),
+                arguments: None,
+                connection_id: None,
+            },),
+        )
+        .await?;
+    assert!(reply.successful);
+    Ok(())
+}
+
+#[tokio::test]
+async fn a_toolkit_with_no_stored_preference_reports_the_default() -> tinybus::Result<()> {
+    let transport = StubTransport::replying(json!({}));
+    let (_serving, _client, proxy, _bus) = proxy_to(service_over(transport)).await?;
+
+    let reply: ComposioUserScopesResponse = proxy
+        .call(
+            names::methods::GET_USER_SCOPES,
+            (ComposioGetUserScopesRequest {
+                toolkit: "notion".into(),
+            },),
+        )
+        .await?;
+
+    assert!(reply.scopes.read);
+    assert!(reply.scopes.write);
+    assert!(
+        !reply.scopes.admin,
+        "admin is off until a user says otherwise"
+    );
     Ok(())
 }
 
