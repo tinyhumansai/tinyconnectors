@@ -303,12 +303,14 @@ impl ConnectorService {
             .map_err(|error| to_bus_error(&error))
     }
 
-    #[allow(clippy::unused_async)] // The interface macro dispatches `async`.
+    // The registry is in memory: there is nothing to await. `async` is the
+    // shape the interface macro dispatches, not a claim about the work.
+    #[allow(clippy::unused_async_trait_impl)]
     async fn list_capabilities(&self) -> TinyBusResult<ComposioCapabilitiesResponse> {
         Ok(self.registry.capabilities())
     }
 
-    #[allow(clippy::unused_async)] // The interface macro dispatches `async`.
+    #[allow(clippy::unused_async_trait_impl)] // Same: reads the registry.
     async fn list_agent_ready_toolkits(&self) -> TinyBusResult<ComposioAgentReadyToolkitsResponse> {
         Ok(ComposioAgentReadyToolkitsResponse {
             toolkits: self.registry.agent_ready_toolkits(),
@@ -548,6 +550,10 @@ tinybus_module::module_export! {
         "DeleteConnection",
         "ListTools",
         "Execute",
+        "ListCapabilities",
+        "ListAgentReadyToolkits",
+        "GetUserProfile",
+        "RefreshAllIdentities",
         "ListGithubRepos",
         "ListAvailableTriggers",
         "ListTriggers",
@@ -555,10 +561,6 @@ tinybus_module::module_export! {
         "EnableTrigger",
         "DisableTrigger",
         "ListTriggerHistory",
-        "GetUserProfile",
-        "RefreshAllIdentities",
-        "ListCapabilities",
-        "ListAgentReadyToolkits",
     ],
     signals = [],
     requires = [],

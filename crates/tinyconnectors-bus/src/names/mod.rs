@@ -168,6 +168,10 @@ pub const METHODS: &[&str] = &[
     methods::DELETE_CONNECTION,
     methods::LIST_TOOLS,
     methods::EXECUTE,
+    methods::LIST_CAPABILITIES,
+    methods::LIST_AGENT_READY_TOOLKITS,
+    methods::GET_USER_PROFILE,
+    methods::REFRESH_ALL_IDENTITIES,
     methods::LIST_GITHUB_REPOS,
     methods::LIST_AVAILABLE_TRIGGERS,
     methods::LIST_TRIGGERS,
@@ -175,10 +179,6 @@ pub const METHODS: &[&str] = &[
     methods::ENABLE_TRIGGER,
     methods::DISABLE_TRIGGER,
     methods::LIST_TRIGGER_HISTORY,
-    methods::GET_USER_PROFILE,
-    methods::REFRESH_ALL_IDENTITIES,
-    methods::LIST_CAPABILITIES,
-    methods::LIST_AGENT_READY_TOOLKITS,
 ];
 
 #[cfg(test)]
