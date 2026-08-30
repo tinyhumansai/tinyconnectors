@@ -69,8 +69,8 @@ fn the_transport_seam_is_implementable_from_outside_the_crate() {
 /// generically does. It was found by that gate failing: the module used to
 /// refuse an empty configuration, which meant it could not be verified after
 /// publication and could not answer the members that need no credential.
-#[test]
-fn the_built_module_loads_with_an_empty_configuration() {
+#[tokio::test]
+async fn the_built_module_loads_with_an_empty_configuration() {
     use tinybus::broker::Broker;
     use tinybus::module::ModuleHost;
     use tinybus::transport::memory::MemoryBus;
