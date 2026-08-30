@@ -294,21 +294,26 @@ impl ConnectorService {
             .map_err(|error| to_bus_error(&error))
     }
 
-    // Reads a local file rather than the network, so there is nothing to
-    // await. `async` is the shape the interface macro dispatches, not a claim
-    // that the work is asynchronous.
-    #[allow(clippy::unused_async)]
     async fn list_trigger_history(
         &self,
         request: ComposioListTriggerHistoryRequest,
     ) -> TinyBusResult<ComposioTriggerHistoryResult> {
-        let archive = self.archive.as_ref().ok_or_else(|| {
-            tinybus::Error::failed(
-                "trigger history is unavailable: the module was loaded without a `state_dir`",
-            )
-        })?;
-        archive
-            .list_recent(request.limit)
+        let archive = self
+            .archive
+            .as_ref()
+            .ok_or_else(|| {
+                tinybus::Error::failed(
+                    "trigger history is unavailable: the module was loaded without a `state_dir`",
+                )
+            })?
+            .clone();
+
+        // Reading the archive is synchronous file I/O, and the module owns a
+        // one-worker runtime: doing it inline would stall every other member
+        // for the duration of the read.
+        tokio::task::spawn_blocking(move || archive.list_recent(request.limit))
+            .await
+            .map_err(|error| tinybus::Error::failed(format!("history read failed: {error}")))?
             .map_err(|error| to_bus_error(&error))
     }
 }
