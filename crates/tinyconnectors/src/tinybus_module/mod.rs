@@ -44,12 +44,15 @@ use tinyconnectors_bus::{
     ComposioGithubReposResponse, ComposioListAvailableTriggersRequest,
     ComposioListGithubReposRequest, ComposioListToolsRequest, ComposioListTriggerHistoryRequest,
     ComposioListTriggersRequest, ComposioToolkitsResponse, ComposioToolsResponse,
-    ComposioTriggerHistoryResult, names,
+    ComposioAgentReadyToolkitsResponse, ComposioCapabilitiesResponse, ComposioIdentityFailure,
+    ComposioRefreshIdentitiesResponse, ComposioTriggerHistoryResult, ComposioUserProfile,
+    ComposioUserProfileRequest, names,
 };
 
 use crate::client::{
     COMPOSIO_API_BASE, ComposioClient, DirectRoute, HttpTransport, ProxyRoute, Route,
 };
+use crate::providers::ClientActions;
 use crate::triggers::TriggerArchive;
 
 /// Configuration the host hands the module at load time.
@@ -158,7 +161,62 @@ struct ConnectorService {
     /// hand the module a writable directory. Asking for one unconditionally
     /// would make every deployment carry a path it does not use.
     archive: Option<TriggerArchive>,
+    /// The toolkits this build knows how to read.
+    ///
+    /// Answers the capability members without touching the network, and gives
+    /// the profile members the action slug and identity field for a toolkit.
+    registry: ProviderRegistry,
+    /// How providers run their actions.
+    actions: Arc<ClientActions>,
+    /// Where providers persist cursors and budgets.
+    state: Arc<dyn SyncStateStore>,
 }
+
+impl ConnectorService {
+    /// Assemble the context one provider needs for one call.
+    fn context(&self, toolkit: &str, connection_id: &str) -> ProviderContext {
+        ProviderContext {
+            toolkit: toolkit.to_string(),
+            connection_id: connection_id.to_string(),
+            // A profile read produces no records, so the source it would write
+            // to is not consulted. Named after the connection anyway so a log
+            // line ties the call to something.
+            source_id: format!("{toolkit}:{connection_id}"),
+            limits: SyncLimits::default(),
+            actions: self.actions.clone(),
+            state: self.state.clone(),
+        }
+    }
+
+    /// Read one connection's identity through its toolkit's provider.
+    async fn profile_of(
+        &self,
+        toolkit: &str,
+        connection_id: &str,
+    ) -> TinyBusResult<ComposioUserProfile> {
+        let provider = self.registry.get(toolkit).ok_or_else(|| {
+            tinybus::Error::failed(format!(
+                "no provider for toolkit `{toolkit}`: this build does not know how to read its \
+                 profile"
+            ))
+        })?;
+
+        let profile = provider
+            .fetch_user_profile(&self.context(toolkit, connection_id))
+            .await
+            .map_err(|error| tinybus::Error::failed(error.to_string()))?;
+
+        Ok(ComposioUserProfile {
+            toolkit: profile.toolkit,
+            connection_id: profile.connection_id,
+            display_name: profile.display_name,
+            email: profile.email,
+            username: profile.username,
+            avatar_url: profile.avatar_url,
+            profile_url: profile.profile_url,
+            extras: profile.extras,
+        })
+    }
 
 #[tinybus::interface(name = "ai.tinyhumans.connectors.Composio")]
 impl ConnectorService {
@@ -224,6 +282,61 @@ impl ConnectorService {
             )
             .await
             .map_err(|error| to_bus_error(&error))
+    }
+
+    #[allow(clippy::unused_async)] // The interface macro dispatches `async`.
+    async fn list_capabilities(&self) -> TinyBusResult<ComposioCapabilitiesResponse> {
+        Ok(self.registry.capabilities())
+    }
+
+    #[allow(clippy::unused_async)] // The interface macro dispatches `async`.
+    async fn list_agent_ready_toolkits(
+        &self,
+    ) -> TinyBusResult<ComposioAgentReadyToolkitsResponse> {
+        Ok(ComposioAgentReadyToolkitsResponse {
+            toolkits: self.registry.agent_ready_toolkits(),
+        })
+    }
+
+    async fn get_user_profile(
+        &self,
+        request: ComposioUserProfileRequest,
+    ) -> TinyBusResult<ComposioUserProfile> {
+        let connection_id = match request.connection_id {
+            Some(id) if !id.trim().is_empty() => id,
+            // No connection named: use the toolkit's first active one. A user
+            // with several gets an arbitrary answer, which is why a caller that
+            // knows which it means should say so.
+            _ => self.first_active_connection(&request.toolkit).await?,
+        };
+        self.profile_of(&request.toolkit, &connection_id).await
+    }
+
+    async fn refresh_all_identities(&self) -> TinyBusResult<ComposioRefreshIdentitiesResponse> {
+        let connections = self
+            .client
+            .list_connections()
+            .await
+            .map_err(|error| to_bus_error(&error))?
+            .connections;
+
+        let mut profiles = Vec::new();
+        let mut failures = Vec::new();
+        for connection in connections.iter().filter(|c| c.is_active()) {
+            let toolkit = connection.normalized_toolkit();
+            match self.profile_of(&toolkit, &connection.id).await {
+                Ok(profile) => profiles.push(profile),
+                // One unreadable connection must not hide every readable one:
+                // a refresh exists precisely to find the broken ones.
+                Err(error) => failures.push(ComposioIdentityFailure {
+                    connection_id: connection.id.clone(),
+                    toolkit,
+                    message: error.to_string(),
+                }),
+            }
+        }
+
+        Ok(ComposioRefreshIdentitiesResponse { profiles, failures })
     }
 
     async fn list_github_repos(
@@ -318,6 +431,24 @@ impl ConnectorService {
     }
 }
 
+impl ConnectorService {
+    /// The first active connection for `toolkit`.
+    async fn first_active_connection(&self, toolkit: &str) -> TinyBusResult<String> {
+        let wanted = toolkit.trim().to_ascii_lowercase();
+        self.client
+            .list_connections()
+            .await
+            .map_err(|error| to_bus_error(&error))?
+            .connections
+            .into_iter()
+            .find(|connection| connection.is_active() && connection.normalized_toolkit() == wanted)
+            .map(|connection| connection.id)
+            .ok_or_else(|| {
+                tinybus::Error::failed(format!("no active connection for toolkit `{toolkit}`"))
+            })
+    }
+}
+
 /// Flatten a crate error onto the bus.
 fn to_bus_error(error: &crate::Error) -> tinybus::Error {
     tinybus::Error::failed(error.to_string())
@@ -369,6 +500,10 @@ tinybus_module::module_export! {
         "EnableTrigger",
         "DisableTrigger",
         "ListTriggerHistory",
+        "GetUserProfile",
+        "RefreshAllIdentities",
+        "ListCapabilities",
+        "ListAgentReadyToolkits",
     ],
     signals = [],
     requires = [],
