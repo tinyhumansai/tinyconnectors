@@ -40,6 +40,18 @@ struct FakeTransport {
 }
 
 impl FakeTransport {
+    /// Answer `value` for any path containing `needle`.
+    ///
+    /// The OAuth pre-clean makes three different calls inside one `authorize`,
+    /// and answering all of them with one envelope tests the wrong thing.
+    fn answering(self: &Arc<Self>, needle: &str, value: serde_json::Value) -> Arc<Self> {
+        self.by_path
+            .lock()
+            .unwrap()
+            .push((needle.to_string(), value));
+        self.clone()
+    }
+
     fn replying(value: serde_json::Value) -> Arc<Self> {
         Arc::new(Self {
             reply: Mutex::new(value),
