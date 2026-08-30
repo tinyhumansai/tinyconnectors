@@ -596,7 +596,22 @@ impl ConnectorService {
                 request.connection_id.as_deref(),
             )
             .await
-            .map_err(|error| to_bus_error(&error))
+            // Classified, like a refusal already is. A provider that answers
+            // "insufficient scope" and a backend that times out mean different
+            // things to whoever is looking at the screen — one is "reconnect
+            // your account", the other is "try again" — and the `[composio:
+            // error:<class>]` prefix is how a caller tells them apart.
+            //
+            // Only the `Err` path passes through here, which is transport and
+            // decode failures. A provider *refusal* arrives as a successful
+            // reply carrying `successful: false`, and its message is formatted
+            // where that is decided, so nothing is classified twice.
+            .map_err(|error| {
+                tinybus::Error::failed(crate::execute::format_provider_error(
+                    &request.tool,
+                    &error.to_string(),
+                ))
+            })
     }
 
     // The registry is in memory: there is nothing to await. `async` is the

@@ -1405,3 +1405,27 @@ async fn configure_none_drops_the_credential_the_module_was_holding() {
     let error = service.list_toolkits().await.unwrap_err().to_string();
     assert!(error.contains("without a connector route"), "{error}");
 }
+
+#[tokio::test]
+async fn a_failed_execute_carries_an_error_class() {
+    // A provider that says "insufficient scope" and a backend that times out
+    // mean different things to whoever is looking at the screen — one is
+    // "reconnect your account", the other is "try again". The
+    // `[composio:error:<class>]` prefix is how a caller tells them apart, and
+    // without it every failure renders as the same unhelpful string.
+    let transport = StubTransport::failing("rate limited");
+    let service = service_over(transport);
+
+    let error = service
+        .execute(ComposioExecuteRequest {
+            tool: "GMAIL_FETCH_EMAILS".to_string(),
+            arguments: None,
+            connection_id: None,
+        })
+        .await
+        .unwrap_err()
+        .to_string();
+
+    assert!(error.contains("[composio:error:"), "{error}");
+    assert!(error.contains("rate limited"), "{error}");
+}
