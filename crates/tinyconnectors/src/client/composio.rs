@@ -4,8 +4,10 @@ use std::sync::Arc;
 
 use super::route::Route;
 use crate::{
-    ComposioAuthorizeResponse, ComposioConnectionsResponse, ComposioDeleteResponse,
-    ComposioExecuteResponse, ComposioToolkitsResponse, ComposioToolsResponse, Error, Result,
+    ComposioActiveTriggersResponse, ComposioAuthorizeResponse, ComposioAvailableTriggersResponse,
+    ComposioConnectionsResponse, ComposioCreateTriggerResponse, ComposioDeleteResponse,
+    ComposioDisableTriggerResponse, ComposioEnableTriggerResponse, ComposioExecuteResponse,
+    ComposioGithubReposResponse, ComposioToolkitsResponse, ComposioToolsResponse, Error, Result,
 };
 
 /// Keys the backend derives itself. Letting a caller set them would let a tool
@@ -179,6 +181,130 @@ impl ComposioClient {
     ) -> Result<ComposioExecuteResponse> {
         crate::execute::execute_action(self.route.as_ref(), tool, arguments, connection_id).await
     }
+
+    /// List the repositories a connected `GitHub` account can see.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`Error::UnsupportedByRoute`] on the direct route, and otherwise
+    /// a transport or decode failure.
+    pub async fn list_github_repos(
+        &self,
+        connection_id: Option<&str>,
+    ) -> Result<ComposioGithubReposResponse> {
+        self.route
+            .list_github_repos(non_empty(connection_id))
+            .await
+    }
+
+    /// List the triggers `toolkit` offers.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`Error::InvalidArguments`] when `toolkit` is empty,
+    /// [`Error::UnsupportedByRoute`] on the direct route, and otherwise a
+    /// transport or decode failure.
+    pub async fn list_available_triggers(
+        &self,
+        toolkit: &str,
+        connection_id: Option<&str>,
+    ) -> Result<ComposioAvailableTriggersResponse> {
+        let toolkit = require("ListAvailableTriggers", "toolkit", toolkit)?;
+        self.route
+            .list_available_triggers(toolkit, non_empty(connection_id))
+            .await
+    }
+
+    /// List the caller's enabled trigger subscriptions.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`Error::UnsupportedByRoute`] on the direct route, and otherwise
+    /// a transport or decode failure.
+    pub async fn list_triggers(
+        &self,
+        toolkit: Option<&str>,
+    ) -> Result<ComposioActiveTriggersResponse> {
+        self.route.list_triggers(non_empty(toolkit)).await
+    }
+
+    /// Create a trigger subscription.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`Error::InvalidArguments`] when `slug` is empty,
+    /// [`Error::UnsupportedByRoute`] on the direct route, and otherwise a
+    /// transport or decode failure.
+    pub async fn create_trigger(
+        &self,
+        slug: &str,
+        connection_id: Option<&str>,
+        trigger_config: Option<serde_json::Value>,
+    ) -> Result<ComposioCreateTriggerResponse> {
+        let slug = require("CreateTrigger", "slug", slug)?;
+        self.route
+            .create_trigger(slug, non_empty(connection_id), trigger_config)
+            .await
+    }
+
+    /// Enable a trigger subscription on a connection.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`Error::InvalidArguments`] when either identifier is empty,
+    /// [`Error::UnsupportedByRoute`] on the direct route, and otherwise a
+    /// transport or decode failure.
+    pub async fn enable_trigger(
+        &self,
+        connection_id: &str,
+        slug: &str,
+        trigger_config: Option<serde_json::Value>,
+    ) -> Result<ComposioEnableTriggerResponse> {
+        let connection_id = require("EnableTrigger", "connection_id", connection_id)?;
+        let slug = require("EnableTrigger", "slug", slug)?;
+        self.route
+            .enable_trigger(connection_id, slug, trigger_config)
+            .await
+    }
+
+    /// Disable a trigger subscription.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`Error::InvalidArguments`] when `trigger_id` is empty,
+    /// [`Error::UnsupportedByRoute`] on the direct route, and otherwise a
+    /// transport or decode failure.
+    pub async fn disable_trigger(
+        &self,
+        trigger_id: &str,
+    ) -> Result<ComposioDisableTriggerResponse> {
+        let trigger_id = require("DisableTrigger", "trigger_id", trigger_id)?;
+        self.route.disable_trigger(trigger_id).await
+    }
+}
+
+/// Refuse an empty required identifier before it reaches a URL.
+///
+/// An empty id in a path silently addresses the collection instead of the item
+/// — a `DELETE` on every trigger rather than one.
+fn require<'a>(member: &str, field: &str, value: &'a str) -> Result<&'a str> {
+    let trimmed = value.trim();
+    if trimmed.is_empty() {
+        Err(Error::InvalidArguments {
+            tool: member.to_string(),
+            message: format!("`{field}` must not be empty"),
+        })
+    } else {
+        Ok(trimmed)
+    }
+}
+
+/// Treat a blank optional argument as absent.
+///
+/// A caller that sends `""` means "no filter", not "filter on the empty
+/// string", and forwarding it as a query parameter would match nothing.
+fn non_empty(value: Option<&str>) -> Option<&str> {
+    value.map(str::trim).filter(|value| !value.is_empty())
 }
 
 /// The scopes a toolkit needs beyond Composio's defaults, if any.
