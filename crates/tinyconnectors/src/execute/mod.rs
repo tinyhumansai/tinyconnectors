@@ -5,13 +5,14 @@
 //!
 //! # The pipeline
 //!
-//! 1. [`prepare`] normalizes and validates the arguments locally. A bare date
-//!    that Google Calendar would reject, a Gmail send with no recipient — these
-//!    are caught before the call rather than after it.
+//! 1. [`prepare_execute_arguments`] normalizes and validates the arguments
+//!    locally. A bare date
+//!    that Google Calendar would reject, a Gmail send with no recipient —
+//!    these are caught before the call rather than after it.
 //! 2. The call goes out through the live [`crate::client::route::Route`], with
 //!    the two retry policies below.
-//! 3. [`classify`] turns whatever came back into a class and a message a user
-//!    can act on.
+//! 3. [`classify_composio_error`] and [`format_provider_error`] turn whatever
+//!    came back into a class and a message a user can act on.
 //!
 //! # Two retries, and why not three
 //!
