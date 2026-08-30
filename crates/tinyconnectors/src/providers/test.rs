@@ -38,7 +38,7 @@ fn actions(reply: serde_json::Value) -> (Arc<StubTransport>, ClientActions) {
         ..StubTransport::default()
     });
     let client = ComposioClient::new(Arc::new(ProxyRoute::new(transport.clone())));
-    (transport, ClientActions::new(client))
+    (transport, ClientActions::new(Some(client)))
 }
 
 #[tokio::test]
@@ -130,7 +130,7 @@ async fn a_transport_failure_becomes_an_action_failure() {
     }
 
     let client = ComposioClient::new(Arc::new(ProxyRoute::new(Arc::new(DeadTransport))));
-    let error = ClientActions::new(client)
+    let error = ClientActions::new(Some(client))
         .run("GMAIL_FETCH_EMAILS", json!({}), "conn_1")
         .await
         .unwrap_err();
@@ -169,4 +169,17 @@ fn a_refusal_with_no_usable_message_still_says_something() {
     for empty in [None, Some(String::new()), Some("   ".to_string())] {
         assert_eq!(refusal_message(empty), "the provider reported failure");
     }
+}
+
+#[tokio::test]
+async fn a_runner_with_no_route_says_so_rather_than_failing_obscurely() {
+    // The module loads without a credential so the capability members work; a
+    // provider that then tries to act gets a named refusal.
+    let error = ClientActions::new(None)
+        .run("GMAIL_FETCH_EMAILS", json!({}), "conn_1")
+        .await
+        .unwrap_err();
+
+    assert!(matches!(error, SyncError::Action { .. }));
+    assert!(error.to_string().contains("route"));
 }
