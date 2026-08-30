@@ -45,7 +45,9 @@ use tinyconnectors_bus::{
     ComposioIdentityFailure, ComposioListAvailableTriggersRequest, ComposioListGithubReposRequest,
     ComposioListToolsRequest, ComposioListTriggerHistoryRequest, ComposioListTriggersRequest,
     ComposioRefreshIdentitiesResponse, ComposioToolkitsResponse, ComposioToolsResponse,
-    ComposioTriggerHistoryResult, ComposioUserProfile, ComposioUserProfileRequest, names,
+    ComposioGetUserScopesRequest, ComposioSetUserScopesRequest, ComposioTriggerHistoryResult,
+    ComposioUserProfile, ComposioUserProfileRequest, ComposioUserScopes,
+    ComposioUserScopesResponse, names,
 };
 
 use crate::client::{
