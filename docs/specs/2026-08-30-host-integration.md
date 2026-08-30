@@ -145,3 +145,26 @@ Nothing, until phase 4. `tinymemory` keeps its Composio sync until the host
 calls `Sync` on the module instead, and the sync returns records the host writes
 to memory over memory's own API. Phase 4 then deletes what nothing calls —
 see the ordering note at the top of that phase.
+
+
+## 6. The scope store is not moved yet
+
+The module can filter a `ListTools` reply by the user's scope preference and
+refuses an `Execute` the same preference forbids, reading both from its own
+state directory.
+
+OpenHuman's preference does not live there. It is two rows in the bound memory
+driver's KV tier, written by the `composio.set_user_scopes` handler and read by
+the agent-facing filter in `integrations::composio::tools`. Those rows are the
+user's actual answer.
+
+Until the store moves, the host asks for `apply_user_scopes: false` and keeps
+applying the preference itself. The alternative — letting the module filter
+against a store nobody has written to — reads as working and is wrong in the
+one direction that matters: it would hide or allow actions by the module's
+defaults rather than by what the user chose, and the two halves would disagree
+the moment anyone touched the toggle.
+
+Moving it is phase 4 work, and it is a data migration, not a flag: existing
+users have rows in memory's KV that have to arrive in the module, or every
+saved preference silently reverts to `read+write`.
