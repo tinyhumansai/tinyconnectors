@@ -61,10 +61,10 @@ where
                 if !is_authorize_rate_limited(&error.to_string()) {
                     return Err(error);
                 }
+                let sleep_secs = delay.as_secs();
                 tracing::warn!(
                     attempt = attempt_number,
-                    max_attempts = AUTHORIZE_RATE_LIMIT_MAX_ATTEMPTS,
-                    sleep_secs = delay.as_secs(),
+                    sleep_secs,
                     "[connectors][oauth] authorize rate-limited; backing off"
                 );
                 tokio::time::sleep(delay).await;
