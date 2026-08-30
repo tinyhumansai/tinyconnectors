@@ -80,12 +80,20 @@ fn names_itself_direct() {
     assert_eq!(route(FakeTransport::replying(json!({}))).name(), "direct");
 }
 
-#[test]
-fn falls_back_to_the_default_entity() {
+#[tokio::test]
+async fn falls_back_to_the_default_entity() {
     // An empty entity id must not travel to Composio as an empty string, which
-    // it rejects; "default" is the value the direct client has always sent.
-    let direct = DirectRoute::new(FakeTransport::replying(json!({})), "sk", "   ");
-    assert_eq!(format!("{direct:?}").contains("default"), true);
+    // it rejects; "default" is what the direct client has always sent.
+    let transport = FakeTransport::replying(json!({ "redirectUrl": "https://composio.dev/x" }));
+    let direct = DirectRoute::new(transport.clone(), "sk", "   ");
+
+    direct
+        .authorize("gmail", &json!({ "toolkit": "gmail" }))
+        .await
+        .unwrap();
+
+    let body = transport.last_body.lock().unwrap().clone().unwrap();
+    assert_eq!(body["entity_id"], "default");
 }
 
 #[tokio::test]

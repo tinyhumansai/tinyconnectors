@@ -14,7 +14,7 @@
 //!
 //! # Which route, and who decides
 //!
-//! The blob also says *how* to reach Composio — proxied through the TinyHumans
+//! The blob also says *how* to reach Composio — proxied through the `TinyHumans`
 //! backend, or directly with a user-supplied API key. The module implements
 //! both and chooses neither: whether the user is signed in, whether they
 //! supplied a key, and which the product prefers are all host policy, and all
@@ -60,7 +60,7 @@ use crate::client::{
 #[derive(Debug, Clone, Deserialize)]
 #[serde(tag = "route", rename_all = "snake_case")]
 pub(crate) enum ModuleConfig {
-    /// Reach Composio through the TinyHumans backend.
+    /// Reach Composio through the `TinyHumans` backend.
     Proxy {
         /// Base URL of the connector backend, e.g. `https://api.example.com`.
         base_url: String,

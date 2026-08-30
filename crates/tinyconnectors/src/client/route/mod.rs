@@ -2,7 +2,7 @@
 //!
 //! Composio can be reached two ways, and they are not the same API:
 //!
-//! - **proxy** — through the TinyHumans backend at
+//! - **proxy** — through the `TinyHumans` backend at
 //!   `/agent-integrations/composio/*`. The backend owns the Composio API key,
 //!   the billing margin, the per-user toolkit allowlist, and the HMAC
 //!   verification of inbound webhooks.

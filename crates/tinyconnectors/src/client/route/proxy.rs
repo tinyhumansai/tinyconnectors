@@ -12,7 +12,7 @@ use crate::{
     ComposioToolkitsResponse, Error, Result,
 };
 
-/// Reaches Composio through the TinyHumans backend.
+/// Reaches Composio through the `TinyHumans` backend.
 ///
 /// The backend answers in this crate's envelopes already — they were defined
 /// from its responses — so this route is paths and nothing else. That is the

@@ -15,7 +15,7 @@
 //! for instance — is written without reference to it.
 //!
 //! Composio itself is reachable two ways, and the module implements both:
-//! proxied through the TinyHumans backend, or directly with a user-supplied API
+//! proxied through the `TinyHumans` backend, or directly with a user-supplied API
 //! key. Which one to use is host policy, stated in the module configuration
 //! blob — see [`client::route`]. The two are not equivalent, and a member the
 //! live route cannot answer says so with [`Error::UnsupportedByRoute`] rather

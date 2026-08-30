@@ -16,7 +16,7 @@
 //!
 //! # Two routes, one client
 //!
-//! Composio is reachable two ways — proxied through the TinyHumans backend, or
+//! Composio is reachable two ways — proxied through the `TinyHumans` backend, or
 //! directly with a user-supplied API key — and they differ in base URL, auth
 //! header, paths, *and* response shape. [`Route`] absorbs all four differences;
 //! [`ComposioClient`] holds the policy that is the same either way and calls

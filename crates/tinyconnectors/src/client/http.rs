@@ -11,7 +11,7 @@ const REQUEST_TIMEOUT: Duration = Duration::from_secs(30);
 
 /// How a transport presents its credential.
 ///
-/// The two routes authenticate differently — the TinyHumans backend takes a
+/// The two routes authenticate differently — the `TinyHumans` backend takes a
 /// user session as `Authorization: Bearer`, Composio takes a user-supplied key
 /// as `x-api-key` — so the header is transport configuration rather than
 /// something a caller passes per request.
