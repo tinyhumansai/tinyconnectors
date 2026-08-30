@@ -348,7 +348,7 @@ impl ConnectorService {
     ) -> TinyBusResult<ComposioAuthorizeResponse> {
         let toolkit = request.toolkit.clone();
         let result = crate::oauth::authorize_with_rate_limit_retry(|| {
-            self.client
+            self.client()?
                 .authorize(&request.toolkit, request.extra_params.clone())
         })
         .await;
@@ -516,7 +516,7 @@ impl ConnectorService {
 
     async fn refresh_all_identities(&self) -> TinyBusResult<ComposioRefreshIdentitiesResponse> {
         let connections = self
-            .client
+            .client()?
             .list_connections()
             .await
             .map_err(|error| to_bus_error(&error))?
@@ -724,12 +724,15 @@ async fn setup(connection: Connection, config: ModuleConfig) -> TinyBusResult<()
 
     let route = config.into_route().map_err(|error| to_bus_error(&error))?;
     tracing::info!(
-        route = route.name(),
+        route = route.as_ref().map_or("none", |route| route.name()),
         archiving_triggers = archive.is_some(),
         "[connectors] serving connector surface"
     );
-    let client = ComposioClient::new(route);
+    let client = route.map(ComposioClient::new);
     let service = ConnectorService {
+        // A module with no route still answers the capability members, so the
+        // action runner is built over a client that reports the missing route
+        // if a provider ever reaches it.
         actions: Arc::new(ClientActions::new(client.clone())),
         // A host that named no state directory gets an in-memory store: profile
         // and capability members need none, and a sync run without persistence
