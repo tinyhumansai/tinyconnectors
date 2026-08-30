@@ -37,6 +37,8 @@
 //! - `src/error/` holds the crate-wide [`Error`] enum and the [`Result`] alias
 //!   returned by every fallible public function.
 //! - `src/oauth/` holds the account-linking policy.
+//! - `src/execute/` holds the action pipeline: argument preparation, the retry
+//!   policies, and failure classification.
 //! - `tinybus_module` adapts the public behavior to `TinyBus` and exports the
 //!   module descriptor, embedded manifest, and initialization entrypoint.
 //!

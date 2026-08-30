@@ -52,6 +52,20 @@ pub enum Error {
         message: String,
     },
 
+    /// Local validation rejected an action's arguments before the call.
+    ///
+    /// Caught here rather than at the provider because the provider's own
+    /// rejection is often unhelpful — and sometimes absent: Gmail accepts a
+    /// send with no recipient and a label change with no labels, then does
+    /// nothing, which the caller reports as success.
+    #[error("invalid arguments for `{tool}`: {message}")]
+    InvalidArguments {
+        /// Action slug the arguments were for.
+        tool: String,
+        /// Which rule rejected them.
+        message: String,
+    },
+
     /// The selected route does not offer this operation.
     ///
     /// The two routes are not equivalent, and pretending otherwise is worse
