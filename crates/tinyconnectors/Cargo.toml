@@ -20,8 +20,8 @@ crate-type = ["rlib", "cdylib"]
 [dependencies]
 # The wire contract: member names, payload types, and the contract version.
 # Re-exported wholesale from `src/lib.rs` so a consumer takes one dependency
-# rather than two, and so `tinyconnectors::GreetRequest` and
-# `tinyconnectors_bus::GreetRequest` are the same type.
+# rather than two, and so `tinyconnectors::ComposioConnection` and
+# `tinyconnectors_bus::ComposioConnection` are the same type.
 tinyconnectors-bus = { workspace = true }
 tinybus = { workspace = true }
 tinybus-module = { workspace = true }
