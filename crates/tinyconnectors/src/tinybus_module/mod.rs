@@ -197,7 +197,13 @@ impl RouteConfig {
 }
 
 struct ConnectorService {
-    client: ComposioClient,
+    /// The Composio client, when the host configured a route.
+    ///
+    /// `None` is a module loaded with no configuration — which is allowed, so
+    /// the capability members can answer. Everything that talks to Composio
+    /// goes through [`ConnectorService::client`], which explains what is
+    /// missing rather than failing obscurely.
+    client: Option<ComposioClient>,
     /// The archive of webhook deliveries, when the host gave the module a
     /// directory to keep state in.
     ///
@@ -217,6 +223,16 @@ struct ConnectorService {
 }
 
 impl ConnectorService {
+    /// The client, or an error naming what the host did not configure.
+    fn client(&self) -> TinyBusResult<&ComposioClient> {
+        self.client.as_ref().ok_or_else(|| {
+            tinybus::Error::failed(
+                "this module was loaded without a connector route: pass a `route` of \
+                 \"proxy\" or \"direct\" in its configuration to reach Composio",
+            )
+        })
+    }
+
     /// Assemble the context one provider needs for one call.
     fn context(&self, toolkit: &str, connection_id: &str) -> ProviderContext {
         ProviderContext {
@@ -296,7 +312,7 @@ impl ConnectorService {
     /// The first active connection for `toolkit`.
     async fn first_active_connection(&self, toolkit: &str) -> TinyBusResult<String> {
         let wanted = toolkit.trim().to_ascii_lowercase();
-        self.client
+        self.client()?
             .list_connections()
             .await
             .map_err(|error| to_bus_error(&error))?
@@ -313,14 +329,14 @@ impl ConnectorService {
 #[tinybus::interface(name = "ai.tinyhumans.connectors.Composio")]
 impl ConnectorService {
     async fn list_toolkits(&self) -> TinyBusResult<ComposioToolkitsResponse> {
-        self.client
+        self.client()?
             .list_toolkits()
             .await
             .map_err(|error| to_bus_error(&error))
     }
 
     async fn list_connections(&self) -> TinyBusResult<ComposioConnectionsResponse> {
-        self.client
+        self.client()?
             .list_connections()
             .await
             .map_err(|error| to_bus_error(&error))
@@ -346,7 +362,7 @@ impl ConnectorService {
         &self,
         request: ComposioDeleteConnectionRequest,
     ) -> TinyBusResult<ComposioDeleteResponse> {
-        self.client
+        self.client()?
             .delete_connection(&request.connection_id)
             .await
             .map_err(|error| to_bus_error(&error))
@@ -357,7 +373,7 @@ impl ConnectorService {
         request: ComposioListToolsRequest,
     ) -> TinyBusResult<ComposioToolsResponse> {
         let mut response = self
-            .client
+            .client()?
             .list_tools(&request.toolkits, &request.tags)
             .await
             .map_err(|error| to_bus_error(&error))?;
@@ -459,7 +475,7 @@ impl ConnectorService {
                 request.tool
             )));
         }
-        self.client
+        self.client()?
             .execute(
                 &request.tool,
                 request.arguments,
@@ -529,7 +545,7 @@ impl ConnectorService {
         &self,
         request: ComposioListGithubReposRequest,
     ) -> TinyBusResult<ComposioGithubReposResponse> {
-        self.client
+        self.client()?
             .list_github_repos(request.connection_id.as_deref())
             .await
             .map_err(|error| to_bus_error(&error))
@@ -539,7 +555,7 @@ impl ConnectorService {
         &self,
         request: ComposioListAvailableTriggersRequest,
     ) -> TinyBusResult<ComposioAvailableTriggersResponse> {
-        self.client
+        self.client()?
             .list_available_triggers(&request.toolkit, request.connection_id.as_deref())
             .await
             .map_err(|error| to_bus_error(&error))
@@ -549,7 +565,7 @@ impl ConnectorService {
         &self,
         request: ComposioListTriggersRequest,
     ) -> TinyBusResult<ComposioActiveTriggersResponse> {
-        self.client
+        self.client()?
             .list_triggers(request.toolkit.as_deref())
             .await
             .map_err(|error| to_bus_error(&error))
@@ -559,7 +575,7 @@ impl ConnectorService {
         &self,
         request: ComposioCreateTriggerRequest,
     ) -> TinyBusResult<ComposioCreateTriggerResponse> {
-        self.client
+        self.client()?
             .create_trigger(
                 &request.slug,
                 request.connection_id.as_deref(),
@@ -573,7 +589,7 @@ impl ConnectorService {
         &self,
         request: ComposioEnableTriggerRequest,
     ) -> TinyBusResult<ComposioEnableTriggerResponse> {
-        self.client
+        self.client()?
             .enable_trigger(
                 &request.connection_id,
                 &request.slug,
@@ -587,7 +603,7 @@ impl ConnectorService {
         &self,
         request: ComposioDisableTriggerRequest,
     ) -> TinyBusResult<ComposioDisableTriggerResponse> {
-        self.client
+        self.client()?
             .disable_trigger(&request.trigger_id)
             .await
             .map_err(|error| to_bus_error(&error))
