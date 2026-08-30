@@ -62,11 +62,11 @@ use crate::providers::ClientActions;
 use crate::state::FileStateStore;
 use crate::triggers::TriggerArchive;
 
-/// Configuration the host hands the module at load time.
+/// How to reach Composio, when the host has said.
 ///
-/// Tagged by `route`, so the two variants cannot be confused and a blob missing
-/// the credential its route needs fails at load rather than producing a module
-/// that answers every member with a 401.
+/// Tagged by `route`, so the two variants cannot be confused and a blob naming
+/// a route without that route's credential is refused rather than producing a
+/// client that answers every call with a 401.
 ///
 /// ```json
 /// { "route": "proxy",  "base_url": "https://api.example.com", "auth_token": "…",
@@ -78,7 +78,7 @@ use crate::triggers::TriggerArchive;
 /// entrypoint it generates; nothing re-exports it from the crate root.
 #[derive(Debug, Clone, Deserialize)]
 #[serde(tag = "route", rename_all = "snake_case")]
-pub(crate) enum ModuleConfig {
+pub(crate) enum RouteConfig {
     /// Reach Composio through the `TinyHumans` backend.
     Proxy {
         /// Directory the module may keep state in, for the trigger archive.
@@ -116,7 +116,44 @@ pub(crate) enum ModuleConfig {
     },
 }
 
+/// Configuration the host hands the module at load time.
+///
+/// Every field is optional, and an empty blob is valid. That is deliberate: a
+/// module that refuses to load without a credential cannot be loaded by a host
+/// that discovers modules generically, and — more importantly — cannot answer
+/// the members that need no credential at all. `ListCapabilities` describes the
+/// compiled build, and a signed-out user deciding what to connect is exactly
+/// who needs it.
+///
+/// A member that does need a route says so when it is called, naming what is
+/// missing. That is a worse error than a load failure only if you assume every
+/// caller wanted a route; most callers of the capability members did not.
+#[derive(Debug, Clone, Default, Deserialize)]
+#[serde(default)]
+pub(crate) struct ModuleConfig {
+    /// How to reach Composio, when the host has said.
+    #[serde(flatten)]
+    route: Option<RouteConfig>,
+}
+
 impl ModuleConfig {
+    /// The directory the module may keep state in, if the host named one.
+    fn state_dir(&self) -> Option<&std::path::Path> {
+        self.route.as_ref().and_then(RouteConfig::state_dir)
+    }
+
+    /// Build the route this configuration selects, if it selects one.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`crate::Error::InsecureBaseUrl`] if the configured base URL
+    /// would send the credential somewhere it must not go.
+    fn into_route(self) -> crate::Result<Option<Arc<dyn Route>>> {
+        self.route.map(RouteConfig::into_route).transpose()
+    }
+}
+
+impl RouteConfig {
     /// The directory the module may keep state in, if the host named one.
     fn state_dir(&self) -> Option<&std::path::Path> {
         match self {
