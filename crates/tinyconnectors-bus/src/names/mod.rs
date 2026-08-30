@@ -55,6 +55,24 @@ pub mod methods {
     /// Takes a [`crate::ComposioDeleteConnectionRequest`] and returns a
     /// [`crate::ComposioDeleteResponse`].
     pub const DELETE_CONNECTION: &str = "DeleteConnection";
+
+    /// Lists the callable tools for a set of toolkits.
+    ///
+    /// Takes a [`crate::ComposioListToolsRequest`] and returns a
+    /// [`crate::ComposioToolsResponse`] in the function-calling envelope a
+    /// model expects, so a caller can forward it into a model request as-is.
+    pub const LIST_TOOLS: &str = "ListTools";
+
+    /// Runs one action against a connected account.
+    ///
+    /// Takes a [`crate::ComposioExecuteRequest`] and returns a
+    /// [`crate::ComposioExecuteResponse`].
+    ///
+    /// A provider that refuses the call is **not** a member failure: the
+    /// response carries `successful: false` and a formatted `error`. A member
+    /// failure means the call never reached the provider at all. Callers that
+    /// check only for a member error will report failed sends as successes.
+    pub const EXECUTE: &str = "Execute";
 }
 
 /// Every member of [`INTERFACE`], in the order the interface dispatches them.
@@ -66,6 +84,8 @@ pub const METHODS: &[&str] = &[
     methods::LIST_CONNECTIONS,
     methods::AUTHORIZE,
     methods::DELETE_CONNECTION,
+    methods::LIST_TOOLS,
+    methods::EXECUTE,
 ];
 
 #[cfg(test)]

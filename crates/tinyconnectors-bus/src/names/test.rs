@@ -30,6 +30,8 @@ fn the_method_table_holds_the_declared_members() {
             methods::LIST_CONNECTIONS,
             methods::AUTHORIZE,
             methods::DELETE_CONNECTION,
+            methods::LIST_TOOLS,
+            methods::EXECUTE,
         ]
     );
 }
