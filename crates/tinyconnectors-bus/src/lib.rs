@@ -15,6 +15,11 @@
 //!   member, plus [`names::METHODS`] listing them in dispatch order.
 //! - [`composio`] — the value vocabulary of the Composio backend, one module
 //!   per payload family. Its types are re-exported at this root.
+//! - [`records`] — what a connector sync *emits*: the records it pulls out of a
+//!   connected account, on their way to memory. These travel the opposite
+//!   direction from everything in [`composio`], and they are deliberately the
+//!   shape memory's ingestion API already accepts, so the host joining the two
+//!   needs no translation step.
 //! - [`version`] — [`CONTRACT_VERSION`] and the [`is_compatible`] bind rule.
 //!
 //! # One backend today, room for more
@@ -95,6 +100,7 @@
 
 pub mod composio;
 pub mod names;
+pub mod records;
 pub mod version;
 
 pub use composio::{
@@ -110,4 +116,5 @@ pub use composio::{
     ComposioTriggerMetadata,
 };
 pub use names::{INTERFACE, METHODS, OBJECT_PATH};
+pub use records::{ConnectorRecord, ConnectorRecordBatch, SyncEvent, SyncStage};
 pub use version::{CONTRACT_VERSION, is_compatible};
