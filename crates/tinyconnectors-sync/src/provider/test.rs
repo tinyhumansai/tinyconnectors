@@ -6,7 +6,6 @@ use std::sync::{Arc, Mutex};
 
 use async_trait::async_trait;
 use serde_json::json;
-use tinyconnectors_bus::ConnectorRecordBatch;
 
 use super::{
     ActionRunner, ConnectorProvider, ProviderContext, ProviderRegistry, ProviderUserProfile,
