@@ -44,6 +44,8 @@ serde = { workspace = true }
 ureq = { workspace = true }
 
 [dev-dependencies]
+# The bundled example implements `Transport`, which is an `async_trait`.
+async-trait = { workspace = true }
 
 [features]
 default = []

@@ -1,14 +1,105 @@
 //! Tests for the `TinyBus` module adapter and its declared surface.
+//!
+//! The bus tests run the real in-memory broker against a stub transport, so
+//! they exercise the whole path — frame in, client call, envelope out — without
+//! a network. What they are checking is the boundary, not the client: that
+//! arguments survive serialization, that responses come back in the contract's
+//! shape, and that a failure reaches the caller as a message it can act on.
 
-use super::{GreetingService, setup};
-use tinyconnectors_bus::{GreetRequest, GreetResponse, names};
+#![allow(clippy::unwrap_used, clippy::expect_used, clippy::panic)]
+
+use std::sync::{Arc, Mutex};
+
+use async_trait::async_trait;
+use serde_json::json;
 use tinybus::broker::Broker;
 use tinybus::transport::memory::MemoryBus;
 use tinybus::{Connection, Interface};
+use tinyconnectors_bus::{
+    ComposioAuthorizeRequest, ComposioAuthorizeResponse, ComposioConnectionsResponse,
+    ComposioDeleteConnectionRequest, ComposioDeleteResponse, ComposioToolkitsResponse, names,
+};
+
+use super::{ConnectorService, ModuleConfig};
+use crate::client::{ComposioClient, Transport};
+use crate::{Error, Result};
+
+#[derive(Debug, Default)]
+struct StubTransport {
+    reply: Mutex<serde_json::Value>,
+    fail: Mutex<Option<String>>,
+    last_body: Mutex<Option<serde_json::Value>>,
+}
+
+impl StubTransport {
+    fn replying(value: serde_json::Value) -> Arc<Self> {
+        Arc::new(Self {
+            reply: Mutex::new(value),
+            ..Self::default()
+        })
+    }
+
+    fn failing(message: &str) -> Arc<Self> {
+        Arc::new(Self {
+            fail: Mutex::new(Some(message.to_string())),
+            ..Self::default()
+        })
+    }
+
+    fn answer(&self, path: &str) -> Result<serde_json::Value> {
+        if let Some(message) = self.fail.lock().unwrap().clone() {
+            return Err(Error::Transport {
+                path: path.to_string(),
+                message,
+            });
+        }
+        Ok(self.reply.lock().unwrap().clone())
+    }
+}
+
+#[async_trait]
+impl Transport for StubTransport {
+    async fn get(&self, path: &str) -> Result<serde_json::Value> {
+        self.answer(path)
+    }
+
+    async fn post(&self, path: &str, body: &serde_json::Value) -> Result<serde_json::Value> {
+        *self.last_body.lock().unwrap() = Some(body.clone());
+        self.answer(path)
+    }
+
+    async fn delete(&self, path: &str) -> Result<serde_json::Value> {
+        self.answer(path)
+    }
+}
+
+fn service_over(transport: Arc<StubTransport>) -> ConnectorService {
+    ConnectorService {
+        client: ComposioClient::new(transport),
+    }
+}
+
+/// Stand a broker up, serve `service` on it, and return a proxy to it.
+async fn proxy_to(
+    service: ConnectorService,
+) -> tinybus::Result<(Connection, tinybus::Proxy, MemoryBus)> {
+    let bus = MemoryBus::new();
+    Broker::new().spawn(bus.clone());
+
+    let serving = Connection::connect(bus.connect().await?).await?;
+    serving
+        .serve_at(names::OBJECT_PATH.try_into()?, service)
+        .await?;
+    serving.request_name(names::INTERFACE).await?;
+
+    let client = Connection::connect(bus.connect().await?).await?;
+    let proxy = client.proxy(names::INTERFACE, names::OBJECT_PATH, names::INTERFACE)?;
+    Ok((client, proxy, bus))
+}
 
 #[test]
 fn declared_methods_match_the_dispatch_table() {
-    let methods = GreetingService
+    let methods = service_over(StubTransport::replying(json!({})))
         .members()
         .into_iter()
         .map(|member| member.to_string())
@@ -19,46 +110,149 @@ fn declared_methods_match_the_dispatch_table() {
 
 #[test]
 fn the_served_interface_name_matches_the_contract() {
-    assert_eq!(GreetingService.name().to_string(), names::INTERFACE);
+    assert_eq!(
+        service_over(StubTransport::replying(json!({}))).name().to_string(),
+        names::INTERFACE
+    );
+}
+
+#[test]
+fn the_module_config_parses_the_host_blob() {
+    let config: ModuleConfig = serde_json::from_value(json!({
+        "base_url": "https://api.example.com",
+        "auth_token": "t0ken"
+    }))
+    .expect("parses");
+    assert_eq!(config.base_url, "https://api.example.com");
+}
+
+#[test]
+fn the_module_config_requires_a_credential() {
+    // A missing token must fail at load rather than producing a module that
+    // serves every member with a 401.
+    let result = serde_json::from_value::<ModuleConfig>(json!({
+        "base_url": "https://api.example.com"
+    }));
+    assert!(result.is_err());
 }
 
 #[tokio::test]
-async fn module_serves_greetings_over_a_real_bus() -> tinybus::Result<()> {
-    let bus = MemoryBus::new();
-    Broker::new().spawn(bus.clone());
+async fn serves_the_toolkit_allowlist_over_a_real_bus() -> tinybus::Result<()> {
+    let transport = StubTransport::replying(json!({ "toolkits": ["gmail", "notion"] }));
+    let (_client, proxy, _bus) = proxy_to(service_over(transport)).await?;
 
-    let service = Connection::connect(bus.connect().await?).await?;
-    setup(service.clone()).await?;
-
-    let client = Connection::connect(bus.connect().await?).await?;
-    let proxy = client.proxy(names::INTERFACE, names::OBJECT_PATH, names::INTERFACE)?;
-    let reply: GreetResponse = proxy
-        .call(names::methods::GREET, (GreetRequest::new("Ferris"),))
-        .await?;
-
-    assert_eq!(reply, GreetResponse::new("Hello, Ferris!"));
+    let reply: ComposioToolkitsResponse = proxy.call(names::methods::LIST_TOOLKITS, ()).await?;
+    assert_eq!(reply.toolkits, vec!["gmail", "notion"]);
     Ok(())
 }
 
 #[tokio::test]
-async fn module_rejects_an_empty_name_over_the_bus() -> tinybus::Result<()> {
-    let bus = MemoryBus::new();
-    Broker::new().spawn(bus.clone());
+async fn serves_connections_including_the_inactive_ones() -> tinybus::Result<()> {
+    let transport = StubTransport::replying(json!({
+        "connections": [
+            { "id": "a", "toolkit": "gmail", "status": "ACTIVE" },
+            { "id": "b", "toolkit": "instagram", "status": "PENDING" }
+        ]
+    }));
+    let (_client, proxy, _bus) = proxy_to(service_over(transport)).await?;
 
-    let service = Connection::connect(bus.connect().await?).await?;
-    setup(service.clone()).await?;
+    let reply: ComposioConnectionsResponse =
+        proxy.call(names::methods::LIST_CONNECTIONS, ()).await?;
+    assert_eq!(reply.connections.len(), 2);
+    assert!(!reply.connections[1].is_active());
+    Ok(())
+}
 
-    let client = Connection::connect(bus.connect().await?).await?;
-    let proxy = client.proxy(names::INTERFACE, names::OBJECT_PATH, names::INTERFACE)?;
+#[tokio::test]
+async fn carries_authorize_arguments_across_the_bus() -> tinybus::Result<()> {
+    let transport = StubTransport::replying(json!({
+        "connectUrl": "https://composio.dev/oauth/abc",
+        "connectionId": "conn_1"
+    }));
+    let (_client, proxy, _bus) = proxy_to(service_over(transport.clone())).await?;
+
+    let reply: ComposioAuthorizeResponse = proxy
+        .call(
+            names::methods::AUTHORIZE,
+            (ComposioAuthorizeRequest {
+                toolkit: "whatsapp".into(),
+                extra_params: Some(json!({ "waba_id": "123" })),
+            },),
+        )
+        .await?;
+
+    assert_eq!(reply.connect_url, "https://composio.dev/oauth/abc");
+    // The optional argument survived the round trip rather than being dropped
+    // by the envelope — which would only show up as an upstream rejection.
+    let body = transport.last_body.lock().unwrap().clone().unwrap();
+    assert_eq!(body["waba_id"], "123");
+    Ok(())
+}
+
+#[tokio::test]
+async fn deletes_a_connection_over_the_bus() -> tinybus::Result<()> {
+    let transport = StubTransport::replying(json!({
+        "deleted": true, "memory_chunks_deleted": 3
+    }));
+    let (_client, proxy, _bus) = proxy_to(service_over(transport)).await?;
+
+    let reply: ComposioDeleteResponse = proxy
+        .call(
+            names::methods::DELETE_CONNECTION,
+            (ComposioDeleteConnectionRequest {
+                connection_id: "conn_9".into(),
+                clear_memory: true,
+            },),
+        )
+        .await?;
+
+    assert!(reply.deleted);
+    assert_eq!(reply.memory_chunks_deleted, 3);
+    Ok(())
+}
+
+#[tokio::test]
+async fn reports_a_backend_failure_to_the_caller() -> tinybus::Result<()> {
+    let transport = StubTransport::failing("502 bad gateway");
+    let (_client, proxy, _bus) = proxy_to(service_over(transport)).await?;
+
     let result = proxy
-        .call::<GreetResponse>(names::methods::GREET, (GreetRequest::new("   "),))
+        .call::<ComposioToolkitsResponse>(names::methods::LIST_TOOLKITS, ())
         .await;
 
     let Err(error) = result else {
         return Err(tinybus::Error::failed(
-            "whitespace-only names unexpectedly succeeded",
+            "a failing backend unexpectedly succeeded",
         ));
     };
-    assert!(error.to_string().contains("name must not be empty"));
+    // The path and the upstream message both have to survive: without them a
+    // host sees only "call failed".
+    let rendered = error.to_string();
+    assert!(rendered.contains("502 bad gateway"), "{rendered}");
+    assert!(rendered.contains("/agent-integrations/composio/toolkits"), "{rendered}");
+    Ok(())
+}
+
+#[tokio::test]
+async fn rejects_an_empty_toolkit_over_the_bus() -> tinybus::Result<()> {
+    let transport = StubTransport::replying(json!({}));
+    let (_client, proxy, _bus) = proxy_to(service_over(transport)).await?;
+
+    let result = proxy
+        .call::<ComposioAuthorizeResponse>(
+            names::methods::AUTHORIZE,
+            (ComposioAuthorizeRequest {
+                toolkit: "   ".into(),
+                extra_params: None,
+            },),
+        )
+        .await;
+
+    let Err(error) = result else {
+        return Err(tinybus::Error::failed(
+            "an empty toolkit unexpectedly succeeded",
+        ));
+    };
+    assert!(error.to_string().contains("toolkit must not be empty"));
     Ok(())
 }
