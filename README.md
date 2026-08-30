@@ -17,21 +17,50 @@ calls depends on the contract crate alone and compiles neither the module nor
 
 Composio is the connector backend today, and the design does not assume it will
 be the only one. Everything Composio-shaped is namespaced under `composio`; the
-neutral parts — the OAuth handoff policy, the transport seam, the error type —
-name it nowhere. A second backend arrives as a sibling interface and object
-path, not as a rename of the first.
+neutral parts — the OAuth handoff policy, the transport seam, the record
+vocabulary, the error type — name it nowhere. A second backend arrives as a
+sibling interface and object path, not as a rename of the first.
 
 The `Composio`-prefixed payload types keep their names deliberately: they mirror
 Composio's own response envelopes, and dressing them as a neutral abstraction
 would be a lie the first time a second backend disagreed about a field.
 
+## Two routes to Composio
+
+Composio is reachable two ways, and the module implements both:
+
+- **proxy** — through the TinyHumans backend, which owns the Composio API key,
+  the billing margin, the toolkit allowlist, and webhook verification.
+- **direct** — straight at `backend.composio.dev/api/v3` with a user-supplied
+  `x-api-key`.
+
+They differ in base URL, auth header, paths, *and response shape*, so a route
+owns its paths and the translation of its responses. Nothing above the route
+branches on which one is live.
+
+**Choosing a route is the host's job.** Whether the user is signed in, whether
+they supplied a key, and which the product prefers are decisions upstream of
+this crate; the host states its choice in the module configuration blob.
+
+The two are not equivalent and the module says so: direct mode has no per-user
+allowlist to report, so `ListToolkits` returns a named refusal rather than an
+empty list that would read as "you may connect nothing".
+
 ## The module holds no connector credential
 
-It never calls Composio. Every request goes through a backend that owns the
-Composio API key, the billing margin, the toolkit allowlist, and the HMAC
-verification of inbound webhooks. That backend authenticates the *user*, whose
-credential belongs to the host — so the module is handed a `base_url` and an
-`auth_token` in its configuration blob at load time and can reach nothing else.
+The credential is the host's to supply, in the configuration blob, and the
+module reads one from nowhere else. It is never logged and never returned
+through a member. A `base_url` that is not HTTPS or a genuine loopback address
+is refused before any request is made — parsed, not prefix-matched, because
+`http://127.0.0.1:8080@evil.com` resolves to `evil.com` and would carry the
+credential header there.
+
+## What a sync emits
+
+Connector sync does not write memory. It returns `ConnectorRecordBatch`, the
+host hands it to the memory engine over memory's own bus API, and neither side
+links the other. `ConnectorRecord`'s wire shape is memory's ingestion vocabulary
+exactly — asserted in a test — so the join needs no translation step.
 
 ## Served surface
 

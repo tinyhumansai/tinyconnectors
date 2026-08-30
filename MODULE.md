@@ -13,19 +13,37 @@ string literal.
 
 ## Configuration
 
-The module requires a JSON configuration blob at load time:
+The module requires a JSON configuration blob at load time, tagged by the route
+it should use:
 
 ```json
-{ "base_url": "https://api.example.com", "auth_token": "<user session token>" }
+{ "route": "proxy",  "base_url": "https://api.example.com", "auth_token": "<user session token>" }
+{ "route": "direct", "api_key": "<user Composio key>", "entity_id": "default" }
 ```
 
-It holds no Composio API key and calls Composio nowhere. Every request goes to
-`base_url`, which owns the key, the billing margin, the toolkit allowlist, and
-the HMAC verification of inbound webhooks. `auth_token` authenticates the
-signed-in user to that backend and is the host's to supply — the module never
-reads a credential from the environment or anywhere else, never logs it, and
-never returns it through a member. Loading without both fields fails, rather
-than producing a module that answers every call with a 401.
+**proxy** goes through the TinyHumans backend, which owns the Composio API key,
+the billing margin, the toolkit allowlist, and the HMAC verification of inbound
+webhooks. **direct** goes straight to `backend.composio.dev/api/v3` with the
+user's own key.
+
+The module implements both routes and selects neither — which one to use depends
+on whether the user is signed in and whether they supplied a key, and those are
+the host's decisions. Change route by reloading the module with a different
+blob.
+
+The credential is the host's to supply either way. The module never reads one
+from the environment, never logs it, and never returns it through a member. It
+also refuses a `base_url` that is not HTTPS or a genuine loopback address, so a
+misconfiguration cannot send the credential somewhere it should not go. Loading
+without the credential its route needs fails, rather than producing a module
+that answers every call with a 401.
+
+### The routes are not equivalent
+
+Direct mode cannot answer `ListToolkits` — there is no per-user allowlist when
+you talk to Composio directly — or `DeleteConnection`, whose proxy version also
+clears memory sourced from the connection. Both return a named refusal rather
+than an empty result that would read like an answer.
 
 ## Installing
 
