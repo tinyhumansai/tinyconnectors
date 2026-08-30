@@ -236,24 +236,22 @@ fn the_default_limits_make_a_first_sync_finish() {
 // ── defaults ────────────────────────────────────────────────────────
 
 #[tokio::test]
-async fn a_provider_that_cannot_sync_produces_an_empty_completed_batch() {
+async fn a_provider_that_cannot_sync_reads_no_page() {
     let provider = TestProvider {
         slug: "slack",
         curated: None,
         can_sync: false,
     };
-    let batch: ConnectorRecordBatch = provider
-        .fetch_records(&context(Arc::new(FakeActions::default())))
+    let page = provider
+        .fetch_page(&context(Arc::new(FakeActions::default())), None)
         .await
         .unwrap();
 
-    assert!(batch.records.is_empty());
+    assert!(page.records.is_empty());
     assert!(
-        batch.complete,
-        "an empty run must not look like more to come"
+        page.next_cursor.is_none(),
+        "no next page: the loop must not ask again"
     );
-    assert_eq!(batch.toolkit, "gmail");
-    assert_eq!(batch.connection_id.as_deref(), Some("conn_1"));
 }
 
 #[test]
