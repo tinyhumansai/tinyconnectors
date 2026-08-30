@@ -12,6 +12,7 @@ payload vocabulary has to be published as an ordinary library. This is it.
 | ---------- | ------------------------------------------------------------ |
 | `names`    | interface name, object path, one constant per member          |
 | `composio` | the Composio backend's value vocabulary, by payload family    |
+| `records`  | what a connector sync emits, on its way to memory             |
 | `version`  | `CONTRACT_VERSION` and the bind rule a host applies to it     |
 
 `composio` holds six families — `toolkits`, `connections`, `tools`, `execute`,
@@ -19,6 +20,15 @@ payload vocabulary has to be published as an ordinary library. This is it.
 connector backend, not the only one this contract expects to carry, so it is
 namespaced: a second backend arrives as a sibling module with its own interface
 and object path rather than as a rename of every type here.
+
+`records` goes the other direction. Everything in `composio` is an answer to a
+question a host asked; `ConnectorRecordBatch` is what a *sync* emits — the items
+pulled out of a connected account, handed to the host, and written into memory
+over memory's own bus API. `ConnectorRecord`'s field names are memory's
+ingestion vocabulary exactly, asserted against a literal key list in
+`records/test.rs` rather than imported from the memory contract: importing it
+would reintroduce the coupling this crate exists to remove, and a near-miss
+shape means a translation step where fields quietly stop arriving.
 
 Two dependencies, both pure Rust: `serde` and `serde_json`.
 
