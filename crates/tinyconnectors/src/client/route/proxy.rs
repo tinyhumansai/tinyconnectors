@@ -17,10 +17,18 @@ use crate::{
 
 /// Reaches Composio through the `TinyHumans` backend.
 ///
-/// The backend answers in this crate's envelopes already — they were defined
-/// from its responses — so this route is paths and nothing else. That is the
-/// point of preferring it: the allowlist, the margin, and the HMAC-verified
-/// webhook fan-out all live on the far side.
+/// The point of preferring it: the allowlist, the margin, and the
+/// HMAC-verified webhook fan-out all live on the far side, so this route is
+/// paths and an envelope.
+///
+/// # The envelope
+///
+/// Every backend reply is wrapped as `{"success": bool, "data": …, "error":
+/// …}`, and the payload this crate's types describe is what sits under `data`.
+/// A route that decoded the wrapper as the payload would not fail loudly — the
+/// contract's response types default their fields, so it would answer with an
+/// empty list on a reply that carried a full one, and a user would see "no
+/// toolkits enabled" instead of theirs.
 #[derive(Debug, Clone)]
 pub struct ProxyRoute {
     transport: Arc<dyn Transport>,
@@ -38,10 +46,54 @@ impl ProxyRoute {
     }
 }
 
+/// The backend's wrapper around every reply.
+#[derive(serde::Deserialize)]
+struct Envelope<T> {
+    #[serde(default)]
+    success: bool,
+    // Not `#[serde(default)]`: that would require `T: Default`, and the
+    // payload types are not all defaultable. `Option` already decodes a
+    // missing key as `None`.
+    data: Option<T>,
+    #[serde(default)]
+    error: Option<String>,
+}
+
+/// Unwrap the backend's envelope and decode the payload inside it.
+///
+/// A reply with no `success` key is decoded as the payload directly. Not every
+/// endpoint on the far side is wrapped, and the alternative — refusing an
+/// unwrapped reply — would turn a working endpoint into a decode error for a
+/// difference that carries no meaning.
+///
+/// `success: false` is an error rather than an empty result. The backend uses
+/// it for the things a user needs told: a toolkit that is not enabled, a
+/// trigger type that does not exist, a required field that was missing.
 fn decode<T: DeserializeOwned>(path: &str, value: serde_json::Value) -> Result<T> {
-    serde_json::from_value(value).map_err(|error| Error::Decode {
+    if value.get("success").is_none() {
+        return serde_json::from_value(value).map_err(|error| Error::Decode {
+            path: path.to_string(),
+            message: error.to_string(),
+        });
+    }
+
+    let envelope: Envelope<T> = serde_json::from_value(value).map_err(|error| Error::Decode {
         path: path.to_string(),
         message: error.to_string(),
+    })?;
+
+    if !envelope.success {
+        return Err(Error::Transport {
+            path: path.to_string(),
+            message: envelope
+                .error
+                .unwrap_or_else(|| "the backend reported failure without saying why".to_string()),
+        });
+    }
+
+    envelope.data.ok_or_else(|| Error::Decode {
+        path: path.to_string(),
+        message: "the backend reported success but sent no data".to_string(),
     })
 }
 
@@ -207,3 +259,7 @@ impl Route for ProxyRoute {
         decode(&path, self.transport.delete(&path).await?)
     }
 }
+
+#[cfg(test)]
+#[path = "test.rs"]
+mod test;
