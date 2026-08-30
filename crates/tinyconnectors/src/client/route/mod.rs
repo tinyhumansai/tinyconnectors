@@ -163,10 +163,7 @@ pub trait Route: Send + Sync + std::fmt::Debug {
     ///
     /// Returns [`crate::Error::UnsupportedByRoute`] on a route that does not
     /// offer it, and otherwise the underlying failure.
-    async fn list_triggers(
-        &self,
-        toolkit: Option<&str>,
-    ) -> Result<ComposioActiveTriggersResponse>;
+    async fn list_triggers(&self, toolkit: Option<&str>) -> Result<ComposioActiveTriggersResponse>;
 
     /// Create a trigger subscription.
     ///

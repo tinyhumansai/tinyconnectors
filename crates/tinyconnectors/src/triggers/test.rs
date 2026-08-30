@@ -69,7 +69,10 @@ fn records_a_delivery_and_reads_it_back() {
     assert_eq!(history.entries.len(), 1);
     assert_eq!(history.entries[0].metadata_id, "evt-1");
     assert_eq!(history.entries[0].payload["subject"], "hi");
-    assert_eq!(history.current_day_file, archive.current_day_file().display().to_string());
+    assert_eq!(
+        history.current_day_file,
+        archive.current_day_file().display().to_string()
+    );
 }
 
 #[test]

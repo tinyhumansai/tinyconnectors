@@ -192,9 +192,7 @@ impl ComposioClient {
         &self,
         connection_id: Option<&str>,
     ) -> Result<ComposioGithubReposResponse> {
-        self.route
-            .list_github_repos(non_empty(connection_id))
-            .await
+        self.route.list_github_repos(non_empty(connection_id)).await
     }
 
     /// List the triggers `toolkit` offers.

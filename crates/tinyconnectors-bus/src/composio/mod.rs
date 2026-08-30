@@ -45,9 +45,7 @@ pub use connections::{
     ComposioConnectionsResponse, ComposioDeleteConnectionRequest, ComposioDeleteResponse,
 };
 pub use execute::{ComposioExecuteRequest, ComposioExecuteResponse};
-pub use github::{
-    ComposioGithubRepo, ComposioGithubReposResponse, ComposioListGithubReposRequest,
-};
+pub use github::{ComposioGithubRepo, ComposioGithubReposResponse, ComposioListGithubReposRequest};
 pub use toolkits::{
     ComposioAgentReadyToolkitsResponse, ComposioCapabilitiesResponse, ComposioCapability,
     ComposioToolkitCatalogEntry, ComposioToolkitsResponse,

@@ -110,9 +110,7 @@ impl ModuleConfig {
     /// The directory the module may keep state in, if the host named one.
     fn state_dir(&self) -> Option<&std::path::Path> {
         match self {
-            Self::Proxy { state_dir, .. } | Self::Direct { state_dir, .. } => {
-                state_dir.as_deref()
-            }
+            Self::Proxy { state_dir, .. } | Self::Direct { state_dir, .. } => state_dir.as_deref(),
         }
     }
 

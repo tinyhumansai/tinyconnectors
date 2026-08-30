@@ -148,10 +148,7 @@ impl Route for ProxyRoute {
         self.get(&path).await
     }
 
-    async fn list_triggers(
-        &self,
-        toolkit: Option<&str>,
-    ) -> Result<ComposioActiveTriggersResponse> {
+    async fn list_triggers(&self, toolkit: Option<&str>) -> Result<ComposioActiveTriggersResponse> {
         let path = match toolkit {
             Some(toolkit) => format!(
                 "/agent-integrations/composio/triggers?toolkit={}",
