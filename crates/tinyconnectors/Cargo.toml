@@ -56,6 +56,9 @@ fs4 = { workspace = true }
 chrono = { workspace = true }
 
 [dev-dependencies]
+# The public-API suite loads the built `cdylib` through the real loader to prove
+# an empty configuration is accepted — the case the release gate exercises.
+serde_json = { workspace = true }
 # The bundled example implements `Transport`, which is an `async_trait`.
 async-trait = { workspace = true }
 # `test-util` gives the retry tests paused time, so a backoff that really sleeps

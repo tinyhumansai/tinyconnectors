@@ -62,3 +62,40 @@ fn the_transport_seam_is_implementable_from_outside_the_crate() {
     fn assert_object_safe(_: &dyn Transport) {}
     let _ = assert_object_safe;
 }
+
+/// The module must load with no configuration at all.
+///
+/// This is what the release gate does — and what any host loading modules
+/// generically does. It was found by that gate failing: the module used to
+/// refuse an empty configuration, which meant it could not be verified after
+/// publication and could not answer the members that need no credential.
+#[test]
+fn the_built_module_loads_with_an_empty_configuration() {
+    use tinybus::broker::Broker;
+    use tinybus::module::ModuleHost;
+    use tinybus::transport::memory::MemoryBus;
+
+    let module = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
+        .join("../../target/debug")
+        .join(format!(
+            "{}tinyconnectors{}",
+            std::env::consts::DLL_PREFIX,
+            std::env::consts::DLL_SUFFIX
+        ));
+    if !module.exists() {
+        // `cargo test` does not guarantee the cdylib is built; the example and
+        // the release workflow both cover this against a real artifact.
+        return;
+    }
+
+    let bus = MemoryBus::new();
+    let broker = Broker::new();
+    let task = broker.spawn(bus.clone());
+    let host = ModuleHost::new(broker);
+
+    let info = host
+        .load_file_with_config(&module, serde_json::json!({}))
+        .expect("an empty configuration must load");
+    assert_eq!(info.name, "tinyconnectors");
+    task.abort();
+}
