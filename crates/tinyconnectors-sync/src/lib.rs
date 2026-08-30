@@ -26,6 +26,8 @@
 //!   that looks one up by slug.
 //! - [`state`] — per-connection cursors, dedupe sets, and the daily request
 //!   budget, persisted through the host's key-value seam.
+//! - [`toolkits`] — the toolkits this build knows, each with its curated action
+//!   catalog and how to read the connected account's identity.
 //!
 //! # Example
 //!
@@ -44,6 +46,7 @@ mod error;
 pub mod provider;
 pub mod scope;
 pub mod state;
+pub mod toolkits;
 
 pub use error::{Error, Result};
 pub use provider::{
@@ -52,3 +55,4 @@ pub use provider::{
 };
 pub use scope::{CuratedTool, ToolScope, classify_unknown, find_curated, toolkit_from_slug};
 pub use state::{DailyBudget, STATE_NAMESPACE, SyncState, SyncStateStore};
+pub use toolkits::default_registry;

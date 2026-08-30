@@ -18,18 +18,7 @@ mod actions;
 
 pub use actions::ClientActions;
 
-use tinyconnectors_sync::ProviderRegistry;
-
-/// The providers this build ships.
-///
-/// Empty while the concrete toolkit providers are still being migrated. That is
-/// visible rather than hidden: the capability matrix reports nothing, and
-/// `GetUserProfile` says which toolkit it has no provider for, instead of a
-/// member quietly returning a plausible blank.
-#[must_use]
-pub fn default_registry() -> ProviderRegistry {
-    ProviderRegistry::new()
-}
+pub use tinyconnectors_sync::default_registry;
 
 #[cfg(test)]
 mod test;
