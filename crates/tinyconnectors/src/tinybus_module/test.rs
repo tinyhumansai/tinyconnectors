@@ -20,7 +20,8 @@ use tinyconnectors_bus::{
     ComposioDeleteConnectionRequest, ComposioDeleteResponse, ComposioExecuteRequest,
     ComposioExecuteResponse, ComposioGetUserScopesRequest, ComposioListToolsRequest,
     ComposioSetUserScopesRequest, ComposioToolkitsResponse, ComposioToolsResponse,
-    ComposioUserScopes, ComposioUserScopesResponse, names,
+    ComposioUserScopes, ComposioUserScopesResponse, ConnectorSyncRequest, ConnectorSyncResponse,
+    SyncStage, names,
 };
 
 use super::{ConnectorService, ModuleConfig};
@@ -514,6 +515,91 @@ async fn local_argument_validation_fails_the_member_before_any_request() -> tiny
     };
     assert!(error.to_string().contains("recipient"));
     assert!(transport.last_body.lock().unwrap().is_none());
+    Ok(())
+}
+
+#[tokio::test]
+async fn syncs_a_toolkit_into_records_without_storing_them() -> tinybus::Result<()> {
+    // The module reads a connected account and hands the records back. It
+    // stores nothing: memory does that, over its own bus API.
+    let transport = StubTransport::replying(json!({
+        "successful": true,
+        "data": { "data": { "messages": [
+            { "id": "m1", "subject": "Hi", "snippet": "there" },
+            { "id": "m2", "subject": "Again", "snippet": "hello" }
+        ] } }
+    }));
+    let (_serving, _client, proxy, _bus) = proxy_to(service_over(transport)).await?;
+
+    let reply: ConnectorSyncResponse = proxy
+        .call(
+            names::methods::SYNC,
+            (ConnectorSyncRequest {
+                toolkit: "gmail".into(),
+                connection_id: Some("conn_1".into()),
+                source_id: Some("gmail:primary".into()),
+                max_items: Some(10),
+                reason: Some("scheduled".into()),
+            },),
+        )
+        .await?;
+
+    assert_eq!(reply.stage, SyncStage::Completed);
+    assert_eq!(reply.batch.records.len(), 2);
+    assert_eq!(reply.batch.toolkit, "gmail");
+    assert_eq!(reply.batch.source_id, "gmail:primary");
+    assert!(reply.batch.complete, "the provider had no next page");
+    assert_eq!(reply.pages_read, 1);
+    Ok(())
+}
+
+#[tokio::test]
+async fn a_second_sync_skips_what_the_first_already_read() -> tinybus::Result<()> {
+    // The cursor and the seen-set are the module's, so a caller does not carry
+    // one — and a re-run does not re-ingest a user's whole mailbox.
+    let transport = StubTransport::replying(json!({
+        "successful": true,
+        "data": { "data": { "messages": [{ "id": "m1", "subject": "Hi" }] } }
+    }));
+    let (_serving, _client, proxy, _bus) = proxy_to(service_over(transport)).await?;
+
+    let request = ConnectorSyncRequest {
+        toolkit: "gmail".into(),
+        connection_id: Some("conn_1".into()),
+        ..ConnectorSyncRequest::default()
+    };
+
+    let first: ConnectorSyncResponse = proxy.call(names::methods::SYNC, (request.clone(),)).await?;
+    assert_eq!(first.batch.records.len(), 1);
+
+    let second: ConnectorSyncResponse = proxy.call(names::methods::SYNC, (request,)).await?;
+    assert!(second.batch.records.is_empty(), "already ingested");
+    assert_eq!(second.records_skipped, 1);
+    Ok(())
+}
+
+#[tokio::test]
+async fn syncing_a_toolkit_with_no_provider_says_so() -> tinybus::Result<()> {
+    let transport = StubTransport::replying(json!({}));
+    let (_serving, _client, proxy, _bus) = proxy_to(service_over(transport)).await?;
+
+    let result = proxy
+        .call::<ConnectorSyncResponse>(
+            names::methods::SYNC,
+            (ConnectorSyncRequest {
+                toolkit: "dropbox".into(),
+                connection_id: Some("conn_1".into()),
+                ..ConnectorSyncRequest::default()
+            },),
+        )
+        .await;
+
+    let Err(error) = result else {
+        return Err(tinybus::Error::failed(
+            "an unknown toolkit unexpectedly synced",
+        ));
+    };
+    assert!(error.to_string().contains("no provider"));
     Ok(())
 }
 
