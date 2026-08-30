@@ -6,6 +6,7 @@ use async_trait::async_trait;
 use serde::de::DeserializeOwned;
 
 use super::Route;
+use super::url::{comma_joined, encode};
 use crate::client::Transport;
 use crate::{
     ComposioActiveTriggersResponse, ComposioAuthorizeResponse, ComposioAvailableTriggersResponse,
@@ -35,34 +36,6 @@ impl ProxyRoute {
     async fn get<T: DeserializeOwned>(&self, path: &str) -> Result<T> {
         decode(path, self.transport.get(path).await?)
     }
-}
-
-/// Percent-encode one value that becomes part of a path or query.
-///
-/// Every id and slug here arrived over the bus. An unencoded `/` in a
-/// connection id would reach a different endpoint entirely, and an unencoded
-/// `&` in a toolkit would forge a query parameter.
-fn encode(value: &str) -> String {
-    percent_encoding::utf8_percent_encode(value.trim(), percent_encoding::NON_ALPHANUMERIC)
-        .to_string()
-}
-
-/// Join non-empty, trimmed, percent-encoded values for a query parameter.
-///
-/// Encoding matters: a tag or toolkit slug reaching this from a bus call is not
-/// guaranteed to be URL-safe, and an unencoded `&` would forge a parameter.
-fn comma_joined(values: &[String]) -> Option<String> {
-    let joined = values
-        .iter()
-        .map(|value| value.trim())
-        .filter(|value| !value.is_empty())
-        .map(|value| {
-            percent_encoding::utf8_percent_encode(value, percent_encoding::NON_ALPHANUMERIC)
-                .to_string()
-        })
-        .collect::<Vec<_>>()
-        .join(",");
-    (!joined.is_empty()).then_some(joined)
 }
 
 fn decode<T: DeserializeOwned>(path: &str, value: serde_json::Value) -> Result<T> {

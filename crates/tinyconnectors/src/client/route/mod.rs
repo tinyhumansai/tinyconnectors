@@ -42,6 +42,7 @@
 
 mod direct;
 mod proxy;
+mod url;
 
 pub use direct::{COMPOSIO_API_BASE, DirectRoute, INVALID_API_KEY_THRESHOLD};
 pub use proxy::ProxyRoute;

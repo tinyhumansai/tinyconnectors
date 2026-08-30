@@ -7,6 +7,7 @@ use std::sync::{Arc, Mutex};
 use async_trait::async_trait;
 
 use super::Route;
+use super::url::{comma_joined, encode};
 use crate::client::Transport;
 use crate::{
     ComposioActiveTriggersResponse, ComposioAuthorizeResponse, ComposioAvailableTriggersResponse,
@@ -299,9 +300,7 @@ impl Route for DirectRoute {
         // upper-snake-case and comes from a catalog rather than free text, but
         // it still reaches here over the bus, so it is encoded before it
         // becomes part of a URL.
-        let encoded =
-            percent_encoding::utf8_percent_encode(tool, percent_encoding::NON_ALPHANUMERIC);
-        let path = format!("/tools/execute/{encoded}");
+        let path = format!("/tools/execute/{}", encode(tool));
         tracing::debug!(tool = %tool, "[connectors][direct] execute");
 
         let mut body = serde_json::json!({
@@ -370,21 +369,6 @@ impl Route for DirectRoute {
     async fn disable_trigger(&self, _trigger_id: &str) -> Result<ComposioDisableTriggerResponse> {
         Err(self.unsupported("DisableTrigger"))
     }
-}
-
-/// Join non-empty, trimmed, percent-encoded values for a query parameter.
-fn comma_joined(values: &[String]) -> Option<String> {
-    let joined = values
-        .iter()
-        .map(|value| value.trim())
-        .filter(|value| !value.is_empty())
-        .map(|value| {
-            percent_encoding::utf8_percent_encode(value, percent_encoding::NON_ALPHANUMERIC)
-                .to_string()
-        })
-        .collect::<Vec<_>>()
-        .join(",");
-    (!joined.is_empty()).then_some(joined)
 }
 
 /// Pull tool schemas out of a v3 listing, which nests them under `items`.
