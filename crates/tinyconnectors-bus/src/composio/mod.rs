@@ -53,7 +53,9 @@ pub use toolkits::{
     ComposioToolkitCatalogEntry, ComposioToolkitsResponse,
 };
 pub use tools::{
-    ComposioListToolsRequest, ComposioToolFunction, ComposioToolSchema, ComposioToolsResponse,
+    ComposioGetUserScopesRequest, ComposioListToolsRequest, ComposioSetUserScopesRequest,
+    ComposioToolFunction, ComposioToolSchema, ComposioToolsResponse, ComposioUserScopes,
+    ComposioUserScopesResponse,
 };
 pub use triggers::{
     ComposioActiveTrigger, ComposioActiveTriggersResponse, ComposioAvailableTrigger,

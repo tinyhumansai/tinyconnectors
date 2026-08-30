@@ -7,7 +7,9 @@
 mod types;
 
 pub use types::{
-    ComposioListToolsRequest, ComposioToolFunction, ComposioToolSchema, ComposioToolsResponse,
+    ComposioGetUserScopesRequest, ComposioListToolsRequest, ComposioSetUserScopesRequest,
+    ComposioToolFunction, ComposioToolSchema, ComposioToolsResponse, ComposioUserScopes,
+    ComposioUserScopesResponse,
 };
 
 #[cfg(test)]
