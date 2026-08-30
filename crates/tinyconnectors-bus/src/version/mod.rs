@@ -20,7 +20,7 @@ pub const CONTRACT_VERSION: (u32, u32) = (1, 0);
 /// # Examples
 ///
 /// ```
-/// # use tinyconnectors_bus::{is_compatible, CONTRACT_VERSION};
+/// # use tinyconnectors_bus::{CONTRACT_VERSION, is_compatible};
 /// assert!(is_compatible(CONTRACT_VERSION));
 /// assert!(is_compatible((1, 4)));
 /// assert!(!is_compatible((2, 0)));
