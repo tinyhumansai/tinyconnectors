@@ -6,8 +6,54 @@
 
 #![allow(clippy::unwrap_used, clippy::expect_used, clippy::panic)]
 
+use std::io::{BufRead, BufReader, Write};
+use std::net::TcpListener;
+use std::sync::mpsc;
+
 use super::{HttpTransport, check_base_url};
 use crate::Error;
+use crate::client::Transport;
+
+/// A one-request HTTP server on loopback.
+///
+/// The guard allows plain HTTP to a genuine loopback address precisely so this
+/// is possible: the transport's actual request — its method, path, and headers
+/// — is otherwise only exercised against a live backend.
+///
+/// Returns the base URL and a channel carrying the request line and headers the
+/// transport actually sent.
+fn loopback_server(response_body: &'static str) -> (String, mpsc::Receiver<String>) {
+    let listener = TcpListener::bind("127.0.0.1:0").expect("binds a port");
+    let port = listener.local_addr().expect("has an address").port();
+    let (sender, receiver) = mpsc::channel();
+
+    std::thread::spawn(move || {
+        let Ok((stream, _)) = listener.accept() else {
+            return;
+        };
+        let mut reader = BufReader::new(&stream);
+        let mut request = String::new();
+        loop {
+            let mut line = String::new();
+            if reader.read_line(&mut line).unwrap_or(0) == 0 || line == "\r\n" {
+                break;
+            }
+            request.push_str(&line);
+        }
+        let _ = sender.send(request);
+
+        let mut stream = &stream;
+        let _ = write!(
+            stream,
+            "HTTP/1.1 200 OK\r\nContent-Type: application/json\r\nContent-Length: {}\r\nConnection: close\r\n\r\n{}",
+            response_body.len(),
+            response_body
+        );
+        let _ = stream.flush();
+    });
+
+    (format!("http://127.0.0.1:{port}"), receiver)
+}
 
 #[test]
 fn accepts_https() {
@@ -103,4 +149,107 @@ fn each_scheme_sends_the_header_its_route_expects() {
 
     let direct = HttpTransport::api_key("https://backend.composio.dev/api/v3", "sk-1").unwrap();
     assert_eq!(direct.auth_header(), ("x-api-key", "sk-1".into()));
+}
+
+#[tokio::test]
+async fn a_get_sends_the_bearer_header_and_decodes_the_body() {
+    let (base_url, requests) = loopback_server(r#"{"toolkits":["gmail"]}"#);
+    let transport = HttpTransport::bearer(&base_url, "t0ken").unwrap();
+
+    let value = transport
+        .get("/agent-integrations/composio/toolkits")
+        .await
+        .unwrap();
+    assert_eq!(value["toolkits"][0], "gmail");
+
+    let request = requests.recv().expect("the server saw a request");
+    assert!(
+        request.starts_with("GET /agent-integrations/composio/toolkits"),
+        "{request}"
+    );
+    assert!(
+        request
+            .to_lowercase()
+            .contains("authorization: bearer t0ken"),
+        "{request}"
+    );
+}
+
+#[tokio::test]
+async fn a_post_sends_the_body_and_the_api_key_header() {
+    let (base_url, requests) = loopback_server(r#"{"successful":true}"#);
+    let transport = HttpTransport::api_key(&base_url, "sk-1").unwrap();
+
+    let value = transport
+        .post(
+            "/tools/execute/GMAIL_SEND_EMAIL",
+            &serde_json::json!({ "a": 1 }),
+        )
+        .await
+        .unwrap();
+    assert_eq!(value["successful"], true);
+
+    let request = requests.recv().expect("the server saw a request");
+    assert!(
+        request.starts_with("POST /tools/execute/GMAIL_SEND_EMAIL"),
+        "{request}"
+    );
+    assert!(
+        request.to_lowercase().contains("x-api-key: sk-1"),
+        "{request}"
+    );
+    assert!(
+        !request.to_lowercase().contains("authorization:"),
+        "the direct route must not also send a bearer token: {request}"
+    );
+}
+
+#[tokio::test]
+async fn a_delete_reaches_the_item_path() {
+    let (base_url, requests) = loopback_server(r#"{"deleted":true}"#);
+    let transport = HttpTransport::bearer(&base_url, "t0ken").unwrap();
+
+    let value = transport
+        .delete("/agent-integrations/composio/connections/conn_9")
+        .await
+        .unwrap();
+    assert_eq!(value["deleted"], true);
+
+    let request = requests.recv().expect("the server saw a request");
+    assert!(
+        request.starts_with("DELETE /agent-integrations/composio/connections/conn_9"),
+        "{request}"
+    );
+}
+
+#[tokio::test]
+async fn a_body_that_is_not_json_is_a_decode_failure_naming_the_path() {
+    // Distinguishable from a transport failure, because retrying cannot fix it.
+    let (base_url, _requests) = loopback_server("not json at all");
+    let transport = HttpTransport::bearer(&base_url, "t0ken").unwrap();
+
+    let error = transport
+        .get("/agent-integrations/composio/toolkits")
+        .await
+        .unwrap_err();
+    assert!(matches!(error, Error::Decode { .. }));
+    assert!(
+        error
+            .to_string()
+            .contains("/agent-integrations/composio/toolkits")
+    );
+}
+
+#[tokio::test]
+async fn a_refused_connection_is_a_transport_failure_naming_the_path() {
+    // Bind and drop, so the port is closed but plausible.
+    let listener = std::net::TcpListener::bind("127.0.0.1:0").unwrap();
+    let port = listener.local_addr().unwrap().port();
+    drop(listener);
+
+    let transport = HttpTransport::bearer(&format!("http://127.0.0.1:{port}"), "t").unwrap();
+    let error = transport.get("/anything").await.unwrap_err();
+
+    assert!(matches!(error, Error::Transport { .. }));
+    assert!(error.to_string().contains("/anything"));
 }
