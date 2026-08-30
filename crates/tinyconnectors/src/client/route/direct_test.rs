@@ -12,7 +12,7 @@ use std::sync::{Arc, Mutex};
 use async_trait::async_trait;
 use serde_json::json;
 
-use super::{DirectRoute, Route};
+use super::{DirectRoute, INVALID_API_KEY_THRESHOLD, Route};
 use crate::client::Transport;
 use crate::{Error, Result};
 
@@ -226,18 +226,19 @@ async fn gates_a_key_composio_keeps_rejecting() {
     let transport = FakeTransport::failing("401 invalid api key");
     let direct = route(transport.clone());
 
-    // Three rejections are allowed through; the fourth call is refused locally.
-    for _ in 0..3 {
+    // Every attempt up to the threshold reaches Composio; the next is refused
+    // locally without a request.
+    for _ in 0..INVALID_API_KEY_THRESHOLD {
         assert!(direct.list_connections().await.is_err());
     }
-    assert_eq!(transport.calls(), 3);
+    assert_eq!(transport.calls(), INVALID_API_KEY_THRESHOLD);
 
     let error = direct.list_connections().await.unwrap_err();
     assert!(matches!(error, Error::DirectAuthGated { .. }));
     assert!(error.to_string().contains("valid key"));
     assert_eq!(
         transport.calls(),
-        3,
+        INVALID_API_KEY_THRESHOLD,
         "the gate must stop the request, not just relabel its failure"
     );
 }
@@ -271,7 +272,7 @@ async fn a_success_clears_the_failure_count() {
 
     // The old tally must not carry over and gate the working key.
     *transport.fail.lock().unwrap() = Some("401 invalid api key".to_string());
-    for _ in 0..3 {
+    for _ in 0..INVALID_API_KEY_THRESHOLD {
         assert!(direct.list_connections().await.is_err());
     }
     let before_gate = transport.calls();

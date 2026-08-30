@@ -17,7 +17,7 @@ use crate::{
 pub const COMPOSIO_API_BASE: &str = "https://backend.composio.dev/api/v3";
 
 /// Consecutive rejections of the same key before the gate closes.
-const INVALID_API_KEY_THRESHOLD: u32 = 3;
+pub const INVALID_API_KEY_THRESHOLD: u32 = 3;
 
 const GATED_MESSAGE: &str = "Composio rejected this API key repeatedly, so further direct-mode \
                              calls are paused. Enter a valid key to resume.";
