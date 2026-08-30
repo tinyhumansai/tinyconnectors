@@ -159,7 +159,10 @@ fn ensure_notion_fetch_type(args: &mut Value) {
         fetch_type = %inferred,
         "[connectors][prepare] NOTION_FETCH_DATA: inferred fetch_type"
     );
-    object.insert("fetch_type".to_string(), Value::String(inferred.to_string()));
+    object.insert(
+        "fetch_type".to_string(),
+        Value::String(inferred.to_string()),
+    );
 }
 
 /// A send with no recipient is refused locally.
@@ -204,9 +207,14 @@ fn validate_gmail_add_label(tool: &str, args: &Value) -> Result<()> {
         return Err(invalid(tool, "`message_id` is required"));
     }
 
-    let changes_a_label = ["add_label_ids", "addLabelIds", "remove_label_ids", "removeLabelIds"]
-        .iter()
-        .any(|key| has_non_empty_string(object.get(*key)));
+    let changes_a_label = [
+        "add_label_ids",
+        "addLabelIds",
+        "remove_label_ids",
+        "removeLabelIds",
+    ]
+    .iter()
+    .any(|key| has_non_empty_string(object.get(*key)));
     if changes_a_label {
         Ok(())
     } else {

@@ -17,7 +17,9 @@ use tinybus::transport::memory::MemoryBus;
 use tinybus::{Connection, Interface};
 use tinyconnectors_bus::{
     ComposioAuthorizeRequest, ComposioAuthorizeResponse, ComposioConnectionsResponse,
-    ComposioDeleteConnectionRequest, ComposioDeleteResponse, ComposioToolkitsResponse, names,
+    ComposioDeleteConnectionRequest, ComposioDeleteResponse, ComposioExecuteRequest,
+    ComposioExecuteResponse, ComposioListToolsRequest, ComposioToolkitsResponse,
+    ComposioToolsResponse, names,
 };
 
 use super::{ConnectorService, ModuleConfig};
@@ -249,6 +251,112 @@ async fn deletes_a_connection_over_the_bus() -> tinybus::Result<()> {
 
     assert!(reply.deleted);
     assert_eq!(reply.memory_chunks_deleted, 3);
+    Ok(())
+}
+
+#[tokio::test]
+async fn serves_the_tool_catalog_over_a_real_bus() -> tinybus::Result<()> {
+    let transport = StubTransport::replying(json!({
+        "tools": [{ "function": { "name": "GMAIL_SEND_EMAIL" } }]
+    }));
+    let (_serving, _client, proxy, _bus) = proxy_to(service_over(transport)).await?;
+
+    let reply: ComposioToolsResponse = proxy
+        .call(
+            names::methods::LIST_TOOLS,
+            (ComposioListToolsRequest {
+                toolkits: vec!["gmail".into()],
+                tags: Vec::new(),
+            },),
+        )
+        .await?;
+
+    assert_eq!(reply.tools.len(), 1);
+    assert_eq!(reply.tools[0].function.name, "GMAIL_SEND_EMAIL");
+    Ok(())
+}
+
+#[tokio::test]
+async fn runs_an_action_over_the_bus() -> tinybus::Result<()> {
+    let transport = StubTransport::replying(json!({
+        "data": { "messageId": "m-1" },
+        "successful": true,
+        "costUsd": 0.0025
+    }));
+    let (_serving, _client, proxy, _bus) = proxy_to(service_over(transport.clone())).await?;
+
+    let reply: ComposioExecuteResponse = proxy
+        .call(
+            names::methods::EXECUTE,
+            (ComposioExecuteRequest {
+                tool: "GMAIL_SEND_EMAIL".into(),
+                arguments: Some(json!({ "to": "a@b.com" })),
+                connection_id: Some("conn_1".into()),
+            },),
+        )
+        .await?;
+
+    assert!(reply.successful);
+    assert_eq!(reply.data["messageId"], "m-1");
+
+    // The connection the caller named must reach the backend: without it the
+    // action runs against whichever account happens to be ambient.
+    let body = transport.last_body.lock().unwrap().clone().unwrap();
+    assert_eq!(body["connectionId"], "conn_1");
+    assert_eq!(body["tool"], "GMAIL_SEND_EMAIL");
+    Ok(())
+}
+
+#[tokio::test]
+async fn a_provider_refusal_crosses_the_bus_as_a_reply_not_a_failure() -> tinybus::Result<()> {
+    // The distinction matters: a caller that only checks for a member error
+    // would report a failed send as a success.
+    let transport = StubTransport::replying(json!({
+        "successful": false,
+        "error": "insufficient authentication scopes"
+    }));
+    let (_serving, _client, proxy, _bus) = proxy_to(service_over(transport)).await?;
+
+    let reply: ComposioExecuteResponse = proxy
+        .call(
+            names::methods::EXECUTE,
+            (ComposioExecuteRequest {
+                tool: "GMAIL_SEND_EMAIL".into(),
+                arguments: Some(json!({ "to": "a@b.com" })),
+                connection_id: None,
+            },),
+        )
+        .await?;
+
+    assert!(!reply.successful);
+    let error = reply.error.expect("carries the failure");
+    assert!(error.starts_with("[composio:error:insufficient_scope]"));
+    Ok(())
+}
+
+#[tokio::test]
+async fn local_argument_validation_fails_the_member_before_any_request() -> tinybus::Result<()> {
+    let transport = StubTransport::replying(json!({}));
+    let (_serving, _client, proxy, _bus) = proxy_to(service_over(transport.clone())).await?;
+
+    let result = proxy
+        .call::<ComposioExecuteResponse>(
+            names::methods::EXECUTE,
+            (ComposioExecuteRequest {
+                tool: "GMAIL_SEND_EMAIL".into(),
+                arguments: Some(json!({ "subject": "hi" })),
+                connection_id: None,
+            },),
+        )
+        .await;
+
+    let Err(error) = result else {
+        return Err(tinybus::Error::failed(
+            "a send with no recipient unexpectedly succeeded",
+        ));
+    };
+    assert!(error.to_string().contains("recipient"));
+    assert!(transport.last_body.lock().unwrap().is_none());
     Ok(())
 }
 

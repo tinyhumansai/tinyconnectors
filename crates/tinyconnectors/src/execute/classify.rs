@@ -137,7 +137,10 @@ pub fn format_provider_error(tool: &str, raw: &str) -> String {
 /// Identifiers are upper-snake-case with the toolkit first, so
 /// `GMAIL_NEW_GMAIL_MESSAGE` is `gmail`.
 fn toolkit_of(tool: &str) -> String {
-    tool.split('_').next().unwrap_or_default().to_ascii_lowercase()
+    tool.split('_')
+        .next()
+        .unwrap_or_default()
+        .to_ascii_lowercase()
 }
 
 fn is_known_toolkit_action(tool: &str) -> bool {
@@ -231,9 +234,15 @@ fn is_trigger_permission(lower: &str) -> bool {
 }
 
 fn is_rate_limited(lower: &str) -> bool {
-    ["rate limit", "rate_limit", "ratelimited", "too many requests", "429"]
-        .iter()
-        .any(|needle| lower.contains(needle))
+    [
+        "rate limit",
+        "rate_limit",
+        "ratelimited",
+        "too many requests",
+        "429",
+    ]
+    .iter()
+    .any(|needle| lower.contains(needle))
 }
 
 /// Scoped to 404 and 410 on purpose: unknown action, or deprecated endpoint.
@@ -254,10 +263,9 @@ fn is_composio_platform(lower: &str) -> bool {
 }
 
 fn is_gateway(lower: &str) -> bool {
-    ["502", "503", "504"]
-        .iter()
-        .any(|code| lower.contains(&format!("backend returned {code}")) || lower.contains(&format!("({code} ")))
-        || lower.contains("502 bad gateway")
+    ["502", "503", "504"].iter().any(|code| {
+        lower.contains(&format!("backend returned {code}")) || lower.contains(&format!("({code} "))
+    }) || lower.contains("502 bad gateway")
 }
 
 /// Whether a message names a provider-level failure, even inside a gateway
@@ -269,7 +277,14 @@ fn is_embedded_provider_failure(lower: &str) -> bool {
         || is_rate_limited(lower)
         || is_action_not_found(lower)
         || is_composio_platform(lower)
-        || ["composio", "google", "slack", "notion", "gmail", "fetch_type"]
-            .iter()
-            .any(|needle| lower.contains(needle))
+        || [
+            "composio",
+            "google",
+            "slack",
+            "notion",
+            "gmail",
+            "fetch_type",
+        ]
+        .iter()
+        .any(|needle| lower.contains(needle))
 }

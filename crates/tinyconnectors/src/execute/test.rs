@@ -56,7 +56,13 @@ fn leaves_a_full_calendar_timestamp_alone() {
 
 #[test]
 fn rejects_an_impossible_calendar_date_before_sending_it() {
-    for bound in ["2026-99-99", "2026-02-30", "2025-02-29", "14-05-2026", "nonsense"] {
+    for bound in [
+        "2026-99-99",
+        "2026-02-30",
+        "2025-02-29",
+        "14-05-2026",
+        "nonsense",
+    ] {
         let error = prepare_execute_arguments(
             "GOOGLECALENDAR_FIND_EVENT",
             Some(json!({ "timeMin": bound })),
@@ -132,8 +138,8 @@ fn keeps_a_notion_fetch_type_the_caller_supplied() {
 
 #[test]
 fn refuses_a_gmail_send_with_no_recipient() {
-    let error =
-        prepare_execute_arguments("GMAIL_SEND_EMAIL", Some(json!({ "subject": "hi" }))).unwrap_err();
+    let error = prepare_execute_arguments("GMAIL_SEND_EMAIL", Some(json!({ "subject": "hi" })))
+        .unwrap_err();
     assert!(error.to_string().contains("recipient"));
 
     // An empty string is not a recipient either.
@@ -204,7 +210,10 @@ fn a_404_wins_over_the_reauthenticate_text_it_carries() {
 #[test]
 fn classifies_each_failure_shape() {
     for (message, expected) in [
-        ("Missing required field `to`", ComposioErrorClass::Validation),
+        (
+            "Missing required field `to`",
+            ComposioErrorClass::Validation,
+        ),
         (
             "Request had insufficient authentication scopes",
             ComposioErrorClass::InsufficientScope,
@@ -373,7 +382,9 @@ async fn retries_once_while_a_fresh_connection_is_still_propagating() {
 #[tokio::test(start_paused = true)]
 async fn does_not_retry_the_readiness_error_more_than_once() {
     // A revoked connection reports this forever. The user has to hear about it.
-    let route = ScriptedRoute::new(vec![failed_response("Connection error, try to authenticate")]);
+    let route = ScriptedRoute::new(vec![failed_response(
+        "Connection error, try to authenticate",
+    )]);
     let response = execute_action(route.as_ref(), "GMAIL_FETCH_EMAILS", None, None)
         .await
         .unwrap();

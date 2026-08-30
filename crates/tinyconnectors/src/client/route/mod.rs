@@ -89,8 +89,11 @@ pub trait Route: Send + Sync + std::fmt::Debug {
     /// # Errors
     ///
     /// Returns the underlying transport or decode failure.
-    async fn list_tools(&self, toolkits: &[String], tags: &[String])
-    -> Result<ComposioToolsResponse>;
+    async fn list_tools(
+        &self,
+        toolkits: &[String],
+        tags: &[String],
+    ) -> Result<ComposioToolsResponse>;
 
     /// Run one action.
     ///
