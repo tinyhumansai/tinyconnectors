@@ -26,6 +26,7 @@ fn the_method_table_holds_the_declared_members() {
     assert_eq!(
         METHODS,
         [
+            methods::CONFIGURE,
             methods::LIST_TOOLKITS,
             methods::LIST_CONNECTIONS,
             methods::AUTHORIZE,
