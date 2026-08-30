@@ -420,6 +420,10 @@ impl ConnectorService {
     /// Replacing is deliberately unconditional. The host owns the decision of
     /// which route to use — this module implements both and chooses neither —
     /// so a `Configure` is an instruction, not a proposal.
+    // `async` with nothing awaited: swapping a route is a lock and a move, but
+    // every member of a `#[tinybus::interface]` impl has to be async to be
+    // dispatched. Narrow, and on this one member only.
+    #[allow(clippy::unused_async, reason = "required by the interface dispatcher")]
     async fn configure(
         &self,
         request: ComposioConfigureRequest,

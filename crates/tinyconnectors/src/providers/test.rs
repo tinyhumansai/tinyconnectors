@@ -38,7 +38,10 @@ fn actions(reply: serde_json::Value) -> (Arc<StubTransport>, ClientActions) {
         ..StubTransport::default()
     });
     let client = ComposioClient::new(Arc::new(ProxyRoute::new(transport.clone())));
-    (transport, ClientActions::new(Arc::new(std::sync::RwLock::new(Some(client)))))
+    (
+        transport,
+        ClientActions::new(Arc::new(std::sync::RwLock::new(Some(client)))),
+    )
 }
 
 #[tokio::test]
