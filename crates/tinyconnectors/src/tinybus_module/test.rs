@@ -1418,7 +1418,7 @@ async fn a_failed_execute_carries_an_error_class() {
 
     let error = service
         .execute(ComposioExecuteRequest {
-            tool: "GMAIL_SEND_EMAIL".to_string(),
+            tool: "GMAIL_FETCH_EMAILS".to_string(),
             arguments: None,
             connection_id: None,
         })
