@@ -30,9 +30,10 @@
 //! - `ListToolkits` — there is no per-user allowlist when you talk to Composio
 //!   directly; you see the whole catalog. An empty list would read as "you may
 //!   connect nothing".
-//! - `DeleteConnection` — the proxy's version also clears memory sourced from
-//!   the connection, which Composio knows nothing about. A bare delete would
-//!   silently orphan the user's synced content.
+//! - `DeleteConnection` — the direct client this route was ported from never
+//!   covered it, so there is no verified v3 request shape to port. Refusing
+//!   loses nothing: that host could not disconnect an account in direct mode
+//!   either.
 //! - **Every trigger member, and the GitHub repository listing.** Triggers are
 //!   webhooks, and a webhook has to arrive somewhere. The proxy backend
 //!   HMAC-verifies deliveries and fans them out over the user's sockets; the
