@@ -37,18 +37,18 @@ use serde::Deserialize;
 use tinybus::{Connection, Result as TinyBusResult};
 use tinyconnectors_bus::{
     ComposioActiveTriggersResponse, ComposioAgentReadyToolkitsResponse, ComposioAuthorizeRequest,
-    ComposioConfigureRequest, ComposioConfigureResponse,
     ComposioAuthorizeResponse, ComposioAvailableTriggersResponse, ComposioCapabilitiesResponse,
-    ComposioConnectionsResponse, ComposioCreateTriggerRequest, ComposioCreateTriggerResponse,
-    ComposioDeleteConnectionRequest, ComposioDeleteResponse, ComposioDisableTriggerRequest,
-    ComposioDisableTriggerResponse, ComposioEnableTriggerRequest, ComposioEnableTriggerResponse,
-    ComposioExecuteRequest, ComposioExecuteResponse, ComposioGetUserScopesRequest,
-    ComposioGithubReposResponse, ComposioIdentityFailure, ComposioListAvailableTriggersRequest,
-    ComposioListGithubReposRequest, ComposioListToolsRequest, ComposioListTriggerHistoryRequest,
-    ComposioListTriggersRequest, ComposioRefreshIdentitiesResponse, ComposioSetUserScopesRequest,
-    ComposioToolkitsResponse, ComposioToolsResponse, ComposioTriggerHistoryResult,
-    ComposioUserProfile, ComposioUserProfileRequest, ComposioUserScopes,
-    ComposioUserScopesResponse, ConnectorSyncRequest, ConnectorSyncResponse, names,
+    ComposioConfigureRequest, ComposioConfigureResponse, ComposioConnectionsResponse,
+    ComposioCreateTriggerRequest, ComposioCreateTriggerResponse, ComposioDeleteConnectionRequest,
+    ComposioDeleteResponse, ComposioDisableTriggerRequest, ComposioDisableTriggerResponse,
+    ComposioEnableTriggerRequest, ComposioEnableTriggerResponse, ComposioExecuteRequest,
+    ComposioExecuteResponse, ComposioGetUserScopesRequest, ComposioGithubReposResponse,
+    ComposioIdentityFailure, ComposioListAvailableTriggersRequest, ComposioListGithubReposRequest,
+    ComposioListToolsRequest, ComposioListTriggerHistoryRequest, ComposioListTriggersRequest,
+    ComposioRefreshIdentitiesResponse, ComposioSetUserScopesRequest, ComposioToolkitsResponse,
+    ComposioToolsResponse, ComposioTriggerHistoryResult, ComposioUserProfile,
+    ComposioUserProfileRequest, ComposioUserScopes, ComposioUserScopesResponse,
+    ConnectorSyncRequest, ConnectorSyncResponse, names,
 };
 
 use crate::client::{
@@ -432,8 +432,7 @@ impl ConnectorService {
         *self
             .client
             .write()
-            .unwrap_or_else(std::sync::PoisonError::into_inner) =
-            Some(ComposioClient::new(route));
+            .unwrap_or_else(std::sync::PoisonError::into_inner) = Some(ComposioClient::new(route));
         Ok(ComposioConfigureResponse { route: name })
     }
 

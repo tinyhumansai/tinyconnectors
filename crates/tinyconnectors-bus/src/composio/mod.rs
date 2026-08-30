@@ -42,10 +42,9 @@ mod serde_compat;
 
 pub use connections::{
     ComposioAuthorizeRequest, ComposioAuthorizeResponse, ComposioConfigureRequest,
-    ComposioConfigureResponse, ComposioConnection,
-    ComposioConnectionsResponse, ComposioDeleteConnectionRequest, ComposioDeleteResponse,
-    ComposioIdentityFailure, ComposioRefreshIdentitiesResponse, ComposioUserProfile,
-    ComposioUserProfileRequest,
+    ComposioConfigureResponse, ComposioConnection, ComposioConnectionsResponse,
+    ComposioDeleteConnectionRequest, ComposioDeleteResponse, ComposioIdentityFailure,
+    ComposioRefreshIdentitiesResponse, ComposioUserProfile, ComposioUserProfileRequest,
 };
 pub use execute::{ComposioExecuteRequest, ComposioExecuteResponse};
 pub use github::{ComposioGithubRepo, ComposioGithubReposResponse, ComposioListGithubReposRequest};
