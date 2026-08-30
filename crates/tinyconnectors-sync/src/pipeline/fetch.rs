@@ -98,7 +98,10 @@ fn page_from(payload: &Value, spec: &PageSpec) -> ProviderPage {
             // Falls back to the whole item: a record with no recognizable body
             // field still carries something an agent can read, which beats
             // ingesting an empty one.
-            content: pick_str(item, spec.content_paths).unwrap_or_else(|| item.to_string()),
+            content: body(
+                &pick_str(item, spec.content_paths).unwrap_or_else(|| item.to_string()),
+                spec.clean_bodies,
+            ),
             mime: Some("text/plain".to_string()),
             url: pick_str(item, spec.url_paths),
             updated_at_ms: None,
