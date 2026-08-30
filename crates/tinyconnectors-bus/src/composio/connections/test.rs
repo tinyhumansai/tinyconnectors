@@ -2,7 +2,10 @@
 
 #![allow(clippy::unwrap_used, clippy::expect_used, clippy::panic)]
 
-use super::{ComposioAuthorizeResponse, ComposioConnection};
+use super::{
+    ComposioAuthorizeResponse, ComposioConfigureRequest, ComposioConfigureResponse,
+    ComposioConnection,
+};
 use serde_json::json;
 
 fn connection_with_status(status: &str) -> ComposioConnection {
