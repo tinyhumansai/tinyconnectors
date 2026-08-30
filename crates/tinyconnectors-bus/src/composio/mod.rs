@@ -41,7 +41,8 @@ pub mod triggers;
 mod serde_compat;
 
 pub use connections::{
-    ComposioAuthorizeRequest, ComposioAuthorizeResponse, ComposioConnection,
+    ComposioAuthorizeRequest, ComposioAuthorizeResponse, ComposioConfigureRequest,
+    ComposioConfigureResponse, ComposioConnection,
     ComposioConnectionsResponse, ComposioDeleteConnectionRequest, ComposioDeleteResponse,
     ComposioIdentityFailure, ComposioRefreshIdentitiesResponse, ComposioUserProfile,
     ComposioUserProfileRequest,

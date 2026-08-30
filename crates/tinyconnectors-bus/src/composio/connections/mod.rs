@@ -16,7 +16,8 @@
 mod types;
 
 pub use types::{
-    ComposioAuthorizeRequest, ComposioAuthorizeResponse, ComposioConnection,
+    ComposioAuthorizeRequest, ComposioAuthorizeResponse, ComposioConfigureRequest,
+    ComposioConfigureResponse, ComposioConnection,
     ComposioConnectionsResponse, ComposioDeleteConnectionRequest, ComposioDeleteResponse,
     ComposioIdentityFailure, ComposioRefreshIdentitiesResponse, ComposioUserProfile,
     ComposioUserProfileRequest,
