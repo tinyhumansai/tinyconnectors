@@ -81,7 +81,7 @@ chrono = { version = "0.4", default-features = false, features = ["std", "clock"
 # Safe advisory file locking for the trigger archive's appends. `unsafe` is
 # forbidden workspace-wide, so the `flock` call has to come from a crate that
 # encapsulates it rather than from a hand-rolled `extern "C"` block.
-fs4 = { version = "0.14", default-features = false, features = ["fs-err3"] }
+fs4 = { version = "1", default-features = false }
 
 # Lints apply to every member that opts in with `[lints] workspace = true`, and
 # to every target of that member. CI runs clippy with `-D warnings`, so anything
