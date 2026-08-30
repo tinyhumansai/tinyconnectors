@@ -144,31 +144,8 @@ impl ComposioClient {
                 message: "connection_id must not be empty".to_string(),
             });
         }
-        tracing::debug!(
-            connection_id = %connection_id,
-            "[connectors][composio] delete_connection"
-        );
-        let path = format!("/agent-integrations/composio/connections/{connection_id}");
-        let value = self.transport.delete(&path).await?;
-        decode(&path, value)
+        self.route.delete_connection(connection_id).await
     }
-
-    async fn get<T: DeserializeOwned>(&self, path: &str) -> Result<T> {
-        let value = self.transport.get(path).await?;
-        decode(path, value)
-    }
-
-    async fn post<T: DeserializeOwned>(&self, path: &str, body: &serde_json::Value) -> Result<T> {
-        let value = self.transport.post(path, body).await?;
-        decode(path, value)
-    }
-}
-
-fn decode<T: DeserializeOwned>(path: &str, value: serde_json::Value) -> Result<T> {
-    serde_json::from_value(value).map_err(|error| Error::Decode {
-        path: path.to_string(),
-        message: error.to_string(),
-    })
 }
 
 /// The scopes a toolkit needs beyond Composio's defaults, if any.

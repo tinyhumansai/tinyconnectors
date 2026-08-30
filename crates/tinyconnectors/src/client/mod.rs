@@ -38,7 +38,7 @@ mod transport;
 
 pub use composio::ComposioClient;
 pub use http::HttpTransport;
-pub use route::{DirectRoute, ProxyRoute, Route, direct::COMPOSIO_API_BASE};
+pub use route::{COMPOSIO_API_BASE, DirectRoute, ProxyRoute, Route};
 pub use transport::Transport;
 
 #[cfg(test)]

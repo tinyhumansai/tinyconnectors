@@ -33,7 +33,7 @@
 mod direct;
 mod proxy;
 
-pub use direct::DirectRoute;
+pub use direct::{COMPOSIO_API_BASE, DirectRoute};
 pub use proxy::ProxyRoute;
 
 use async_trait::async_trait;
