@@ -279,6 +279,65 @@ async fn state_flows_through_the_context() {
 }
 
 #[test]
+fn the_capability_matrix_describes_the_build_not_the_user() {
+    let registry = ProviderRegistry::new()
+        .with(provider("gmail"))
+        .with(Arc::new(TestProvider {
+            slug: "slack",
+            curated: None,
+            can_sync: false,
+        }));
+
+    let rows = registry.capabilities().capabilities;
+    assert_eq!(rows.len(), 2);
+
+    let gmail = &rows[0];
+    assert_eq!(gmail.toolkit, "gmail");
+    assert!(gmail.curated_tools);
+    assert_eq!(gmail.curated_tool_count, 1);
+    assert!(gmail.initial_sync);
+    assert!(gmail.periodic_sync);
+    assert!(gmail.memory_ingest);
+
+    // A write-only toolkit is connectable and usable, but nothing will read it.
+    // Saying so is what stops a UI implying a sync that will never run.
+    let slack = &rows[1];
+    assert!(!slack.curated_tools);
+    assert!(!slack.initial_sync);
+    assert!(!slack.periodic_sync);
+    assert!(!slack.memory_ingest);
+    assert!(slack.tool_execution, "it can still be acted through");
+}
+
+#[test]
+fn a_provider_that_opted_out_of_scheduling_reports_no_periodic_sync() {
+    #[derive(Debug)]
+    struct Unscheduled;
+
+    #[async_trait]
+    impl ConnectorProvider for Unscheduled {
+        fn toolkit_slug(&self) -> &'static str {
+            "webhookonly"
+        }
+        fn description(&self) -> &'static str {
+            "nothing to poll"
+        }
+        fn sync_interval_secs(&self) -> Option<u64> {
+            None
+        }
+        async fn fetch_user_profile(&self, _: &ProviderContext) -> Result<ProviderUserProfile> {
+            Ok(ProviderUserProfile::default())
+        }
+    }
+
+    let registry = ProviderRegistry::new().with(Arc::new(Unscheduled));
+    let row = &registry.capabilities().capabilities[0];
+    assert!(!row.periodic_sync);
+    assert!(row.sync_interval_secs.is_none());
+    assert!(row.initial_sync, "it can still be read once, on connect");
+}
+
+#[test]
 fn an_action_failure_names_the_action() {
     let error = Error::Action {
         action: "GMAIL_FETCH_EMAILS".into(),

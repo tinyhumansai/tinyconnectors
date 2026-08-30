@@ -3,6 +3,8 @@
 use std::collections::BTreeMap;
 use std::sync::Arc;
 
+use tinyconnectors_bus::{ComposioCapabilitiesResponse, ComposioCapability};
+
 use super::traits::ConnectorProvider;
 
 /// The providers a build knows about, keyed by toolkit slug.
@@ -76,6 +78,46 @@ impl ProviderRegistry {
             })
             .map(|provider| provider.toolkit_slug().to_string())
             .collect()
+    }
+
+    /// What this build can do for each toolkit it knows.
+    ///
+    /// Describes the compiled binary, not the user: it needs no session and no
+    /// connection. That distinction is the point of it — a UI can tell "you
+    /// cannot connect this" apart from "you can connect it, but nothing will
+    /// read it yet", which are the same blank row otherwise.
+    #[must_use]
+    pub fn capabilities(&self) -> ComposioCapabilitiesResponse {
+        ComposioCapabilitiesResponse {
+            capabilities: self
+                .providers
+                .values()
+                .map(|provider| {
+                    let curated = provider.curated_tools().unwrap_or_default();
+                    let interval = provider.sync_interval_secs();
+                    ComposioCapability {
+                        toolkit: provider.toolkit_slug().to_string(),
+                        description: provider.description().to_string(),
+                        native_provider: true,
+                        curated_tools: !curated.is_empty(),
+                        curated_tool_count: curated.len(),
+                        // Every toolkit can execute: the catalog narrows what
+                        // is offered, it does not gate the mechanism.
+                        tool_execution: true,
+                        user_profile: true,
+                        initial_sync: provider.can_sync(),
+                        // Periodic sync needs both an interval and something to
+                        // read. A write-only toolkit has neither.
+                        periodic_sync: provider.can_sync() && interval.is_some(),
+                        sync_interval_secs: interval,
+                        // Triggers are a backend concern, not a provider one —
+                        // the module has no endpoint for a webhook to reach.
+                        trigger_webhooks: false,
+                        memory_ingest: provider.can_sync(),
+                    }
+                })
+                .collect(),
+        }
     }
 
     /// Whether the registry holds no providers.
