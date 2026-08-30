@@ -52,6 +52,42 @@ pub enum Error {
         message: String,
     },
 
+    /// The selected route does not offer this operation.
+    ///
+    /// The two routes are not equivalent, and pretending otherwise is worse
+    /// than saying so: direct mode talks to Composio itself, where there is no
+    /// per-user toolkit allowlist to list. A caller gets a named refusal it can
+    /// act on rather than an empty result that looks like an answer.
+    #[error("{member} is not available over the {route} route")]
+    UnsupportedByRoute {
+        /// Route that was asked, `"proxy"` or `"direct"`.
+        route: &'static str,
+        /// Bus member that was refused.
+        member: &'static str,
+    },
+
+    /// A direct-mode API key was rejected repeatedly and is now gated.
+    ///
+    /// Without this, a revoked key makes every poll hit Composio and fail
+    /// again, several times a minute, indefinitely. The gate stops asking until
+    /// the user supplies a different key.
+    #[error("{message}")]
+    DirectAuthGated {
+        /// User-facing explanation of the gate and how to clear it.
+        message: String,
+    },
+
+    /// A base URL would send a credential somewhere it must not go.
+    ///
+    /// Refused before any request is made — see `client::HttpTransport`.
+    #[error("refusing to send a credential to {base_url}: {reason}")]
+    InsecureBaseUrl {
+        /// The rejected base URL.
+        base_url: String,
+        /// Why it was rejected.
+        reason: &'static str,
+    },
+
     /// An OAuth host rate-limited the handoff and retries were exhausted.
     ///
     /// Distinct from [`Error::Authorize`] because it is not the user's request
