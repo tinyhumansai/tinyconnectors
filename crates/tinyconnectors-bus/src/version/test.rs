@@ -16,8 +16,12 @@ fn the_contract_binds_to_itself() {
 
 #[test]
 fn a_newer_minor_on_the_module_side_binds() {
-    assert!(is_compatible((1, 1)));
-    assert!(is_compatible((1, 97)));
+    // Relative to the shipped version, not literal: a literal minor stops
+    // being "newer" the moment the contract gains a member, which is a test
+    // failure that says nothing about the rule it is checking.
+    let (major, minor) = CONTRACT_VERSION;
+    assert!(is_compatible((major, minor + 1)));
+    assert!(is_compatible((major, minor + 96)));
 }
 
 #[test]
