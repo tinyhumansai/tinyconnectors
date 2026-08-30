@@ -121,6 +121,40 @@ pub mod methods {
     /// is fanned out over a socket and then gone, so the only way to answer
     /// "did it fire?" is to have written it down as it arrived.
     pub const LIST_TRIGGER_HISTORY: &str = "ListTriggerHistory";
+
+    /// Reads a connected account's identity.
+    ///
+    /// Takes a [`crate::ComposioUserProfileRequest`] and returns a
+    /// [`crate::ComposioUserProfile`]. Answered by the toolkit's provider,
+    /// which knows both the action to call and the field the identity is in —
+    /// so a toolkit with no provider cannot answer it.
+    pub const GET_USER_PROFILE: &str = "GetUserProfile";
+
+    /// Re-reads the identity of every connection.
+    ///
+    /// Takes no arguments and returns a
+    /// [`crate::ComposioRefreshIdentitiesResponse`]. A connection whose profile
+    /// could not be read is reported as a failure alongside the ones that
+    /// worked, rather than failing the whole call: one broken connection must
+    /// not hide every working one.
+    pub const REFRESH_ALL_IDENTITIES: &str = "RefreshAllIdentities";
+
+    /// Lists what this build can do for each toolkit it knows.
+    ///
+    /// Takes no arguments and returns a
+    /// [`crate::ComposioCapabilitiesResponse`]. Describes the compiled module,
+    /// not the user, so it answers without a session or a connection — which is
+    /// what lets a caller tell "you cannot connect this" apart from "you can
+    /// connect it, but nothing will read it yet".
+    pub const LIST_CAPABILITIES: &str = "ListCapabilities";
+
+    /// Lists the toolkits that ship a curated agent catalog.
+    ///
+    /// Takes no arguments and returns a
+    /// [`crate::ComposioAgentReadyToolkitsResponse`]. A connected toolkit
+    /// absent from this list should be surfaced as preview rather than as
+    /// something the agent can already act through.
+    pub const LIST_AGENT_READY_TOOLKITS: &str = "ListAgentReadyToolkits";
 }
 
 /// Every member of [`INTERFACE`], in the order the interface dispatches them.
@@ -141,6 +175,10 @@ pub const METHODS: &[&str] = &[
     methods::ENABLE_TRIGGER,
     methods::DISABLE_TRIGGER,
     methods::LIST_TRIGGER_HISTORY,
+    methods::GET_USER_PROFILE,
+    methods::REFRESH_ALL_IDENTITIES,
+    methods::LIST_CAPABILITIES,
+    methods::LIST_AGENT_READY_TOOLKITS,
 ];
 
 #[cfg(test)]

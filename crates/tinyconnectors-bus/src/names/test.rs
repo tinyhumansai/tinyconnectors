@@ -39,6 +39,10 @@ fn the_method_table_holds_the_declared_members() {
             methods::ENABLE_TRIGGER,
             methods::DISABLE_TRIGGER,
             methods::LIST_TRIGGER_HISTORY,
+            methods::GET_USER_PROFILE,
+            methods::REFRESH_ALL_IDENTITIES,
+            methods::LIST_CAPABILITIES,
+            methods::LIST_AGENT_READY_TOOLKITS,
         ]
     );
 }
