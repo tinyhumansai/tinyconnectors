@@ -174,3 +174,54 @@ fn trigger_event_parses_a_full_delivery() {
     assert_eq!(event.metadata.uuid, "uuid-1");
     assert_eq!(event.payload["subject"], "hi");
 }
+
+#[test]
+fn active_trigger_names_the_type_it_could_not_read() {
+    // The message has to say what arrived, or a drift report is unactionable.
+    for (value, described) in [
+        (json!(null), "null"),
+        (json!(true), "bool"),
+        (json!(42), "number"),
+        (json!([1]), "array"),
+    ] {
+        let mut raw = json!({
+            "slug": "X", "toolkit": "gmail", "connectionId": "c1"
+        });
+        raw["id"] = value.clone();
+
+        let error = serde_json::from_value::<ComposioActiveTrigger>(raw).expect_err("must reject");
+        assert!(
+            error.to_string().contains(described),
+            "{value} should be described as {described}: {error}"
+        );
+    }
+}
+
+#[test]
+fn active_trigger_state_ignores_a_non_string_leaf() {
+    // Optional and resilient: an unexpected scalar is "not reported", not an
+    // error that would drop the whole trigger.
+    for value in [json!(42), json!(true), json!([1, 2])] {
+        let mut raw = json!({
+            "id": "t1", "slug": "X", "toolkit": "gmail", "connectionId": "c1"
+        });
+        raw["state"] = value.clone();
+
+        let trigger: ComposioActiveTrigger = serde_json::from_value(raw).expect("parses");
+        assert!(trigger.state.is_none(), "{value}");
+    }
+}
+
+#[test]
+fn active_trigger_reads_an_object_wrapped_field_by_any_known_key() {
+    for key in ["slug", "id", "name", "key"] {
+        let raw = json!({
+            "id": { key: "t1" },
+            "slug": "X",
+            "toolkit": "gmail",
+            "connectionId": "c1"
+        });
+        let trigger: ComposioActiveTrigger = serde_json::from_value(raw).expect("parses");
+        assert_eq!(trigger.id, "t1", "{key}");
+    }
+}

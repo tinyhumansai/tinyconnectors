@@ -17,12 +17,19 @@ use crate::state::SyncStateStore;
 struct FixedActions {
     payload: serde_json::Value,
     last_action: Mutex<Option<String>>,
+    last_arguments: Mutex<Option<serde_json::Value>>,
 }
 
 #[async_trait]
 impl ActionRunner for FixedActions {
-    async fn run(&self, action: &str, _: serde_json::Value, _: &str) -> Result<serde_json::Value> {
+    async fn run(
+        &self,
+        action: &str,
+        arguments: serde_json::Value,
+        _: &str,
+    ) -> Result<serde_json::Value> {
         *self.last_action.lock().unwrap() = Some(action.to_string());
+        *self.last_arguments.lock().unwrap() = Some(arguments);
         Ok(self.payload.clone())
     }
 }
@@ -44,6 +51,7 @@ fn context(toolkit: &str, payload: serde_json::Value) -> (Arc<FixedActions>, Pro
     let actions = Arc::new(FixedActions {
         payload,
         last_action: Mutex::new(None),
+        last_arguments: Mutex::new(None),
     });
     let context = ProviderContext {
         toolkit: toolkit.to_string(),
@@ -338,4 +346,63 @@ async fn a_github_numeric_id_becomes_a_record_id() {
         .await
         .unwrap();
     assert_eq!(page.records[0].item_id, "42");
+}
+
+#[tokio::test]
+async fn clickup_reads_its_username_and_avatar() {
+    let (_actions, context) = context(
+        "clickup",
+        json!({
+            "username": "ada",
+            "email": "ada@example.com",
+            "profilePicture": "https://example.com/a.png"
+        }),
+    );
+    let profile = default_registry()
+        .get("clickup")
+        .unwrap()
+        .fetch_user_profile(&context)
+        .await
+        .unwrap();
+
+    assert_eq!(profile.username.as_deref(), Some("ada"));
+    assert_eq!(profile.email.as_deref(), Some("ada@example.com"));
+    assert_eq!(
+        profile.avatar_url.as_deref(),
+        Some("https://example.com/a.png")
+    );
+}
+
+#[tokio::test]
+async fn linear_reads_its_display_name() {
+    let (_actions, context) = context("linear", json!({ "name": "Ada", "email": "a@b.com" }));
+    let profile = default_registry()
+        .get("linear")
+        .unwrap()
+        .fetch_user_profile(&context)
+        .await
+        .unwrap();
+    assert_eq!(profile.display_name.as_deref(), Some("Ada"));
+}
+
+#[tokio::test]
+async fn every_toolkit_resumes_from_a_cursor() {
+    // The cursor argument is the one thing that makes a second page possible.
+    for toolkit in ["gmail", "github", "notion", "linear", "clickup"] {
+        let (actions, context) = context(toolkit, json!({}));
+        default_registry()
+            .get(toolkit)
+            .unwrap()
+            .fetch_page(&context, Some("page-2"))
+            .await
+            .unwrap();
+
+        let arguments = actions.last_arguments.lock().unwrap().clone().unwrap();
+        assert!(
+            arguments
+                .as_object()
+                .is_some_and(|args| args.values().any(|v| v == "page-2")),
+            "{toolkit} did not forward the cursor: {arguments}"
+        );
+    }
 }

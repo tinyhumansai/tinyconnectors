@@ -139,3 +139,46 @@ async fn preferences_do_not_collide_between_toolkits() {
         UserScopePref::default()
     );
 }
+
+#[tokio::test]
+async fn a_preference_lands_under_the_prefs_namespace() {
+    // Not the sync-state namespace: a cursor and a preference for one toolkit
+    // must never collide.
+    let store = MemoryStore::default();
+    UserScopePref::default()
+        .save(&store, "gmail")
+        .await
+        .unwrap();
+
+    let values = store.values.lock().unwrap();
+    assert!(values.contains_key(&(PREFS_NAMESPACE.to_string(), "gmail".to_string())));
+    assert!(!values.contains_key(&(STATE_NAMESPACE.to_string(), "gmail".to_string())));
+}
+
+#[test]
+fn an_empty_toolkit_still_produces_a_usable_key() {
+    // Reached only through a member that already rejects a blank toolkit, but
+    // handled rather than assumed away: a future caller need not come that way.
+    assert_eq!(UserScopePref::key("   "), "");
+}
+
+#[test]
+fn every_scope_is_checked_against_its_own_flag() {
+    let none = UserScopePref {
+        read: false,
+        write: false,
+        admin: false,
+    };
+    for scope in [ToolScope::Read, ToolScope::Write, ToolScope::Admin] {
+        assert!(!none.allows(scope), "{scope:?}");
+    }
+
+    let all = UserScopePref {
+        read: true,
+        write: true,
+        admin: true,
+    };
+    for scope in [ToolScope::Read, ToolScope::Write, ToolScope::Admin] {
+        assert!(all.allows(scope), "{scope:?}");
+    }
+}
