@@ -46,6 +46,10 @@ ureq = { workspace = true }
 url = { workspace = true }
 # Encodes bus-supplied values before they become part of a request URL.
 percent-encoding = { workspace = true }
+# Exclusive locking for trigger-archive appends.
+fs4 = { workspace = true }
+# Daily rotation of the trigger archive needs a civil date.
+chrono = { workspace = true }
 
 [dev-dependencies]
 # The bundled example implements `Transport`, which is an `async_trait`.

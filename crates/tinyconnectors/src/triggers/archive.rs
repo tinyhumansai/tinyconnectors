@@ -2,6 +2,8 @@
 
 use std::fs::{self, File, OpenOptions};
 use std::io::{BufRead, BufReader, Write};
+
+use fs4::fs_std::FileExt;
 use std::path::{Path, PathBuf};
 use std::time::{SystemTime, UNIX_EPOCH};
 
@@ -76,7 +78,7 @@ impl TriggerArchive {
             message,
         };
 
-        let line = serde_json::to_string(&entry)
+        let mut line = serde_json::to_string(&entry)
             .map_err(|error| failed(format!("could not serialize the delivery: {error}")))?;
 
         let mut file = OpenOptions::new()
@@ -85,13 +87,20 @@ impl TriggerArchive {
             .open(&path)
             .map_err(|error| failed(format!("could not open the archive file: {error}")))?;
 
-        // A whole-line write under an exclusive lock. Two deliveries can arrive
-        // at once, and interleaving them would corrupt both records.
-        let guard = FileLock::acquire(&file)
+        // One `write_all` of one buffer, under an exclusive lock. Two
+        // deliveries can arrive at once, and a payload is easily large enough
+        // that `O_APPEND` alone does not guarantee the two lines will not
+        // interleave — which would corrupt both records, since JSONL's one
+        // guarantee is that a line is a record.
+        file.lock_exclusive()
             .map_err(|error| failed(format!("could not lock the archive file: {error}")))?;
-        let written = writeln!(file, "{line}").and_then(|()| file.flush());
-        drop(guard);
+        line.push('\n');
+        let written = file.write_all(line.as_bytes()).and_then(|()| file.flush());
+        // Unlock even when the write failed: holding the lock would block every
+        // later delivery on a failure that has already been reported.
+        let unlocked = FileExt::unlock(&file);
         written.map_err(|error| failed(format!("could not append to the archive: {error}")))?;
+        unlocked.map_err(|error| failed(format!("could not unlock the archive: {error}")))?;
 
         tracing::debug!(
             toolkit = %entry.toolkit,
@@ -183,64 +192,4 @@ fn now_ms() -> u64 {
 /// reorder files when a machine changes timezone.
 fn utc_day() -> String {
     chrono::Utc::now().format("%Y-%m-%d").to_string()
-}
-
-/// An exclusive advisory lock held for the duration of one append.
-struct FileLock<'a> {
-    #[cfg(unix)]
-    file: &'a File,
-    #[cfg(not(unix))]
-    _file: std::marker::PhantomData<&'a File>,
-}
-
-#[cfg(unix)]
-impl<'a> FileLock<'a> {
-    fn acquire(file: &'a File) -> std::io::Result<Self> {
-        use std::os::unix::io::AsRawFd;
-        // SAFETY: `flock` takes a valid file descriptor and an operation flag.
-        // The descriptor is borrowed from `file`, which outlives this guard, so
-        // it cannot be closed while the lock is held.
-        let locked = unsafe { libc_flock(file.as_raw_fd(), LOCK_EX) };
-        if locked == 0 {
-            Ok(Self { file })
-        } else {
-            Err(std::io::Error::last_os_error())
-        }
-    }
-}
-
-#[cfg(unix)]
-impl Drop for FileLock<'_> {
-    fn drop(&mut self) {
-        use std::os::unix::io::AsRawFd;
-        // SAFETY: same descriptor, still open; releasing a lock cannot fail in
-        // a way worth propagating from a destructor.
-        unsafe {
-            libc_flock(self.file.as_raw_fd(), LOCK_UN);
-        }
-    }
-}
-
-#[cfg(not(unix))]
-impl<'a> FileLock<'a> {
-    /// Windows has no `flock`, and the archive is appended from one process.
-    ///
-    /// Opening with `append` gives an atomic positioned write for a line this
-    /// small, which is the guarantee that actually matters here.
-    fn acquire(_file: &'a File) -> std::io::Result<Self> {
-        Ok(Self {
-            _file: std::marker::PhantomData,
-        })
-    }
-}
-
-#[cfg(unix)]
-const LOCK_EX: i32 = 2;
-#[cfg(unix)]
-const LOCK_UN: i32 = 8;
-
-#[cfg(unix)]
-unsafe extern "C" {
-    #[link_name = "flock"]
-    fn libc_flock(fd: i32, operation: i32) -> i32;
 }
