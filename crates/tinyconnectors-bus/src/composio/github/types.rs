@@ -23,6 +23,14 @@ pub struct ComposioGithubRepo {
     pub html_url: Option<String>,
 }
 
+/// Arguments for listing a connected GitHub account's repositories.
+#[derive(Debug, Clone, Default, Serialize, Deserialize)]
+pub struct ComposioListGithubReposRequest {
+    /// Connection to list through. `None` uses the ambient GitHub account.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub connection_id: Option<String>,
+}
+
 /// Response body of `GET /agent-integrations/composio/github/repos`.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ComposioGithubReposResponse {

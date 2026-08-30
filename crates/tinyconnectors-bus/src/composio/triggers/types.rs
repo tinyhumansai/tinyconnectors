@@ -40,6 +40,19 @@ pub struct ComposioAvailableTrigger {
     pub repo: Option<ComposioAvailableTriggerRepo>,
 }
 
+/// Arguments for listing the triggers a toolkit offers.
+#[derive(Debug, Clone, Default, Serialize, Deserialize)]
+pub struct ComposioListAvailableTriggersRequest {
+    /// Toolkit slug to list triggers for.
+    pub toolkit: String,
+    /// Connection to scope the listing to.
+    ///
+    /// Required in practice for `github`, whose triggers are per repository:
+    /// without a connection the backend has no repositories to fan out into.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub connection_id: Option<String>,
+}
+
 /// Response body of `GET /agent-integrations/composio/triggers/available`.
 #[derive(Debug, Clone, Default, Serialize, Deserialize)]
 pub struct ComposioAvailableTriggersResponse {
@@ -81,12 +94,33 @@ pub struct ComposioActiveTrigger {
     pub state: Option<String>,
 }
 
+/// Arguments for listing enabled trigger subscriptions.
+#[derive(Debug, Clone, Default, Serialize, Deserialize)]
+pub struct ComposioListTriggersRequest {
+    /// Toolkit to filter to. `None` lists every enabled subscription.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub toolkit: Option<String>,
+}
+
 /// Response body of `GET /agent-integrations/composio/triggers`.
 #[derive(Debug, Clone, Default, Serialize, Deserialize)]
 pub struct ComposioActiveTriggersResponse {
     /// Currently enabled subscriptions.
     #[serde(default)]
     pub triggers: Vec<ComposioActiveTrigger>,
+}
+
+/// Arguments for creating a trigger subscription.
+#[derive(Debug, Clone, Default, Serialize, Deserialize)]
+pub struct ComposioCreateTriggerRequest {
+    /// Trigger slug to create.
+    pub slug: String,
+    /// Connection to create it on.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub connection_id: Option<String>,
+    /// Trigger-specific configuration.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub trigger_config: Option<serde_json::Value>,
 }
 
 /// Response body of `POST /agent-integrations/composio/triggers`.
@@ -98,6 +132,37 @@ pub struct ComposioCreateTriggerResponse {
     /// Upstream status of the new subscription, when reported.
     #[serde(default)]
     pub status: Option<String>,
+}
+
+/// Arguments for enabling a trigger subscription.
+#[derive(Debug, Clone, Default, Serialize, Deserialize)]
+pub struct ComposioEnableTriggerRequest {
+    /// Connection to enable the trigger on.
+    pub connection_id: String,
+    /// Trigger slug to enable.
+    pub slug: String,
+    /// Trigger-specific configuration. Members the trigger lists in
+    /// `required_config_keys` must be present or the backend refuses it.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub trigger_config: Option<serde_json::Value>,
+}
+
+/// Arguments for disabling a trigger subscription.
+#[derive(Debug, Clone, Default, Serialize, Deserialize)]
+pub struct ComposioDisableTriggerRequest {
+    /// Subscription id to remove.
+    pub trigger_id: String,
+}
+
+/// Arguments for reading the trigger archive.
+#[derive(Debug, Clone, Default, Serialize, Deserialize)]
+pub struct ComposioListTriggerHistoryRequest {
+    /// How many deliveries to return, newest first.
+    ///
+    /// `None` takes the module's default. The archive can hold a great many
+    /// entries, so this is a window rather than a filter.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub limit: Option<usize>,
 }
 
 /// Response body of the enable path of `POST /agent-integrations/composio/triggers`.

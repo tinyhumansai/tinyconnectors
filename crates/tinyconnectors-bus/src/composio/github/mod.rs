@@ -8,7 +8,9 @@
 
 mod types;
 
-pub use types::{ComposioGithubRepo, ComposioGithubReposResponse};
+pub use types::{
+    ComposioGithubRepo, ComposioGithubReposResponse, ComposioListGithubReposRequest,
+};
 
 #[cfg(test)]
 mod test;
