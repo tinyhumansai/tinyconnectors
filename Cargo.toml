@@ -57,6 +57,10 @@ tracing = "0.1"
 # Object-safe async traits. Used for the host-supplied `Transport` seam, which
 # has to be `dyn` because the host chooses the implementation at runtime.
 async-trait = "0.1"
+# The module's HTTP transport to the connector backend. Blocking by design —
+# it runs on a blocking task, which keeps a second async runtime out of a
+# cdylib that already owns one.
+ureq = { version = "3", features = ["json"] }
 
 # Lints apply to every member that opts in with `[lints] workspace = true`, and
 # to every target of that member. CI runs clippy with `-D warnings`, so anything

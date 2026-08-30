@@ -37,6 +37,11 @@ tokio = { workspace = true }
 tracing = { workspace = true }
 # Payload round-tripping in the crate-level doc example and the bus adapter.
 serde_json = { workspace = true }
+# Payload derives for the module configuration blob the host supplies.
+serde = { workspace = true }
+# The HTTP transport. Blocking and small: the module runs it on a blocking task
+# rather than pulling a second async stack in beside the module runtime.
+ureq = { workspace = true }
 
 [dev-dependencies]
 

@@ -21,9 +21,11 @@
 //! here would multiply the two.
 
 mod composio;
+mod http;
 mod transport;
 
 pub use composio::ComposioClient;
+pub use http::HttpTransport;
 pub use transport::Transport;
 
 #[cfg(test)]
