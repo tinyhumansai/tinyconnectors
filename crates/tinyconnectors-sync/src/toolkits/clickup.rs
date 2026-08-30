@@ -45,9 +45,10 @@ impl ConnectorProvider for ClickupProvider {
             display_name: pick(&payload, &["username"]),
             email: pick(&payload, &["email"]),
             avatar_url: pick(&payload, &["profilePicture"]),
-            // The whole payload, so a caller wanting a field this
-            // shape does not name can still reach it.
+            // The whole payload, so a caller wanting a field this shape does
+            // not name can still reach it.
             extras: payload,
+            ..ProviderUserProfile::default()
         })
     }
 }

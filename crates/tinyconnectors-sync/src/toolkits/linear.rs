@@ -43,9 +43,10 @@ impl ConnectorProvider for LinearProvider {
             connection_id: Some(context.connection_id.clone()),
             display_name: pick(&payload, &["name", "displayName"]),
             email: pick(&payload, &["email"]),
-            // The whole payload, so a caller wanting a field this
-            // shape does not name can still reach it.
+            // The whole payload, so a caller wanting a field this shape does
+            // not name can still reach it.
             extras: payload,
+            ..ProviderUserProfile::default()
         })
     }
 }

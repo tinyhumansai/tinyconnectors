@@ -46,9 +46,10 @@ impl ConnectorProvider for GithubProvider {
             email: pick(&payload, &["email"]),
             avatar_url: pick(&payload, &["avatar_url"]),
             profile_url: pick(&payload, &["html_url"]),
-            // The whole payload, so a caller wanting a field this
-            // shape does not name can still reach it.
+            // The whole payload, so a caller wanting a field this shape does
+            // not name can still reach it.
             extras: payload,
+            ..ProviderUserProfile::default()
         })
     }
 }
