@@ -47,7 +47,7 @@ use tinyconnectors_bus::{
     ComposioListTriggersRequest, ComposioRefreshIdentitiesResponse, ComposioSetUserScopesRequest,
     ComposioToolkitsResponse, ComposioToolsResponse, ComposioTriggerHistoryResult,
     ComposioUserProfile, ComposioUserProfileRequest, ComposioUserScopes,
-    ComposioUserScopesResponse, names,
+    ComposioUserScopesResponse, ConnectorSyncRequest, ConnectorSyncResponse, names,
 };
 
 use crate::client::{
@@ -337,6 +337,54 @@ impl ConnectorService {
         Ok(response)
     }
 
+    async fn sync(&self, request: ConnectorSyncRequest) -> TinyBusResult<ConnectorSyncResponse> {
+        let provider = self.registry.get(&request.toolkit).ok_or_else(|| {
+            tinybus::Error::failed(format!(
+                "no provider for toolkit `{}`: this build does not know how to read it",
+                request.toolkit
+            ))
+        })?;
+
+        let connection_id = match request.connection_id {
+            Some(id) if !id.trim().is_empty() => id,
+            _ => self.first_active_connection(&request.toolkit).await?,
+        };
+        let source_id = request
+            .source_id
+            .filter(|id| !id.trim().is_empty())
+            .unwrap_or_else(|| format!("{}:{connection_id}", request.toolkit));
+
+        let mut limits = SyncLimits::default();
+        if let Some(max_items) = request.max_items.filter(|max| *max > 0) {
+            limits.max_items = max_items;
+        }
+
+        let context = ProviderContext {
+            toolkit: request.toolkit.clone(),
+            connection_id,
+            source_id,
+            limits,
+            actions: self.actions.clone(),
+            state: self.state.clone(),
+        };
+
+        let outcome = run_sync(
+            provider.as_ref(),
+            &context,
+            sync_reason(request.reason.as_deref()),
+        )
+        .await
+        .map_err(|error| tinybus::Error::failed(error.to_string()))?;
+
+        Ok(ConnectorSyncResponse {
+            batch: outcome.batch,
+            stage: outcome.stage,
+            pages_read: outcome.pages_read,
+            records_skipped: outcome.records_skipped,
+            message: outcome.message,
+        })
+    }
+
     async fn get_user_scopes(
         &self,
         request: ComposioGetUserScopesRequest,
@@ -580,6 +628,20 @@ impl SyncStateStore for EphemeralStateStore {
     }
 }
 
+/// Why a caller says the run started.
+///
+/// An unrecognized reason is treated as manual rather than refused: the reason
+/// is for a log line and a status label, and failing a sync over one would
+/// break a working integration for a cosmetic field.
+fn sync_reason(reason: Option<&str>) -> SyncReason {
+    match reason.map(str::trim).unwrap_or_default() {
+        "initial_connect" => SyncReason::InitialConnect,
+        "scheduled" => SyncReason::Scheduled,
+        "trigger" => SyncReason::Trigger,
+        _ => SyncReason::Manual,
+    }
+}
+
 /// Render a stored preference as the member's reply.
 fn scopes_response(toolkit: &str, pref: UserScopePref) -> ComposioUserScopesResponse {
     ComposioUserScopesResponse {
@@ -643,6 +705,7 @@ tinybus_module::module_export! {
         "Authorize",
         "DeleteConnection",
         "ListTools",
+        "Sync",
         "GetUserScopes",
         "SetUserScopes",
         "Execute",

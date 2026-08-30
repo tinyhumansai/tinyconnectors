@@ -31,6 +31,7 @@ fn the_method_table_holds_the_declared_members() {
             methods::AUTHORIZE,
             methods::DELETE_CONNECTION,
             methods::LIST_TOOLS,
+            methods::SYNC,
             methods::GET_USER_SCOPES,
             methods::SET_USER_SCOPES,
             methods::EXECUTE,

@@ -201,6 +201,7 @@ pub const METHODS: &[&str] = &[
     methods::AUTHORIZE,
     methods::DELETE_CONNECTION,
     methods::LIST_TOOLS,
+    methods::SYNC,
     methods::GET_USER_SCOPES,
     methods::SET_USER_SCOPES,
     methods::EXECUTE,
