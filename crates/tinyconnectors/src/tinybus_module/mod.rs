@@ -147,7 +147,7 @@ impl<'de> Deserialize<'de> for ModuleConfig {
         deserializer: D,
     ) -> std::result::Result<Self, D::Error> {
         let value = serde_json::Value::deserialize(deserializer)?;
-        if !value.get("route").is_some_and(|route| !route.is_null()) {
+        if value.get("route").is_none_or(serde_json::Value::is_null) {
             return Ok(Self { route: None });
         }
         RouteConfig::deserialize(value)
