@@ -54,6 +54,9 @@ tokio = { version = "1", features = ["macros", "rt-multi-thread", "time"] }
 # Structured diagnostics. The OAuth handoff paths are the ones worth tracing:
 # their failures are minutes apart and happen in a browser we cannot see.
 tracing = "0.1"
+# Object-safe async traits. Used for the host-supplied `Transport` seam, which
+# has to be `dyn` because the host chooses the implementation at runtime.
+async-trait = "0.1"
 
 # Lints apply to every member that opts in with `[lints] workspace = true`, and
 # to every target of that member. CI runs clippy with `-D warnings`, so anything

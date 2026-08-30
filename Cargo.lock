@@ -531,12 +531,14 @@ dependencies = [
 name = "tinyconnectors"
 version = "0.2.1"
 dependencies = [
+ "async-trait",
  "serde_json",
  "thiserror",
  "tinybus",
  "tinybus-module",
  "tinyconnectors-bus",
  "tokio",
+ "tracing",
 ]
 
 [[package]]

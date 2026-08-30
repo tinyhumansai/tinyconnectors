@@ -26,6 +26,32 @@ pub enum Error {
         message: String,
     },
 
+    /// The transport failed, or the backend reported an error status.
+    ///
+    /// `path` is the backend-relative path so a failure names the call that
+    /// produced it — several members hit the same host, and the message alone
+    /// rarely says which one.
+    #[error("request to {path} failed: {message}")]
+    Transport {
+        /// Backend-relative path the request targeted.
+        path: String,
+        /// Failure as the transport reported it.
+        message: String,
+    },
+
+    /// The backend answered, but not in the shape this contract expects.
+    ///
+    /// Separate from [`Error::Transport`] because the two mean opposite things
+    /// operationally: a transport failure is usually transient, while a decode
+    /// failure means the backend changed and the contract has to catch up.
+    #[error("response from {path} did not match the contract: {message}")]
+    Decode {
+        /// Backend-relative path whose response failed to decode.
+        path: String,
+        /// Deserialization failure.
+        message: String,
+    },
+
     /// An OAuth host rate-limited the handoff and retries were exhausted.
     ///
     /// Distinct from [`Error::Authorize`] because it is not the user's request

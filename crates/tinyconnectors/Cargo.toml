@@ -26,6 +26,9 @@ tinyconnectors-bus = { workspace = true }
 tinybus = { workspace = true }
 tinybus-module = { workspace = true }
 thiserror = { workspace = true }
+# `Transport` is an object-safe trait with `async fn` methods, which native
+# `async fn in trait` cannot express behind `dyn`.
+async-trait = { workspace = true }
 # The OAuth authorize backoff sleeps between attempts. `time` alone: the module
 # runtime comes from `tinybus-module`, which owns the reactor.
 tokio = { workspace = true }

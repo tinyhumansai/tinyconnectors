@@ -57,6 +57,7 @@
 //! ```
 
 mod error;
+pub mod client;
 pub mod oauth;
 mod tinybus_module;
 
