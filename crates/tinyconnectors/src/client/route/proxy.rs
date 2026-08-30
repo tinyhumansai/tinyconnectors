@@ -259,3 +259,7 @@ impl Route for ProxyRoute {
         decode(&path, self.transport.delete(&path).await?)
     }
 }
+
+#[cfg(test)]
+#[path = "test.rs"]
+mod test;
