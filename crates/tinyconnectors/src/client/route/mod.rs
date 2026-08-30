@@ -24,11 +24,21 @@
 //!
 //! # The routes are not equivalent
 //!
-//! Direct mode genuinely cannot answer some members. There is no per-user
-//! toolkit allowlist when you talk to Composio directly — you see the whole
-//! catalog — so `ListToolkits` has nothing to return. Those members answer with
-//! [`crate::Error::UnsupportedByRoute`] naming the route and the member, rather
-//! than an empty list a caller would read as "you may connect nothing".
+//! Direct mode genuinely cannot answer several members, and says so with
+//! [`crate::Error::UnsupportedByRoute`] naming the route and the member:
+//!
+//! - `ListToolkits` — there is no per-user allowlist when you talk to Composio
+//!   directly; you see the whole catalog. An empty list would read as "you may
+//!   connect nothing".
+//! - `DeleteConnection` — the proxy's version also clears memory sourced from
+//!   the connection, which Composio knows nothing about. A bare delete would
+//!   silently orphan the user's synced content.
+//! - **Every trigger member, and the GitHub repository listing.** Triggers are
+//!   webhooks, and a webhook has to arrive somewhere. The proxy backend
+//!   HMAC-verifies deliveries and fans them out over the user's sockets; the
+//!   module has no socket and no public endpoint. A direct-mode subscription
+//!   would be created successfully and then deliver to nobody, which is worse
+//!   than not offering it.
 
 mod direct;
 mod proxy;
@@ -39,8 +49,10 @@ pub use proxy::ProxyRoute;
 use async_trait::async_trait;
 
 use crate::{
-    ComposioAuthorizeResponse, ComposioConnectionsResponse, ComposioDeleteResponse,
-    ComposioExecuteResponse, ComposioToolkitsResponse, ComposioToolsResponse, Result,
+    ComposioActiveTriggersResponse, ComposioAuthorizeResponse, ComposioAvailableTriggersResponse,
+    ComposioConnectionsResponse, ComposioCreateTriggerResponse, ComposioDeleteResponse,
+    ComposioDisableTriggerResponse, ComposioEnableTriggerResponse, ComposioExecuteResponse,
+    ComposioGithubReposResponse, ComposioToolkitsResponse, ComposioToolsResponse, Result,
 };
 
 /// One way of reaching Composio.
@@ -120,4 +132,72 @@ pub trait Route: Send + Sync + std::fmt::Debug {
     /// Returns [`crate::Error::UnsupportedByRoute`] on a route that does not
     /// offer it, and otherwise the underlying failure.
     async fn delete_connection(&self, connection_id: &str) -> Result<ComposioDeleteResponse>;
+
+    /// List the repositories a connected GitHub account can see.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`crate::Error::UnsupportedByRoute`] on a route that does not
+    /// offer it, and otherwise the underlying failure.
+    async fn list_github_repos(
+        &self,
+        connection_id: Option<&str>,
+    ) -> Result<ComposioGithubReposResponse>;
+
+    /// List the triggers `toolkit` offers.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`crate::Error::UnsupportedByRoute`] on a route that does not
+    /// offer it, and otherwise the underlying failure.
+    async fn list_available_triggers(
+        &self,
+        toolkit: &str,
+        connection_id: Option<&str>,
+    ) -> Result<ComposioAvailableTriggersResponse>;
+
+    /// List the caller's enabled trigger subscriptions.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`crate::Error::UnsupportedByRoute`] on a route that does not
+    /// offer it, and otherwise the underlying failure.
+    async fn list_triggers(
+        &self,
+        toolkit: Option<&str>,
+    ) -> Result<ComposioActiveTriggersResponse>;
+
+    /// Create a trigger subscription.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`crate::Error::UnsupportedByRoute`] on a route that does not
+    /// offer it, and otherwise the underlying failure.
+    async fn create_trigger(
+        &self,
+        slug: &str,
+        connection_id: Option<&str>,
+        trigger_config: Option<serde_json::Value>,
+    ) -> Result<ComposioCreateTriggerResponse>;
+
+    /// Enable a trigger subscription.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`crate::Error::UnsupportedByRoute`] on a route that does not
+    /// offer it, and otherwise the underlying failure.
+    async fn enable_trigger(
+        &self,
+        connection_id: &str,
+        slug: &str,
+        trigger_config: Option<serde_json::Value>,
+    ) -> Result<ComposioEnableTriggerResponse>;
+
+    /// Disable a trigger subscription.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`crate::Error::UnsupportedByRoute`] on a route that does not
+    /// offer it, and otherwise the underlying failure.
+    async fn disable_trigger(&self, trigger_id: &str) -> Result<ComposioDisableTriggerResponse>;
 }
