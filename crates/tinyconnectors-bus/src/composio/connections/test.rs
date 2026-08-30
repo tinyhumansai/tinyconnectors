@@ -84,3 +84,76 @@ fn authorize_response_uses_camel_case_keys() {
     assert!(value.get("connectUrl").is_some());
     assert!(value.get("connectionId").is_some());
 }
+
+// ── the configure request ────────────────────────────────────────────
+
+#[test]
+fn a_proxy_configuration_is_tagged_exactly_like_the_load_time_blob() {
+    // The point of the shared tag is that a host builds one shape and uses it
+    // both to load the module and to reconfigure it. A drift here means a host
+    // that can load the module but cannot re-route it, which surfaces as a
+    // signed-in user who still cannot reach Composio.
+    let json = serde_json::to_value(ComposioConfigureRequest::Proxy {
+        base_url: "https://api.example.com".to_string(),
+        auth_token: "tok".to_string(),
+    })
+    .expect("serialize");
+
+    assert_eq!(json["route"], "proxy");
+    assert_eq!(json["base_url"], "https://api.example.com");
+    assert_eq!(json["auth_token"], "tok");
+}
+
+#[test]
+fn a_direct_configuration_omits_the_optional_fields_it_was_not_given() {
+    let json = serde_json::to_value(ComposioConfigureRequest::Direct {
+        api_key: "sk-1".to_string(),
+        entity_id: None,
+        base_url: None,
+    })
+    .expect("serialize");
+
+    assert_eq!(json["route"], "direct");
+    assert_eq!(json["api_key"], "sk-1");
+    assert!(json.get("entity_id").is_none());
+    assert!(json.get("base_url").is_none());
+}
+
+#[test]
+fn a_configuration_round_trips_through_the_wire_form() {
+    let wire = serde_json::json!({
+        "route": "direct",
+        "api_key": "sk-2",
+        "entity_id": "ent_1",
+    });
+    let request: ComposioConfigureRequest = serde_json::from_value(wire).expect("decode");
+    match request {
+        ComposioConfigureRequest::Direct {
+            api_key,
+            entity_id,
+            base_url,
+        } => {
+            assert_eq!(api_key, "sk-2");
+            assert_eq!(entity_id.as_deref(), Some("ent_1"));
+            assert!(base_url.is_none());
+        }
+        ComposioConfigureRequest::Proxy { .. } => panic!("decoded as the wrong route"),
+    }
+}
+
+#[test]
+fn an_unknown_route_name_is_refused_rather_than_defaulted() {
+    // Silently picking a route the host did not ask for would send a user's
+    // requests somewhere they did not choose.
+    let wire = serde_json::json!({ "route": "smtp", "api_key": "sk" });
+    assert!(serde_json::from_value::<ComposioConfigureRequest>(wire).is_err());
+}
+
+#[test]
+fn the_response_names_the_route_now_in_use() {
+    let json = serde_json::to_value(ComposioConfigureResponse {
+        route: "proxy".to_string(),
+    })
+    .expect("serialize");
+    assert_eq!(json["route"], "proxy");
+}
