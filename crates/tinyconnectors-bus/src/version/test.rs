@@ -1,5 +1,7 @@
 //! Unit tests for the contract version and its bind rule.
 
+#![allow(clippy::unwrap_used, clippy::expect_used, clippy::panic)]
+
 use super::{CONTRACT_VERSION, binds, is_compatible};
 
 #[test]

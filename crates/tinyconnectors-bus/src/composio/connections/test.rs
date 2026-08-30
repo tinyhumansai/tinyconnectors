@@ -1,5 +1,7 @@
 //! Serde and status-normalization tests for the connection payloads.
 
+#![allow(clippy::unwrap_used, clippy::expect_used, clippy::panic)]
+
 use super::{ComposioAuthorizeResponse, ComposioConnection};
 use serde_json::json;
 

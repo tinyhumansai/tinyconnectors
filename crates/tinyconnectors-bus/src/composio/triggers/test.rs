@@ -4,6 +4,8 @@
 //! reproduces a shape Composio has actually sent, and a regression turns a
 //! user's live subscriptions into an empty list.
 
+#![allow(clippy::unwrap_used, clippy::expect_used, clippy::panic)]
+
 use super::{
     ComposioActiveTrigger, ComposioAvailableTrigger, ComposioDisableTriggerResponse,
     ComposioEnableTriggerResponse, ComposioTriggerEvent,

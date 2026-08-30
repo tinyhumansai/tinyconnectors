@@ -1,5 +1,7 @@
 //! Serde representation tests for the tool schema payloads.
 
+#![allow(clippy::unwrap_used, clippy::expect_used, clippy::panic)]
+
 use super::ComposioToolSchema;
 use serde_json::json;
 

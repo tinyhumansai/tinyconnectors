@@ -1,5 +1,7 @@
 //! Serde representation tests for the execute payload.
 
+#![allow(clippy::unwrap_used, clippy::expect_used, clippy::panic)]
+
 use super::ComposioExecuteResponse;
 use serde_json::json;
 

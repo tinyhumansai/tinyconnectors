@@ -4,6 +4,8 @@
 //! at runtime as a decode error in a host, so the assertions check the JSON
 //! keys, not just the round-trip.
 
+#![allow(clippy::unwrap_used, clippy::expect_used, clippy::panic)]
+
 use super::{ComposioToolkitCatalogEntry, ComposioToolkitsResponse};
 use serde_json::json;
 

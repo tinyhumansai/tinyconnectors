@@ -1,5 +1,7 @@
 //! Unit tests for the bus name table.
 
+#![allow(clippy::unwrap_used, clippy::expect_used, clippy::panic)]
+
 use super::{INTERFACE, METHODS, OBJECT_PATH, methods};
 
 #[test]

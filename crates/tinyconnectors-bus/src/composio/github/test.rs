@@ -1,5 +1,7 @@
 //! Serde representation tests for the GitHub repository payloads.
 
+#![allow(clippy::unwrap_used, clippy::expect_used, clippy::panic)]
+
 use super::ComposioGithubReposResponse;
 use serde_json::json;
 
