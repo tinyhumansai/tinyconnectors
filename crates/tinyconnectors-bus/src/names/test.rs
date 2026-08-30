@@ -32,6 +32,13 @@ fn the_method_table_holds_the_declared_members() {
             methods::DELETE_CONNECTION,
             methods::LIST_TOOLS,
             methods::EXECUTE,
+            methods::LIST_GITHUB_REPOS,
+            methods::LIST_AVAILABLE_TRIGGERS,
+            methods::LIST_TRIGGERS,
+            methods::CREATE_TRIGGER,
+            methods::ENABLE_TRIGGER,
+            methods::DISABLE_TRIGGER,
+            methods::LIST_TRIGGER_HISTORY,
         ]
     );
 }

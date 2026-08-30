@@ -73,6 +73,54 @@ pub mod methods {
     /// failure means the call never reached the provider at all. Callers that
     /// check only for a member error will report failed sends as successes.
     pub const EXECUTE: &str = "Execute";
+
+    /// Lists the repositories a connected `GitHub` account can see.
+    ///
+    /// Takes a [`crate::ComposioListGithubReposRequest`] and returns a
+    /// [`crate::ComposioGithubReposResponse`]. Exists to pick a repository for
+    /// a `GitHub`-scoped trigger, whose subscriptions are per repository rather
+    /// than per toolkit.
+    pub const LIST_GITHUB_REPOS: &str = "ListGithubRepos";
+
+    /// Lists the triggers a toolkit offers.
+    ///
+    /// Takes a [`crate::ComposioListAvailableTriggersRequest`] and returns a
+    /// [`crate::ComposioAvailableTriggersResponse`].
+    pub const LIST_AVAILABLE_TRIGGERS: &str = "ListAvailableTriggers";
+
+    /// Lists the caller's enabled trigger subscriptions.
+    ///
+    /// Takes a [`crate::ComposioListTriggersRequest`] and returns a
+    /// [`crate::ComposioActiveTriggersResponse`].
+    pub const LIST_TRIGGERS: &str = "ListTriggers";
+
+    /// Creates a trigger subscription.
+    ///
+    /// Takes a [`crate::ComposioCreateTriggerRequest`] and returns a
+    /// [`crate::ComposioCreateTriggerResponse`].
+    pub const CREATE_TRIGGER: &str = "CreateTrigger";
+
+    /// Enables a trigger subscription on a connection.
+    ///
+    /// Takes a [`crate::ComposioEnableTriggerRequest`] and returns a
+    /// [`crate::ComposioEnableTriggerResponse`].
+    pub const ENABLE_TRIGGER: &str = "EnableTrigger";
+
+    /// Disables a trigger subscription.
+    ///
+    /// Takes a [`crate::ComposioDisableTriggerRequest`] and returns a
+    /// [`crate::ComposioDisableTriggerResponse`].
+    pub const DISABLE_TRIGGER: &str = "DisableTrigger";
+
+    /// Reads recent webhook deliveries from the module's archive.
+    ///
+    /// Takes a [`crate::ComposioListTriggerHistoryRequest`] and returns a
+    /// [`crate::ComposioTriggerHistoryResult`].
+    ///
+    /// Answered from the module's own record, not from the backend: a delivery
+    /// is fanned out over a socket and then gone, so the only way to answer
+    /// "did it fire?" is to have written it down as it arrived.
+    pub const LIST_TRIGGER_HISTORY: &str = "ListTriggerHistory";
 }
 
 /// Every member of [`INTERFACE`], in the order the interface dispatches them.
@@ -86,6 +134,13 @@ pub const METHODS: &[&str] = &[
     methods::DELETE_CONNECTION,
     methods::LIST_TOOLS,
     methods::EXECUTE,
+    methods::LIST_GITHUB_REPOS,
+    methods::LIST_AVAILABLE_TRIGGERS,
+    methods::LIST_TRIGGERS,
+    methods::CREATE_TRIGGER,
+    methods::ENABLE_TRIGGER,
+    methods::DISABLE_TRIGGER,
+    methods::LIST_TRIGGER_HISTORY,
 ];
 
 #[cfg(test)]
