@@ -27,28 +27,9 @@ fn the_method_table_holds_the_declared_members() {
         METHODS,
         [
             methods::LIST_TOOLKITS,
-            methods::LIST_CAPABILITIES,
-            methods::LIST_AGENT_READY_TOOLKITS,
             methods::LIST_CONNECTIONS,
             methods::AUTHORIZE,
             methods::DELETE_CONNECTION,
-            methods::LIST_TOOLS,
-            methods::EXECUTE,
-            methods::LIST_GITHUB_REPOS,
-            methods::CREATE_TRIGGER,
-            methods::GET_USER_PROFILE,
-            methods::REFRESH_ALL_IDENTITIES,
-            methods::SYNC,
-            methods::LIST_TRIGGER_HISTORY,
-            methods::GET_USER_SCOPES,
-            methods::SET_USER_SCOPES,
-            methods::LIST_AVAILABLE_TRIGGERS,
-            methods::LIST_TRIGGERS,
-            methods::ENABLE_TRIGGER,
-            methods::DISABLE_TRIGGER,
-            methods::GET_MODE,
-            methods::SET_API_KEY,
-            methods::CLEAR_API_KEY,
         ]
     );
 }

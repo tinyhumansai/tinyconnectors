@@ -22,108 +22,39 @@ pub const INTERFACE: &str = "ai.tinyhumans.connectors.Composio";
 pub const OBJECT_PATH: &str = "/ai/tinyhumans/connectors/Composio";
 
 /// One constant per member of [`INTERFACE`].
+///
+/// The table is the connector surface as it stands, not as it is planned. A
+/// member appears here when the module serves it; the remaining Composio
+/// operations — tools, execute, triggers, scopes, mode — arrive as additive
+/// minor bumps of [`crate::CONTRACT_VERSION`] rather than as constants nothing
+/// answers, which a host would only discover as a runtime "unknown method".
 pub mod methods {
     /// Lists the toolkits the backend allowlist currently enables.
     ///
-    /// Returns a [`crate::ComposioToolkitsResponse`].
+    /// Takes no arguments and returns a [`crate::ComposioToolkitsResponse`].
     pub const LIST_TOOLKITS: &str = "ListToolkits";
 
-    /// Lists this build's connector capability matrix.
+    /// Lists the caller's connections, active or not.
     ///
-    /// Needs no signed-in session — it describes the compiled module. Returns a
-    /// [`crate::ComposioCapabilitiesResponse`].
-    pub const LIST_CAPABILITIES: &str = "ListCapabilities";
-
-    /// Lists the toolkit slugs that ship a curated agent catalog.
-    ///
-    /// Returns a [`crate::ComposioAgentReadyToolkitsResponse`].
-    pub const LIST_AGENT_READY_TOOLKITS: &str = "ListAgentReadyToolkits";
-
-    /// Lists the caller's connections.
-    ///
-    /// Returns a [`crate::ComposioConnectionsResponse`].
+    /// Takes no arguments and returns a [`crate::ComposioConnectionsResponse`].
+    /// Non-active rows are included: they are what an abandoned OAuth handoff
+    /// leaves behind, and a caller cleaning them up needs to see them.
     pub const LIST_CONNECTIONS: &str = "ListConnections";
 
     /// Begins an OAuth handoff for a toolkit.
     ///
-    /// Returns a [`crate::ComposioAuthorizeResponse`] carrying the hosted
-    /// connect URL the user opens in a browser.
+    /// Takes a [`crate::ComposioAuthorizeRequest`] and returns a
+    /// [`crate::ComposioAuthorizeResponse`] carrying the hosted URL the user
+    /// opens in a browser. The connection it names stays inactive until they
+    /// finish, so a caller polls [`LIST_CONNECTIONS`] rather than expecting
+    /// this member to block.
     pub const AUTHORIZE: &str = "Authorize";
 
-    /// Disconnects a connection, optionally clearing memory sourced from it.
+    /// Disconnects a connection.
     ///
-    /// Returns a [`crate::ComposioDeleteResponse`].
+    /// Takes a [`crate::ComposioDeleteConnectionRequest`] and returns a
+    /// [`crate::ComposioDeleteResponse`].
     pub const DELETE_CONNECTION: &str = "DeleteConnection";
-
-    /// Lists the callable tools for a set of toolkits.
-    ///
-    /// Returns a [`crate::ComposioToolsResponse`].
-    pub const LIST_TOOLS: &str = "ListTools";
-
-    /// Runs one action against a connected account.
-    ///
-    /// Returns a [`crate::ComposioExecuteResponse`].
-    pub const EXECUTE: &str = "Execute";
-
-    /// Lists the repositories a connected GitHub account can see.
-    ///
-    /// Returns a [`crate::ComposioGithubReposResponse`].
-    pub const LIST_GITHUB_REPOS: &str = "ListGithubRepos";
-
-    /// Creates a trigger subscription.
-    ///
-    /// Returns a [`crate::ComposioCreateTriggerResponse`].
-    pub const CREATE_TRIGGER: &str = "CreateTrigger";
-
-    /// Fetches the cached provider profile for a connection.
-    pub const GET_USER_PROFILE: &str = "GetUserProfile";
-
-    /// Re-fetches every connection's provider identity.
-    pub const REFRESH_ALL_IDENTITIES: &str = "RefreshAllIdentities";
-
-    /// Runs a sync for a connection.
-    pub const SYNC: &str = "Sync";
-
-    /// Reads recent trigger deliveries from the archive.
-    ///
-    /// Returns a [`crate::ComposioTriggerHistoryResult`].
-    pub const LIST_TRIGGER_HISTORY: &str = "ListTriggerHistory";
-
-    /// Reads the caller's per-toolkit scope preferences.
-    pub const GET_USER_SCOPES: &str = "GetUserScopes";
-
-    /// Writes the caller's per-toolkit scope preferences.
-    pub const SET_USER_SCOPES: &str = "SetUserScopes";
-
-    /// Lists the triggers a toolkit offers.
-    ///
-    /// Returns a [`crate::ComposioAvailableTriggersResponse`].
-    pub const LIST_AVAILABLE_TRIGGERS: &str = "ListAvailableTriggers";
-
-    /// Lists the caller's enabled trigger subscriptions.
-    ///
-    /// Returns a [`crate::ComposioActiveTriggersResponse`].
-    pub const LIST_TRIGGERS: &str = "ListTriggers";
-
-    /// Enables a trigger subscription.
-    ///
-    /// Returns a [`crate::ComposioEnableTriggerResponse`].
-    pub const ENABLE_TRIGGER: &str = "EnableTrigger";
-
-    /// Disables a trigger subscription.
-    ///
-    /// Returns a [`crate::ComposioDisableTriggerResponse`].
-    pub const DISABLE_TRIGGER: &str = "DisableTrigger";
-
-    /// Reports whether the module is proxying through the backend or calling
-    /// Composio directly with a caller-supplied key.
-    pub const GET_MODE: &str = "GetMode";
-
-    /// Stores a direct-mode Composio API key.
-    pub const SET_API_KEY: &str = "SetApiKey";
-
-    /// Clears the stored direct-mode API key, returning to backend-proxied mode.
-    pub const CLEAR_API_KEY: &str = "ClearApiKey";
 }
 
 /// Every member of [`INTERFACE`], in the order the interface dispatches them.
@@ -132,28 +63,9 @@ pub mod methods {
 /// list, so the two cannot drift.
 pub const METHODS: &[&str] = &[
     methods::LIST_TOOLKITS,
-    methods::LIST_CAPABILITIES,
-    methods::LIST_AGENT_READY_TOOLKITS,
     methods::LIST_CONNECTIONS,
     methods::AUTHORIZE,
     methods::DELETE_CONNECTION,
-    methods::LIST_TOOLS,
-    methods::EXECUTE,
-    methods::LIST_GITHUB_REPOS,
-    methods::CREATE_TRIGGER,
-    methods::GET_USER_PROFILE,
-    methods::REFRESH_ALL_IDENTITIES,
-    methods::SYNC,
-    methods::LIST_TRIGGER_HISTORY,
-    methods::GET_USER_SCOPES,
-    methods::SET_USER_SCOPES,
-    methods::LIST_AVAILABLE_TRIGGERS,
-    methods::LIST_TRIGGERS,
-    methods::ENABLE_TRIGGER,
-    methods::DISABLE_TRIGGER,
-    methods::GET_MODE,
-    methods::SET_API_KEY,
-    methods::CLEAR_API_KEY,
 ];
 
 #[cfg(test)]
