@@ -38,7 +38,10 @@ fn actions(reply: serde_json::Value) -> (Arc<StubTransport>, ClientActions) {
         ..StubTransport::default()
     });
     let client = ComposioClient::new(Arc::new(ProxyRoute::new(transport.clone())));
-    (transport, ClientActions::new(Some(client)))
+    (
+        transport,
+        ClientActions::new(Arc::new(std::sync::RwLock::new(Some(client)))),
+    )
 }
 
 #[tokio::test]
@@ -130,7 +133,7 @@ async fn a_transport_failure_becomes_an_action_failure() {
     }
 
     let client = ComposioClient::new(Arc::new(ProxyRoute::new(Arc::new(DeadTransport))));
-    let error = ClientActions::new(Some(client))
+    let error = ClientActions::new(Arc::new(std::sync::RwLock::new(Some(client))))
         .run("GMAIL_FETCH_EMAILS", json!({}), "conn_1")
         .await
         .unwrap_err();
@@ -175,7 +178,7 @@ fn a_refusal_with_no_usable_message_still_says_something() {
 async fn a_runner_with_no_route_says_so_rather_than_failing_obscurely() {
     // The module loads without a credential so the capability members work; a
     // provider that then tries to act gets a named refusal.
-    let error = ClientActions::new(None)
+    let error = ClientActions::new(Arc::new(std::sync::RwLock::new(None)))
         .run("GMAIL_FETCH_EMAILS", json!({}), "conn_1")
         .await
         .unwrap_err();

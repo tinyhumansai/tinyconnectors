@@ -1,5 +1,7 @@
 //! Adapting the module's client to the provider action seam.
 
+use std::sync::{Arc, PoisonError, RwLock};
+
 use async_trait::async_trait;
 use tinyconnectors_sync::{ActionRunner, Error as SyncError, Result as SyncResult};
 
@@ -11,15 +13,21 @@ use crate::client::ComposioClient;
 /// only wants the capability members should not have to supply a credential.
 /// A provider that then tries to run an action gets a named refusal rather than
 /// a module that would not load at all.
+///
+/// It is *shared* rather than owned because the route can be replaced while the
+/// module runs — a user signs in after a lazily-loaded module was already up.
+/// A runner holding its own copy would keep running syncs against the
+/// credential the module happened to start with, which after a sign-out is one
+/// that answers 401 to everything.
 #[derive(Debug, Clone)]
 pub struct ClientActions {
-    client: Option<ComposioClient>,
+    client: Arc<RwLock<Option<ComposioClient>>>,
 }
 
 impl ClientActions {
-    /// Build a runner over `client`, or over nothing.
+    /// Build a runner sharing the module's current client.
     #[must_use]
-    pub fn new(client: Option<ComposioClient>) -> Self {
+    pub fn new(client: Arc<RwLock<Option<ComposioClient>>>) -> Self {
         Self { client }
     }
 }
@@ -44,10 +52,15 @@ impl ActionRunner for ClientActions {
         arguments: serde_json::Value,
         connection_id: &str,
     ) -> SyncResult<serde_json::Value> {
-        let client = self.client.as_ref().ok_or_else(|| SyncError::Action {
-            action: action.to_string(),
-            message: "this module was loaded without a connector route".to_string(),
-        })?;
+        let client = self
+            .client
+            .read()
+            .unwrap_or_else(PoisonError::into_inner)
+            .clone()
+            .ok_or_else(|| SyncError::Action {
+                action: action.to_string(),
+                message: "this module was loaded without a connector route".to_string(),
+            })?;
 
         let response = client
             .execute(action, Some(arguments), Some(connection_id))

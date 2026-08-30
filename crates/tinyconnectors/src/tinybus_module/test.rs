@@ -18,16 +18,17 @@ use tinybus::{Connection, Interface};
 use tinyconnectors_bus::{
     ComposioActiveTriggersResponse, ComposioAgentReadyToolkitsResponse, ComposioAuthorizeRequest,
     ComposioAuthorizeResponse, ComposioAvailableTriggersResponse, ComposioCapabilitiesResponse,
-    ComposioConnectionsResponse, ComposioCreateTriggerRequest, ComposioCreateTriggerResponse,
-    ComposioDeleteConnectionRequest, ComposioDeleteResponse, ComposioDisableTriggerRequest,
-    ComposioDisableTriggerResponse, ComposioEnableTriggerRequest, ComposioEnableTriggerResponse,
-    ComposioExecuteRequest, ComposioExecuteResponse, ComposioGetUserScopesRequest,
-    ComposioGithubReposResponse, ComposioListAvailableTriggersRequest,
-    ComposioListGithubReposRequest, ComposioListToolsRequest, ComposioListTriggerHistoryRequest,
-    ComposioListTriggersRequest, ComposioRefreshIdentitiesResponse, ComposioSetUserScopesRequest,
-    ComposioToolkitsResponse, ComposioToolsResponse, ComposioTriggerHistoryResult,
-    ComposioUserProfile, ComposioUserProfileRequest, ComposioUserScopes,
-    ComposioUserScopesResponse, ConnectorSyncRequest, ConnectorSyncResponse, SyncStage, names,
+    ComposioConfigureRequest, ComposioConnectionsResponse, ComposioCreateTriggerRequest,
+    ComposioCreateTriggerResponse, ComposioDeleteConnectionRequest, ComposioDeleteResponse,
+    ComposioDisableTriggerRequest, ComposioDisableTriggerResponse, ComposioEnableTriggerRequest,
+    ComposioEnableTriggerResponse, ComposioExecuteRequest, ComposioExecuteResponse,
+    ComposioGetUserScopesRequest, ComposioGithubReposResponse,
+    ComposioListAvailableTriggersRequest, ComposioListGithubReposRequest, ComposioListToolsRequest,
+    ComposioListTriggerHistoryRequest, ComposioListTriggersRequest,
+    ComposioRefreshIdentitiesResponse, ComposioSetUserScopesRequest, ComposioToolkitsResponse,
+    ComposioToolsResponse, ComposioTriggerHistoryResult, ComposioUserProfile,
+    ComposioUserProfileRequest, ComposioUserScopes, ComposioUserScopesResponse,
+    ConnectorSyncRequest, ConnectorSyncResponse, SyncStage, names,
 };
 
 use super::{ConnectorService, ModuleConfig};
@@ -105,11 +106,12 @@ impl Transport for StubTransport {
 
 fn service_over(transport: Arc<StubTransport>) -> ConnectorService {
     let client = ComposioClient::new(Arc::new(ProxyRoute::new(transport)));
+    let client = Arc::new(std::sync::RwLock::new(Some(client)));
     ConnectorService {
-        actions: Arc::new(crate::providers::ClientActions::new(Some(client.clone()))),
+        actions: Arc::new(crate::providers::ClientActions::new(Arc::clone(&client))),
         state: Arc::new(super::EphemeralStateStore::default()),
         registry: crate::providers::default_registry(),
-        client: Some(client),
+        client,
         // No archive: these tests exercise the backend-facing members. The
         // history member's own behaviour without one is tested separately.
         archive: None,
@@ -1264,4 +1266,124 @@ async fn an_unnamed_state_dir_keeps_nothing_between_instances() {
         .await
         .expect("loads");
     assert!(pref.write, "a new instance starts from the default");
+}
+
+// ── reconfiguring the route ──────────────────────────────────────────
+
+#[tokio::test]
+async fn a_module_loaded_without_a_route_becomes_usable_after_configure() {
+    // The reason this member exists. `LoadPolicy::Lazy` means the module is
+    // commonly up before the user signs in, so the credential arrives after the
+    // load. Without this the user would be stuck routeless until they restarted
+    // the application.
+    let service = ConnectorService {
+        actions: Arc::new(crate::providers::ClientActions::new(Arc::new(
+            std::sync::RwLock::new(None),
+        ))),
+        state: Arc::new(super::EphemeralStateStore::default()),
+        registry: crate::providers::default_registry(),
+        client: Arc::new(std::sync::RwLock::new(None)),
+        archive: None,
+    };
+
+    let before = service.list_toolkits().await.unwrap_err();
+    assert!(before.to_string().contains("without a connector route"));
+
+    let reply = service
+        .configure(ComposioConfigureRequest::Direct {
+            api_key: "sk-live".to_string(),
+            entity_id: None,
+            base_url: None,
+        })
+        .await
+        .expect("a direct route is installable");
+    assert_eq!(reply.route, "direct");
+
+    // No longer the "no route" refusal. It will fail for want of a network,
+    // which is a different failure and the one we want to see.
+    let after = service.list_toolkits().await.unwrap_err().to_string();
+    assert!(!after.contains("without a connector route"), "{after}");
+}
+
+#[tokio::test]
+async fn configure_replaces_a_route_that_is_already_installed() {
+    // Sign-out and mode switches point the same problem the other way: a stale
+    // bearer answers 401 to everything, so the host must be able to replace a
+    // route, not only supply a first one.
+    let transport = Arc::new(StubTransport::default());
+    let service = service_over(transport);
+
+    let reply = service
+        .configure(ComposioConfigureRequest::Direct {
+            api_key: "sk-live".to_string(),
+            entity_id: Some("ent_9".to_string()),
+            base_url: None,
+        })
+        .await
+        .expect("replacing a route is allowed");
+    assert_eq!(reply.route, "direct");
+}
+
+#[tokio::test]
+async fn configure_refuses_a_base_url_that_would_leak_the_credential() {
+    // The load-time path checks this; reconfiguration reuses the same builder
+    // so that it cannot become the way around the check.
+    let transport = Arc::new(StubTransport::default());
+    let service = service_over(transport);
+
+    let error = service
+        .configure(ComposioConfigureRequest::Proxy {
+            base_url: "http://evil.example.com".to_string(),
+            auth_token: "tok".to_string(),
+        })
+        .await
+        .expect_err("plain http to a public host must be refused");
+    assert!(error.to_string().contains("http"), "{error}");
+}
+
+#[tokio::test]
+async fn a_reconfigured_route_reaches_the_action_runner_too() {
+    // The runner shares the client handle rather than holding a copy. If it
+    // did not, a sync started after a sign-out would keep using the credential
+    // the module happened to load with.
+    let client = Arc::new(std::sync::RwLock::new(None));
+    let actions = Arc::new(crate::providers::ClientActions::new(Arc::clone(&client)));
+    let service = ConnectorService {
+        actions: Arc::clone(&actions),
+        state: Arc::new(super::EphemeralStateStore::default()),
+        registry: crate::providers::default_registry(),
+        client,
+        archive: None,
+    };
+
+    let before = tinyconnectors_sync::ActionRunner::run(
+        actions.as_ref(),
+        "GMAIL_FETCH_EMAILS",
+        serde_json::json!({}),
+        "conn_1",
+    )
+    .await
+    .unwrap_err()
+    .to_string();
+    assert!(before.contains("without a connector route"), "{before}");
+
+    service
+        .configure(ComposioConfigureRequest::Direct {
+            api_key: "sk-live".to_string(),
+            entity_id: None,
+            base_url: None,
+        })
+        .await
+        .expect("install a route");
+
+    let after = tinyconnectors_sync::ActionRunner::run(
+        actions.as_ref(),
+        "GMAIL_FETCH_EMAILS",
+        serde_json::json!({}),
+        "conn_1",
+    )
+    .await
+    .unwrap_err()
+    .to_string();
+    assert!(!after.contains("without a connector route"), "{after}");
 }

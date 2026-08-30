@@ -31,23 +31,24 @@
 //! distinguishing detail — the failing path, or the user-facing rate-limit
 //! guidance — because that is all a host will have to act on.
 
-use std::sync::Arc;
+use std::sync::{Arc, RwLock};
 
 use serde::Deserialize;
 use tinybus::{Connection, Result as TinyBusResult};
 use tinyconnectors_bus::{
     ComposioActiveTriggersResponse, ComposioAgentReadyToolkitsResponse, ComposioAuthorizeRequest,
     ComposioAuthorizeResponse, ComposioAvailableTriggersResponse, ComposioCapabilitiesResponse,
-    ComposioConnectionsResponse, ComposioCreateTriggerRequest, ComposioCreateTriggerResponse,
-    ComposioDeleteConnectionRequest, ComposioDeleteResponse, ComposioDisableTriggerRequest,
-    ComposioDisableTriggerResponse, ComposioEnableTriggerRequest, ComposioEnableTriggerResponse,
-    ComposioExecuteRequest, ComposioExecuteResponse, ComposioGetUserScopesRequest,
-    ComposioGithubReposResponse, ComposioIdentityFailure, ComposioListAvailableTriggersRequest,
-    ComposioListGithubReposRequest, ComposioListToolsRequest, ComposioListTriggerHistoryRequest,
-    ComposioListTriggersRequest, ComposioRefreshIdentitiesResponse, ComposioSetUserScopesRequest,
-    ComposioToolkitsResponse, ComposioToolsResponse, ComposioTriggerHistoryResult,
-    ComposioUserProfile, ComposioUserProfileRequest, ComposioUserScopes,
-    ComposioUserScopesResponse, ConnectorSyncRequest, ConnectorSyncResponse, names,
+    ComposioConfigureRequest, ComposioConfigureResponse, ComposioConnectionsResponse,
+    ComposioCreateTriggerRequest, ComposioCreateTriggerResponse, ComposioDeleteConnectionRequest,
+    ComposioDeleteResponse, ComposioDisableTriggerRequest, ComposioDisableTriggerResponse,
+    ComposioEnableTriggerRequest, ComposioEnableTriggerResponse, ComposioExecuteRequest,
+    ComposioExecuteResponse, ComposioGetUserScopesRequest, ComposioGithubReposResponse,
+    ComposioIdentityFailure, ComposioListAvailableTriggersRequest, ComposioListGithubReposRequest,
+    ComposioListToolsRequest, ComposioListTriggerHistoryRequest, ComposioListTriggersRequest,
+    ComposioRefreshIdentitiesResponse, ComposioSetUserScopesRequest, ComposioToolkitsResponse,
+    ComposioToolsResponse, ComposioTriggerHistoryResult, ComposioUserProfile,
+    ComposioUserProfileRequest, ComposioUserScopes, ComposioUserScopesResponse,
+    ConnectorSyncRequest, ConnectorSyncResponse, names,
 };
 
 use crate::client::{
@@ -173,6 +174,41 @@ impl ModuleConfig {
     }
 }
 
+impl From<ComposioConfigureRequest> for RouteConfig {
+    /// Reuse the load-time route builder for a runtime reconfiguration.
+    ///
+    /// The two carry the same description of a route, so building one from the
+    /// other keeps a single place that turns a description into a transport —
+    /// including the check that refuses to send a credential over plain HTTP to
+    /// anywhere but a loopback address.
+    ///
+    /// `state_dir` is dropped rather than carried: the trigger archive is
+    /// opened once at load, and letting a later call move it would leave
+    /// already-archived history behind with nothing pointing at it.
+    fn from(request: ComposioConfigureRequest) -> Self {
+        match request {
+            ComposioConfigureRequest::Proxy {
+                base_url,
+                auth_token,
+            } => Self::Proxy {
+                base_url,
+                auth_token,
+                state_dir: None,
+            },
+            ComposioConfigureRequest::Direct {
+                api_key,
+                entity_id,
+                base_url,
+            } => Self::Direct {
+                api_key,
+                entity_id,
+                base_url,
+                state_dir: None,
+            },
+        }
+    }
+}
+
 impl RouteConfig {
     /// The directory the module may keep state in, if the host named one.
     fn state_dir(&self) -> Option<&std::path::Path> {
@@ -217,13 +253,19 @@ impl RouteConfig {
 }
 
 struct ConnectorService {
-    /// The Composio client, when the host configured a route.
+    /// The Composio client, when a route has been configured.
     ///
-    /// `None` is a module loaded with no configuration — which is allowed, so
-    /// the capability members can answer. Everything that talks to Composio
-    /// goes through [`ConnectorService::client`], which explains what is
-    /// missing rather than failing obscurely.
-    client: Option<ComposioClient>,
+    /// `None` is a module loaded with no configuration — allowed, so the
+    /// capability members can answer. Everything that talks to Composio goes
+    /// through [`ConnectorService::client`], which explains what is missing
+    /// rather than failing obscurely.
+    ///
+    /// Swappable, because a host's credential does not stand still. A user
+    /// signs in, supplies an API key, or switches mode long after this module
+    /// was lazily loaded, and a route fixed at load time would leave them
+    /// unable to reach Composio until the application restarted. `Configure`
+    /// replaces it in place.
+    client: Arc<RwLock<Option<ComposioClient>>>,
     /// The archive of webhook deliveries, when the host gave the module a
     /// directory to keep state in.
     ///
@@ -244,13 +286,18 @@ struct ConnectorService {
 
 impl ConnectorService {
     /// The client, or an error naming what the host did not configure.
-    fn client(&self) -> TinyBusResult<&ComposioClient> {
-        self.client.as_ref().ok_or_else(|| {
-            tinybus::Error::failed(
-                "this module was loaded without a connector route: pass a `route` of \
-                 \"proxy\" or \"direct\" in its configuration to reach Composio",
-            )
-        })
+    fn client(&self) -> TinyBusResult<ComposioClient> {
+        self.client
+            .read()
+            .unwrap_or_else(std::sync::PoisonError::into_inner)
+            .clone()
+            .ok_or_else(|| {
+                tinybus::Error::failed(
+                    "this module was loaded without a connector route: pass a `route` of \
+                     \"proxy\" or \"direct\" in its configuration, or call Configure, to \
+                     reach Composio",
+                )
+            })
     }
 
     /// Assemble the context one provider needs for one call.
@@ -348,6 +395,41 @@ impl ConnectorService {
 
 #[tinybus::interface(name = "ai.tinyhumans.connectors.Composio")]
 impl ConnectorService {
+    /// Install or replace the route this module reaches Composio over.
+    ///
+    /// A host supplies a route at load time, but its credential does not stand
+    /// still. Under a lazy load policy the module is commonly up *before* the
+    /// user signs in, and a route fixed at load would leave them unable to
+    /// reach Composio until the application restarted. Sign-out is the same
+    /// problem pointed the other way: a stale bearer answers 401 to everything.
+    ///
+    /// Replacing is deliberately unconditional. The host owns the decision of
+    /// which route to use — this module implements both and chooses neither —
+    /// so a `Configure` is an instruction, not a proposal.
+    // `async` with nothing awaited: swapping a route is a lock and a move, but
+    // every member of a `#[tinybus::interface]` impl has to be async to be
+    // dispatched. Narrow, and on this one member only.
+    #[allow(
+        clippy::unused_async,
+        clippy::unused_async_trait_impl,
+        reason = "required by the interface dispatcher"
+    )]
+    async fn configure(
+        &self,
+        request: ComposioConfigureRequest,
+    ) -> TinyBusResult<ComposioConfigureResponse> {
+        let route = RouteConfig::from(request)
+            .into_route()
+            .map_err(|error| to_bus_error(&error))?;
+        let name = route.name().to_string();
+        tracing::info!(route = %name, "[connectors] route reconfigured");
+        *self
+            .client
+            .write()
+            .unwrap_or_else(std::sync::PoisonError::into_inner) = Some(ComposioClient::new(route));
+        Ok(ComposioConfigureResponse { route: name })
+    }
+
     async fn list_toolkits(&self) -> TinyBusResult<ComposioToolkitsResponse> {
         self.client()?
             .list_toolkits()
@@ -750,12 +832,13 @@ async fn setup(connection: Connection, config: ModuleConfig) -> TinyBusResult<()
         archiving_triggers = archive.is_some(),
         "[connectors] serving connector surface"
     );
-    let client = route.map(ComposioClient::new);
+    let client = Arc::new(RwLock::new(route.map(ComposioClient::new)));
     let service = ConnectorService {
         // A module with no route still answers the capability members, so the
         // action runner is built over a client that reports the missing route
-        // if a provider ever reaches it.
-        actions: Arc::new(ClientActions::new(client.clone())),
+        // if a provider ever reaches it. It shares the handle rather than
+        // copying it, so a later `Configure` reaches running syncs too.
+        actions: Arc::new(ClientActions::new(Arc::clone(&client))),
         // A host that named no state directory gets an in-memory store: profile
         // and capability members need none, and a sync run without persistence
         // is better than a module that refuses to load.
@@ -778,6 +861,7 @@ tinybus_module::module_export! {
     worker_threads = 1,
     provides = ["ai.tinyhumans.connectors.Composio"],
     methods = [
+        "Configure",
         "ListToolkits",
         "ListConnections",
         "Authorize",

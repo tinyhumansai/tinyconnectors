@@ -65,6 +65,45 @@ pub struct ComposioConnectionsResponse {
     pub connections: Vec<ComposioConnection>,
 }
 
+/// A route for the module to use from now on.
+///
+/// The module takes its route at load time, but a host's credential does not
+/// stand still: a user signs in, supplies their own API key, or switches mode
+/// long after the module was first loaded — and a lazily-loaded module would
+/// otherwise stay routeless until the application restarted.
+///
+/// Tagged exactly like the load-time blob, so a host builds one shape and uses
+/// it for both.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(tag = "route", rename_all = "snake_case")]
+pub enum ComposioConfigureRequest {
+    /// Reach Composio through the `TinyHumans` backend.
+    Proxy {
+        /// Base URL of the connector backend.
+        base_url: String,
+        /// Bearer token for the signed-in user.
+        auth_token: String,
+    },
+    /// Reach Composio directly with a user-supplied key.
+    Direct {
+        /// The user's own Composio API key.
+        api_key: String,
+        /// Composio entity the connections belong to.
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        entity_id: Option<String>,
+        /// Override for Composio's API base, for a loopback test server.
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        base_url: Option<String>,
+    },
+}
+
+/// What route the module is using.
+#[derive(Debug, Clone, Default, Serialize, Deserialize)]
+pub struct ComposioConfigureResponse {
+    /// `"proxy"` or `"direct"`.
+    pub route: String,
+}
+
 /// Arguments for beginning an OAuth handoff.
 #[derive(Debug, Clone, Default, Serialize, Deserialize)]
 pub struct ComposioAuthorizeRequest {

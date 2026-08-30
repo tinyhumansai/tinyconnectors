@@ -34,6 +34,15 @@ pub mod methods {
     /// Takes no arguments and returns a [`crate::ComposioToolkitsResponse`].
     pub const LIST_TOOLKITS: &str = "ListToolkits";
 
+    /// Installs or replaces the route the module reaches Composio over.
+    ///
+    /// Takes a [`crate::ComposioConfigureRequest`] and returns a
+    /// [`crate::ComposioConfigureResponse`]. A host calls it when its
+    /// credential changes — a sign-in after a lazy load, a sign-out, a switch
+    /// between the proxy and a user's own key — rather than reloading the
+    /// module.
+    pub const CONFIGURE: &str = "Configure";
+
     /// Lists the caller's connections, active or not.
     ///
     /// Takes no arguments and returns a [`crate::ComposioConnectionsResponse`].
@@ -196,6 +205,7 @@ pub mod methods {
 /// `crates/tinyconnectors` asserts its declared manifest methods against this
 /// list, so the two cannot drift.
 pub const METHODS: &[&str] = &[
+    methods::CONFIGURE,
     methods::LIST_TOOLKITS,
     methods::LIST_CONNECTIONS,
     methods::AUTHORIZE,

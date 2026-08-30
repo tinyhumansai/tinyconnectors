@@ -81,6 +81,34 @@ constructing a client and start choosing a blob. `state_dir` should be the
 host's existing state directory — the module keeps its sync cursors and the
 trigger archive there.
 
+The blob is also optional. A module loaded without one still answers the
+capability members, so a signed-out user is not locked out of the question
+"what could I connect?".
+
+### Keeping the route current
+
+A load-time blob alone is not enough, because the host's credential does not
+stand still and the module is lazy. The common order of events is:
+
+1. the application starts, signed out;
+2. something touches a connector member, and the module loads — routeless;
+3. the user signs in.
+
+A route fixed at load would leave that user unable to reach Composio until they
+restarted. Sign-out is the same problem reversed: a stale bearer answers 401 to
+everything.
+
+So the host calls `Configure` whenever its answer to "which route" changes —
+sign-in, sign-out, a `composio.set_api_key`, a `composio.mode` switch. The
+request carries the same tagged shape as the blob, so the host builds it once
+and uses it for both. The module replaces the route unconditionally: which
+route to use is the host's decision, and a `Configure` is an instruction rather
+than a proposal.
+
+`state_dir` is deliberately absent from the request. The trigger archive is
+opened once at load, and letting a later call move it would strand history that
+is already written.
+
 ## 3. Replacing the calls
 
 `integrations::composio` keeps its module path — it is referenced across the
