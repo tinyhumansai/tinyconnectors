@@ -16,19 +16,18 @@ use tinybus::broker::Broker;
 use tinybus::transport::memory::MemoryBus;
 use tinybus::{Connection, Interface};
 use tinyconnectors_bus::{
-    ComposioAuthorizeRequest, ComposioAuthorizeResponse, ComposioConnectionsResponse,
-    ComposioDeleteConnectionRequest, ComposioDeleteResponse, ComposioExecuteRequest,
-    ComposioExecuteResponse, ComposioGetUserScopesRequest, ComposioListToolsRequest,
-    ComposioSetUserScopesRequest, ComposioToolkitsResponse, ComposioToolsResponse,
-    ComposioActiveTriggersResponse, ComposioAgentReadyToolkitsResponse,
-    ComposioAvailableTriggersResponse, ComposioCapabilitiesResponse, ComposioCreateTriggerRequest,
-    ComposioCreateTriggerResponse, ComposioDisableTriggerRequest, ComposioDisableTriggerResponse,
-    ComposioEnableTriggerRequest, ComposioEnableTriggerResponse, ComposioGithubReposResponse,
-    ComposioListAvailableTriggersRequest, ComposioListGithubReposRequest,
-    ComposioListTriggerHistoryRequest, ComposioListTriggersRequest,
-    ComposioRefreshIdentitiesResponse, ComposioTriggerHistoryResult, ComposioUserProfile,
-    ComposioUserProfileRequest, ComposioUserScopes, ComposioUserScopesResponse,
-    ConnectorSyncRequest, ConnectorSyncResponse, SyncStage, names,
+    ComposioActiveTriggersResponse, ComposioAgentReadyToolkitsResponse, ComposioAuthorizeRequest,
+    ComposioAuthorizeResponse, ComposioAvailableTriggersResponse, ComposioCapabilitiesResponse,
+    ComposioConnectionsResponse, ComposioCreateTriggerRequest, ComposioCreateTriggerResponse,
+    ComposioDeleteConnectionRequest, ComposioDeleteResponse, ComposioDisableTriggerRequest,
+    ComposioDisableTriggerResponse, ComposioEnableTriggerRequest, ComposioEnableTriggerResponse,
+    ComposioExecuteRequest, ComposioExecuteResponse, ComposioGetUserScopesRequest,
+    ComposioGithubReposResponse, ComposioListAvailableTriggersRequest,
+    ComposioListGithubReposRequest, ComposioListToolsRequest, ComposioListTriggerHistoryRequest,
+    ComposioListTriggersRequest, ComposioRefreshIdentitiesResponse, ComposioSetUserScopesRequest,
+    ComposioToolkitsResponse, ComposioToolsResponse, ComposioTriggerHistoryResult,
+    ComposioUserProfile, ComposioUserProfileRequest, ComposioUserScopes,
+    ComposioUserScopesResponse, ConnectorSyncRequest, ConnectorSyncResponse, SyncStage, names,
 };
 
 use super::{ConnectorService, ModuleConfig};
@@ -38,6 +37,12 @@ use crate::{Error, Result};
 #[derive(Debug, Default)]
 struct StubTransport {
     reply: Mutex<serde_json::Value>,
+    /// Replies keyed by a substring of the path, tried before `reply`.
+    ///
+    /// Several members call more than one endpoint — reading a profile lists
+    /// connections and then executes an action — and answering both with one
+    /// envelope tests the wrong thing.
+    by_path: Mutex<Vec<(String, serde_json::Value)>>,
     fail: Mutex<Option<String>>,
     last_body: Mutex<Option<serde_json::Value>>,
 }
@@ -57,12 +62,26 @@ impl StubTransport {
         })
     }
 
+    /// Answer `value` for any path containing `needle`.
+    fn answering(self: &Arc<Self>, needle: &str, value: serde_json::Value) -> Arc<Self> {
+        self.by_path
+            .lock()
+            .unwrap()
+            .push((needle.to_string(), value));
+        self.clone()
+    }
+
     fn answer(&self, path: &str) -> Result<serde_json::Value> {
         if let Some(message) = self.fail.lock().unwrap().clone() {
             return Err(Error::Transport {
                 path: path.to_string(),
                 message,
             });
+        }
+        for (needle, value) in self.by_path.lock().unwrap().iter() {
+            if path.contains(needle.as_str()) {
+                return Ok(value.clone());
+            }
         }
         Ok(self.reply.lock().unwrap().clone())
     }
@@ -659,12 +678,10 @@ async fn rejects_an_empty_toolkit_over_the_bus() -> tinybus::Result<()> {
     Ok(())
 }
 
-
 // ── capability and identity members ──────────────────────────────────
 
 #[tokio::test]
-async fn reports_the_capability_matrix_without_touching_the_backend()
--> tinybus::Result<()> {
+async fn reports_the_capability_matrix_without_touching_the_backend() -> tinybus::Result<()> {
     // It describes the compiled build, so it must answer with no session and
     // no request — that is what lets a UI tell "you cannot connect this" apart
     // from "you can connect it, but nothing will read it yet".
@@ -724,8 +741,7 @@ async fn reads_a_connected_account_s_identity() -> tinybus::Result<()> {
 }
 
 #[tokio::test]
-async fn a_profile_for_a_toolkit_with_no_provider_names_the_toolkit()
--> tinybus::Result<()> {
+async fn a_profile_for_a_toolkit_with_no_provider_names_the_toolkit() -> tinybus::Result<()> {
     let transport = StubTransport::replying(json!({}));
     let (_serving, _client, proxy, _bus) = proxy_to(service_over(transport)).await?;
 
@@ -740,15 +756,16 @@ async fn a_profile_for_a_toolkit_with_no_provider_names_the_toolkit()
         .await;
 
     let Err(error) = result else {
-        return Err(tinybus::Error::failed("an unknown toolkit returned a profile"));
+        return Err(tinybus::Error::failed(
+            "an unknown toolkit returned a profile",
+        ));
     };
     assert!(error.to_string().contains("dropbox"));
     Ok(())
 }
 
 #[tokio::test]
-async fn a_refresh_reports_the_broken_connections_beside_the_working_ones()
--> tinybus::Result<()> {
+async fn a_refresh_reports_the_broken_connections_beside_the_working_ones() -> tinybus::Result<()> {
     // A refresh exists to find the broken ones, so one of them must not hide
     // the rest by failing the whole call.
     let transport = StubTransport::replying(json!({
@@ -757,11 +774,16 @@ async fn a_refresh_reports_the_broken_connections_beside_the_working_ones()
             { "id": "c2", "toolkit": "dropbox", "status": "ACTIVE" },
             { "id": "c3", "toolkit": "gmail", "status": "PENDING" }
         ]
-    }));
+    }))
+    .answering(
+        "/execute",
+        json!({ "successful": true, "data": { "emailAddress": "a@b.com" } }),
+    );
     let (_serving, _client, proxy, _bus) = proxy_to(service_over(transport)).await?;
 
-    let reply: ComposioRefreshIdentitiesResponse =
-        proxy.call(names::methods::REFRESH_ALL_IDENTITIES, ()).await?;
+    let reply: ComposioRefreshIdentitiesResponse = proxy
+        .call(names::methods::REFRESH_ALL_IDENTITIES, ())
+        .await?;
 
     // gmail has a provider; dropbox does not; the pending row is skipped.
     assert_eq!(reply.profiles.len(), 1);
@@ -771,29 +793,32 @@ async fn a_refresh_reports_the_broken_connections_beside_the_working_ones()
 }
 
 #[tokio::test]
-async fn falls_back_to_the_first_active_connection_for_a_toolkit()
--> tinybus::Result<()> {
+async fn falls_back_to_the_first_active_connection_for_a_toolkit() -> tinybus::Result<()> {
     let transport = StubTransport::replying(json!({
         "connections": [
             { "id": "c1", "toolkit": "gmail", "status": "PENDING" },
             { "id": "c2", "toolkit": "gmail", "status": "ACTIVE" }
         ]
-    }));
+    }))
+    .answering("/execute", json!({ "successful": true, "data": {} }));
     let (_serving, _client, proxy, _bus) = proxy_to(service_over(transport)).await?;
 
     // No connection named: the pending row must not be chosen.
-    let result = proxy
-        .call::<ComposioUserProfile>(
+    let reply: ComposioUserProfile = proxy
+        .call(
             names::methods::GET_USER_PROFILE,
             (ComposioUserProfileRequest {
                 toolkit: "gmail".into(),
                 connection_id: None,
             },),
         )
-        .await;
-    // The stub answers the profile action with the connection list, which has
-    // no identity fields — the point is that it got as far as calling it.
-    assert!(result.is_ok(), "an active connection should have been chosen");
+        .await?;
+
+    assert_eq!(
+        reply.connection_id.as_deref(),
+        Some("c2"),
+        "the active connection, not the pending one"
+    );
     Ok(())
 }
 
@@ -813,7 +838,9 @@ async fn a_toolkit_with_no_active_connection_says_so() -> tinybus::Result<()> {
         .await;
 
     let Err(error) = result else {
-        return Err(tinybus::Error::failed("a profile came back with no connection"));
+        return Err(tinybus::Error::failed(
+            "a profile came back with no connection",
+        ));
     };
     assert!(error.to_string().contains("no active connection"));
     Ok(())
