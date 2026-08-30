@@ -52,6 +52,8 @@ use tinyconnectors_bus::{
 use crate::client::{
     COMPOSIO_API_BASE, ComposioClient, DirectRoute, HttpTransport, ProxyRoute, Route,
 };
+use tinyconnectors_sync::{ProviderContext, ProviderRegistry, SyncLimits, SyncStateStore};
+
 use crate::providers::ClientActions;
 use crate::triggers::TriggerArchive;
 
@@ -217,6 +219,23 @@ impl ConnectorService {
             extras: profile.extras,
         })
     }
+
+    /// The first active connection for `toolkit`.
+    async fn first_active_connection(&self, toolkit: &str) -> TinyBusResult<String> {
+        let wanted = toolkit.trim().to_ascii_lowercase();
+        self.client
+            .list_connections()
+            .await
+            .map_err(|error| to_bus_error(&error))?
+            .connections
+            .into_iter()
+            .find(|connection| connection.is_active() && connection.normalized_toolkit() == wanted)
+            .map(|connection| connection.id)
+            .ok_or_else(|| {
+                tinybus::Error::failed(format!("no active connection for toolkit `{toolkit}`"))
+            })
+    }
+}
 
 #[tinybus::interface(name = "ai.tinyhumans.connectors.Composio")]
 impl ConnectorService {
@@ -428,24 +447,6 @@ impl ConnectorService {
             .await
             .map_err(|error| tinybus::Error::failed(format!("history read failed: {error}")))?
             .map_err(|error| to_bus_error(&error))
-    }
-}
-
-impl ConnectorService {
-    /// The first active connection for `toolkit`.
-    async fn first_active_connection(&self, toolkit: &str) -> TinyBusResult<String> {
-        let wanted = toolkit.trim().to_ascii_lowercase();
-        self.client
-            .list_connections()
-            .await
-            .map_err(|error| to_bus_error(&error))?
-            .connections
-            .into_iter()
-            .find(|connection| connection.is_active() && connection.normalized_toolkit() == wanted)
-            .map(|connection| connection.id)
-            .ok_or_else(|| {
-                tinybus::Error::failed(format!("no active connection for toolkit `{toolkit}`"))
-            })
     }
 }
 
