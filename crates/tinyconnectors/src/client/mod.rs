@@ -33,7 +33,7 @@
 
 mod composio;
 mod http;
-mod route;
+pub mod route;
 mod transport;
 
 pub use composio::ComposioClient;

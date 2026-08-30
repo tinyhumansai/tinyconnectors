@@ -66,9 +66,8 @@ impl HttpTransport {
     ///
     /// # Errors
     ///
-    /// Returns [`Error::InsecureBaseUrl`] if `base_url` would send the
-    /// credential anywhere other than an HTTPS host or a genuine loopback
-    /// address — see [`check_base_url`].
+    /// Returns [`Error::InsecureBaseUrl`] unless `base_url` is HTTPS or a
+    /// genuine loopback address, or if it carries embedded credentials.
     pub fn bearer(base_url: &str, token: impl Into<String>) -> Result<Self> {
         Self::build(base_url, token.into(), AuthScheme::Bearer)
     }
@@ -78,7 +77,7 @@ impl HttpTransport {
     /// # Errors
     ///
     /// Returns [`Error::InsecureBaseUrl`] on a base URL that would leak the
-    /// key — see [`check_base_url`].
+    /// key: anything but HTTPS or a genuine loopback address.
     pub fn api_key(base_url: &str, key: impl Into<String>) -> Result<Self> {
         Self::build(base_url, key.into(), AuthScheme::ApiKey)
     }
