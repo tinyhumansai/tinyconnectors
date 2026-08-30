@@ -38,8 +38,10 @@
 //! assert_eq!(toolkit_from_slug("GMAIL_SEND_EMAIL").as_deref(), Some("gmail"));
 //! ```
 
+mod error;
 pub mod scope;
 pub mod state;
 
+pub use error::{Error, Result};
 pub use scope::{CuratedTool, ToolScope, classify_unknown, find_curated, toolkit_from_slug};
 pub use state::{DailyBudget, SyncState, SyncStateStore};
