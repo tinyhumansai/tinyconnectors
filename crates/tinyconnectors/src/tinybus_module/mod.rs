@@ -423,7 +423,11 @@ impl ConnectorService {
     // `async` with nothing awaited: swapping a route is a lock and a move, but
     // every member of a `#[tinybus::interface]` impl has to be async to be
     // dispatched. Narrow, and on this one member only.
-    #[allow(clippy::unused_async, reason = "required by the interface dispatcher")]
+    #[allow(
+        clippy::unused_async,
+        clippy::unused_async_trait_impl,
+        reason = "required by the interface dispatcher"
+    )]
     async fn configure(
         &self,
         request: ComposioConfigureRequest,
