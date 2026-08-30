@@ -28,7 +28,12 @@ fn the_payload_vocabulary_is_the_contract_crate_s_own_types() {
 #[test]
 fn the_bus_identity_is_available_to_consumers() {
     assert_eq!(names::INTERFACE, "ai.tinyhumans.connectors.Composio");
-    assert_eq!(names::METHODS.len(), 6);
+    assert_eq!(names::OBJECT_PATH, "/ai/tinyhumans/connectors/Composio");
+    // Not a count: a count passes through a member being swapped for another,
+    // and the point of the table is which members a host may call.
+    assert!(names::METHODS.contains(&names::methods::AUTHORIZE));
+    assert!(names::METHODS.contains(&names::methods::EXECUTE));
+    assert!(names::METHODS.contains(&names::methods::LIST_TRIGGER_HISTORY));
 }
 
 #[test]
