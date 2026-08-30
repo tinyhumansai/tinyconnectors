@@ -111,14 +111,13 @@ pub use composio::{
     ComposioCreateTriggerRequest, ComposioCreateTriggerResponse, ComposioDeleteConnectionRequest,
     ComposioDeleteResponse, ComposioDisableTriggerRequest, ComposioDisableTriggerResponse,
     ComposioEnableTriggerRequest, ComposioEnableTriggerResponse, ComposioExecuteRequest,
-    ComposioExecuteResponse, ComposioGithubRepo, ComposioGithubReposResponse, ComposioIdentityFailure,
-    ComposioListAvailableTriggersRequest, ComposioListGithubReposRequest, ComposioListToolsRequest,
-    ComposioListTriggerHistoryRequest, ComposioListTriggersRequest, ComposioRefreshIdentitiesResponse,
-    ComposioToolFunction,
-    ComposioToolSchema, ComposioToolkitCatalogEntry, ComposioToolkitsResponse,
-    ComposioToolsResponse, ComposioTriggerEvent, ComposioTriggerHistoryEntry,
-    ComposioTriggerHistoryResult, ComposioTriggerMetadata, ComposioUserProfile,
-    ComposioUserProfileRequest,
+    ComposioExecuteResponse, ComposioGithubRepo, ComposioGithubReposResponse,
+    ComposioIdentityFailure, ComposioListAvailableTriggersRequest, ComposioListGithubReposRequest,
+    ComposioListToolsRequest, ComposioListTriggerHistoryRequest, ComposioListTriggersRequest,
+    ComposioRefreshIdentitiesResponse, ComposioToolFunction, ComposioToolSchema,
+    ComposioToolkitCatalogEntry, ComposioToolkitsResponse, ComposioToolsResponse,
+    ComposioTriggerEvent, ComposioTriggerHistoryEntry, ComposioTriggerHistoryResult,
+    ComposioTriggerMetadata, ComposioUserProfile, ComposioUserProfileRequest,
 };
 pub use names::{INTERFACE, METHODS, OBJECT_PATH};
 pub use records::{ConnectorRecord, ConnectorRecordBatch, SyncEvent, SyncStage};

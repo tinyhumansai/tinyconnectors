@@ -71,7 +71,12 @@ impl SyncStateStore for FileStateStore {
             // A connection that has never synced is the normal first case, not
             // a failure.
             Err(error) if error.kind() == std::io::ErrorKind::NotFound => return Ok(None),
-            Err(error) => return Err(failed(format!("could not read {}: {error}", path.display()))),
+            Err(error) => {
+                return Err(failed(format!(
+                    "could not read {}: {error}",
+                    path.display()
+                )));
+            }
         };
 
         serde_json::from_str(&contents)

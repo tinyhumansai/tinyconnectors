@@ -117,8 +117,7 @@ pub trait ConnectorProvider: Send + Sync + std::fmt::Debug {
     /// # Errors
     ///
     /// Returns [`crate::Error::Action`] when the underlying action fails.
-    async fn fetch_user_profile(&self, context: &ProviderContext)
-    -> Result<ProviderUserProfile>;
+    async fn fetch_user_profile(&self, context: &ProviderContext) -> Result<ProviderUserProfile>;
 
     /// Read one batch of records.
     ///

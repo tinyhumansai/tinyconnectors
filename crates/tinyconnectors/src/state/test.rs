@@ -37,7 +37,13 @@ async fn a_key_that_was_never_written_reads_as_absent() {
     // failure, or every first run would report one.
     let dir = TempDir::new("absent");
     let store = FileStateStore::new(&dir.0);
-    assert!(store.get(STATE_NAMESPACE, "gmail:conn_1").await.unwrap().is_none());
+    assert!(
+        store
+            .get(STATE_NAMESPACE, "gmail:conn_1")
+            .await
+            .unwrap()
+            .is_none()
+    );
 }
 
 #[tokio::test]
@@ -46,7 +52,11 @@ async fn a_value_round_trips() {
     let store = FileStateStore::new(&dir.0);
 
     store
-        .set(STATE_NAMESPACE, "gmail:conn_1", &json!({ "cursor": "page-2" }))
+        .set(
+            STATE_NAMESPACE,
+            "gmail:conn_1",
+            &json!({ "cursor": "page-2" }),
+        )
         .await
         .unwrap();
 
@@ -85,11 +95,19 @@ async fn two_connections_do_not_share_a_file() {
         .unwrap();
 
     assert_eq!(
-        store.get(STATE_NAMESPACE, "gmail:conn_1").await.unwrap().unwrap()["cursor"],
+        store
+            .get(STATE_NAMESPACE, "gmail:conn_1")
+            .await
+            .unwrap()
+            .unwrap()["cursor"],
         "a"
     );
     assert_eq!(
-        store.get(STATE_NAMESPACE, "gmail:conn_2").await.unwrap().unwrap()["cursor"],
+        store
+            .get(STATE_NAMESPACE, "gmail:conn_2")
+            .await
+            .unwrap()
+            .unwrap()["cursor"],
         "b"
     );
 }
@@ -131,7 +149,10 @@ async fn a_lone_dot_key_does_not_become_a_directory_reference() {
     let store = FileStateStore::new(&dir.0);
 
     for key in [".", "..", "..."] {
-        store.set(STATE_NAMESPACE, key, &json!({ "k": key })).await.unwrap();
+        store
+            .set(STATE_NAMESPACE, key, &json!({ "k": key }))
+            .await
+            .unwrap();
         assert!(store.get(STATE_NAMESPACE, key).await.unwrap().is_some());
     }
 }

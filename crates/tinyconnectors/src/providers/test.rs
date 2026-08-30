@@ -9,8 +9,8 @@ use serde_json::json;
 use tinyconnectors_sync::{ActionRunner, Error as SyncError};
 
 use super::ClientActions;
-use crate::client::{ComposioClient, ProxyRoute, Transport};
 use crate::Result;
+use crate::client::{ComposioClient, ProxyRoute, Transport};
 
 #[derive(Debug, Default)]
 struct StubTransport {

@@ -32,11 +32,10 @@ impl ActionRunner for FakeActions {
         arguments: serde_json::Value,
         connection_id: &str,
     ) -> Result<serde_json::Value> {
-        self.calls.lock().unwrap().push((
-            action.to_string(),
-            arguments,
-            connection_id.to_string(),
-        ));
+        self.calls
+            .lock()
+            .unwrap()
+            .push((action.to_string(), arguments, connection_id.to_string()));
         Ok(self.reply.lock().unwrap().clone())
     }
 }
@@ -80,10 +79,7 @@ impl ConnectorProvider for TestProvider {
     fn can_sync(&self) -> bool {
         self.can_sync
     }
-    async fn fetch_user_profile(
-        &self,
-        context: &ProviderContext,
-    ) -> Result<ProviderUserProfile> {
+    async fn fetch_user_profile(&self, context: &ProviderContext) -> Result<ProviderUserProfile> {
         let raw = context.run("TEST_GET_PROFILE", json!({})).await?;
         Ok(ProviderUserProfile {
             toolkit: context.toolkit.clone(),
@@ -212,7 +208,10 @@ async fn running_an_action_targets_this_run_s_connection() {
 
     let (action, _, connection) = actions.calls.lock().unwrap()[0].clone();
     assert_eq!(action, "TEST_GET_PROFILE");
-    assert_eq!(connection, "conn_1", "a provider cannot address another account");
+    assert_eq!(
+        connection, "conn_1",
+        "a provider cannot address another account"
+    );
 }
 
 #[test]
@@ -250,7 +249,10 @@ async fn a_provider_that_cannot_sync_produces_an_empty_completed_batch() {
         .unwrap();
 
     assert!(batch.records.is_empty());
-    assert!(batch.complete, "an empty run must not look like more to come");
+    assert!(
+        batch.complete,
+        "an empty run must not look like more to come"
+    );
     assert_eq!(batch.toolkit, "gmail");
     assert_eq!(batch.connection_id.as_deref(), Some("conn_1"));
 }

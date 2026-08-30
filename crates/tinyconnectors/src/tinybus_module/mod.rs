@@ -36,17 +36,16 @@ use std::sync::Arc;
 use serde::Deserialize;
 use tinybus::{Connection, Result as TinyBusResult};
 use tinyconnectors_bus::{
-    ComposioActiveTriggersResponse, ComposioAuthorizeRequest, ComposioAuthorizeResponse,
-    ComposioAvailableTriggersResponse, ComposioConnectionsResponse, ComposioCreateTriggerRequest,
-    ComposioCreateTriggerResponse, ComposioDeleteConnectionRequest, ComposioDeleteResponse,
-    ComposioDisableTriggerRequest, ComposioDisableTriggerResponse, ComposioEnableTriggerRequest,
-    ComposioEnableTriggerResponse, ComposioExecuteRequest, ComposioExecuteResponse,
-    ComposioGithubReposResponse, ComposioListAvailableTriggersRequest,
-    ComposioListGithubReposRequest, ComposioListToolsRequest, ComposioListTriggerHistoryRequest,
-    ComposioListTriggersRequest, ComposioToolkitsResponse, ComposioToolsResponse,
-    ComposioAgentReadyToolkitsResponse, ComposioCapabilitiesResponse, ComposioIdentityFailure,
-    ComposioRefreshIdentitiesResponse, ComposioTriggerHistoryResult, ComposioUserProfile,
-    ComposioUserProfileRequest, names,
+    ComposioActiveTriggersResponse, ComposioAgentReadyToolkitsResponse, ComposioAuthorizeRequest,
+    ComposioAuthorizeResponse, ComposioAvailableTriggersResponse, ComposioCapabilitiesResponse,
+    ComposioConnectionsResponse, ComposioCreateTriggerRequest, ComposioCreateTriggerResponse,
+    ComposioDeleteConnectionRequest, ComposioDeleteResponse, ComposioDisableTriggerRequest,
+    ComposioDisableTriggerResponse, ComposioEnableTriggerRequest, ComposioEnableTriggerResponse,
+    ComposioExecuteRequest, ComposioExecuteResponse, ComposioGithubReposResponse,
+    ComposioIdentityFailure, ComposioListAvailableTriggersRequest, ComposioListGithubReposRequest,
+    ComposioListToolsRequest, ComposioListTriggerHistoryRequest, ComposioListTriggersRequest,
+    ComposioRefreshIdentitiesResponse, ComposioToolkitsResponse, ComposioToolsResponse,
+    ComposioTriggerHistoryResult, ComposioUserProfile, ComposioUserProfileRequest, names,
 };
 
 use crate::client::{
@@ -310,9 +309,7 @@ impl ConnectorService {
     }
 
     #[allow(clippy::unused_async)] // The interface macro dispatches `async`.
-    async fn list_agent_ready_toolkits(
-        &self,
-    ) -> TinyBusResult<ComposioAgentReadyToolkitsResponse> {
+    async fn list_agent_ready_toolkits(&self) -> TinyBusResult<ComposioAgentReadyToolkitsResponse> {
         Ok(ComposioAgentReadyToolkitsResponse {
             toolkits: self.registry.agent_ready_toolkits(),
         })
