@@ -1413,7 +1413,7 @@ async fn a_failed_execute_carries_an_error_class() {
     // "reconnect your account", the other is "try again". The
     // `[composio:error:<class>]` prefix is how a caller tells them apart, and
     // without it every failure renders as the same unhelpful string.
-    let transport = Arc::new(StubTransport::failing("rate limited"));
+    let transport = StubTransport::failing("rate limited");
     let service = service_over(transport);
 
     let error = service
