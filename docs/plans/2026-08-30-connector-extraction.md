@@ -19,14 +19,16 @@ payload vocabulary out of `tinymemory-api::host::composio`.
   types, each family pinning its serde form in `test.rs`.
 - `crates/tinyconnectors-bus/src/names/` — interface
   `ai.tinyhumans.connectors.Composio` at `/ai/tinyhumans/connectors/Composio`.
-- `crates/tinyconnectors/src/client/` — the `Transport` seam, `ComposioClient`,
-  and `HttpTransport`.
+- `crates/tinyconnectors-bus/src/records/` — the ingestion vocabulary a sync
+  emits: `ConnectorRecord`, `ConnectorRecordBatch`, `SyncStage`, `SyncEvent`.
+- `crates/tinyconnectors/src/client/` — the `Transport` seam, the `Route` seam
+  with `ProxyRoute` and `DirectRoute`, `ComposioClient`, and `HttpTransport`.
 - `crates/tinyconnectors/src/oauth/` — Meta rate-limit policy and the authorize
   backoff.
 - `crates/tinyconnectors/src/tinybus_module/` — serves `ListToolkits`,
   `ListConnections`, `Authorize`, `DeleteConnection`.
 
-**Verified:** 86 tests; `cargo run --example verify_module` loads the built
+**Verified:** 121 tests; `cargo run --example verify_module` loads the built
 `cdylib` through the real TinyBus loader and matches its manifest members
 against `names::METHODS`.
 
@@ -58,11 +60,17 @@ what they need, in dependency order:
    `ListAgentReadyToolkits`. These describe the compiled build, so they must
    answer without a session; keep them off the transport.
 5. **Scopes** — `GetUserScopes`, `SetUserScopes`.
-6. **Mode** — `GetMode`, `SetApiKey`, `ClearApiKey`. Direct mode is the
-   awkward one: it wraps a host agent tool today (`ComposioClientKind::Direct`
-   in `client.rs:740`), and mode dispatch was left in the host deliberately
-   when the types moved. Decide before writing whether direct mode becomes a
-   second `Transport` implementation — likely yes — or stays host policy.
+6. **Mode** — `GetMode`, `SetApiKey`, `ClearApiKey`. **Settled:** these stay
+   host-side. The module routes but does not select, and it must not acquire a
+   credential it was not given, so reading the keychain and writing a key are
+   the host's. `GetMode` has no module member because the host already knows
+   which route it configured; `ComposioClient::route_name` covers diagnostics.
+   Changing route means reloading the module with a different config blob.
+
+Direct-mode coverage grows with each group. Where Composio's v3 API genuinely
+has no equivalent, the route returns `Error::UnsupportedByRoute` rather than an
+invented call — the same rule `ListToolkits` and `DeleteConnection` already
+follow.
 
 **Not moving:** `tools.rs`, `tools/direct.rs`, `action_tool.rs`. Those are
 model-facing agent tools; they belong to whichever host runs an agent loop and
@@ -90,11 +98,26 @@ crate does not grow a memory dependency:
    `gmail_post_process`, `slack_post_process`, `email_clean`,
    `email_markdown`, and the per-provider normalizers.
 
-The pipelines write into memory. That write is the seam to design first: they
-currently reach `crate::store::MemoryClient` directly, and after the move they
-must either return records for a host to write or call memory over the bus.
-**Decide this before moving any pipeline code** — it determines whether the
-sync crate depends on a memory contract at all.
+**Settled: pipelines return records.** A pipeline produces
+`ConnectorRecordBatch` and returns it; the host hands it to the memory engine
+over memory's own bus API. `crates/tinyconnectors-sync` therefore takes
+`tinyconnectors-bus` and *no memory dependency at all* — which is what makes
+this phase a move rather than a rewrite.
+
+Concretely, per pipeline:
+
+- Replace every `MemoryClient` write with a record appended to the batch.
+- Replace progress logging with a `SyncEvent`.
+- Paging state becomes `ConnectorRecordBatch::cursor` and `complete`, so a run
+  is resumable by the host rather than by a pipeline-local loop.
+
+The one thing to watch: some pipelines currently *read* memory to decide what to
+re-sync (`sync_state.rs`, the diff logic). Those reads become an input the host
+supplies to the run, not a call the pipeline makes. Design that input before
+porting the first provider — it is the only remaining coupling.
+
+A `Sync` member on the bus emits batches. It is added when the first pipeline
+lands, as a minor contract bump.
 
 ---
 
@@ -122,7 +145,10 @@ the types exist in two places and can drift.
 ### `openhuman`
 
 1. Depend on `tinyconnectors-bus`; load `tinyconnectors` as a module, passing
-   `base_url` and the signed-in user's token as the config blob.
+   the route it selected as the config blob — `{"route": "proxy", …}` for a
+   signed-in user, `{"route": "direct", …}` for one with their own key. The
+   existing `composio.mode` config and the keychain lookup stay in OpenHuman;
+   they now choose a blob instead of constructing a client.
 2. Replace `integrations::composio::client` with bus calls. Keep the
    `integrations::composio` module path — it is referenced across the crate —
    but reduce it to an adapter.
@@ -143,6 +169,10 @@ it needs connections and execute, not the trigger or catalog surface.
 ## Sequencing note
 
 Phases 2 and 3 are independent and can run in parallel; both must land before
-phase 4, and phase 4 before phase 5 for either host. The riskiest decision in
-the whole plan is the memory-write seam in phase 3 — settle it first, because
-reversing it means rewriting every pipeline.
+phase 4, and phase 4 before phase 5 for either host.
+
+Both open design questions are now settled — records out rather than memory
+writes, and routing in the module with selection in the host. What remains
+riskiest in phase 3 is the pipelines that *read* memory to decide what to
+re-sync: that input has to be designed before the first provider is ported,
+because retrofitting it means touching every pipeline again.
