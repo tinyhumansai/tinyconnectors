@@ -44,6 +44,8 @@ serde = { workspace = true }
 ureq = { workspace = true }
 # Validates the configured base URL before any credential is sent over it.
 url = { workspace = true }
+# Encodes bus-supplied values before they become part of a request URL.
+percent-encoding = { workspace = true }
 
 [dev-dependencies]
 # The bundled example implements `Transport`, which is an `async_trait`.

@@ -9,7 +9,7 @@ use super::Route;
 use crate::client::Transport;
 use crate::{
     ComposioAuthorizeResponse, ComposioConnectionsResponse, ComposioDeleteResponse,
-    ComposioToolkitsResponse, Error, Result,
+    ComposioExecuteResponse, ComposioToolkitsResponse, ComposioToolsResponse, Error, Result,
 };
 
 /// Reaches Composio through the `TinyHumans` backend.
@@ -33,6 +33,24 @@ impl ProxyRoute {
     async fn get<T: DeserializeOwned>(&self, path: &str) -> Result<T> {
         decode(path, self.transport.get(path).await?)
     }
+}
+
+/// Join non-empty, trimmed, percent-encoded values for a query parameter.
+///
+/// Encoding matters: a tag or toolkit slug reaching this from a bus call is not
+/// guaranteed to be URL-safe, and an unencoded `&` would forge a parameter.
+fn comma_joined(values: &[String]) -> Option<String> {
+    let joined = values
+        .iter()
+        .map(|value| value.trim())
+        .filter(|value| !value.is_empty())
+        .map(|value| {
+            percent_encoding::utf8_percent_encode(value, percent_encoding::NON_ALPHANUMERIC)
+                .to_string()
+        })
+        .collect::<Vec<_>>()
+        .join(",");
+    (!joined.is_empty()).then_some(joined)
 }
 
 fn decode<T: DeserializeOwned>(path: &str, value: serde_json::Value) -> Result<T> {
@@ -66,6 +84,43 @@ impl Route for ProxyRoute {
         tracing::debug!(toolkit = %toolkit, "[connectors][proxy] authorize");
         let path = "/agent-integrations/composio/authorize";
         decode(path, self.transport.post(path, body).await?)
+    }
+
+    async fn list_tools(
+        &self,
+        toolkits: &[String],
+        tags: &[String],
+    ) -> Result<ComposioToolsResponse> {
+        let mut query: Vec<String> = Vec::new();
+        if let Some(joined) = comma_joined(toolkits) {
+            query.push(format!("toolkits={joined}"));
+        }
+        if let Some(joined) = comma_joined(tags) {
+            query.push(format!("tags={joined}"));
+        }
+
+        let path = if query.is_empty() {
+            "/agent-integrations/composio/tools".to_string()
+        } else {
+            format!("/agent-integrations/composio/tools?{}", query.join("&"))
+        };
+        tracing::debug!(path = %path, "[connectors][proxy] list_tools");
+        self.get(&path).await
+    }
+
+    async fn execute(
+        &self,
+        tool: &str,
+        arguments: &serde_json::Value,
+        connection_id: Option<&str>,
+    ) -> Result<ComposioExecuteResponse> {
+        tracing::debug!(tool = %tool, "[connectors][proxy] execute");
+        let mut body = serde_json::json!({ "tool": tool, "arguments": arguments });
+        if let Some(connection_id) = connection_id {
+            body["connectionId"] = serde_json::Value::String(connection_id.to_string());
+        }
+        let path = "/agent-integrations/composio/execute";
+        decode(path, self.transport.post(path, &body).await?)
     }
 
     async fn delete_connection(&self, connection_id: &str) -> Result<ComposioDeleteResponse> {

@@ -10,7 +10,8 @@ use super::Route;
 use crate::client::Transport;
 use crate::{
     ComposioAuthorizeResponse, ComposioConnection, ComposioConnectionsResponse,
-    ComposioDeleteResponse, ComposioToolkitsResponse, Error, Result,
+    ComposioDeleteResponse, ComposioExecuteResponse, ComposioToolkitsResponse,
+    ComposioToolsResponse, Error, Result,
 };
 
 /// Composio's own API base. The direct route talks to this, not to us.
@@ -246,6 +247,58 @@ impl Route for DirectRoute {
         })
     }
 
+    async fn list_tools(
+        &self,
+        toolkits: &[String],
+        tags: &[String],
+    ) -> Result<ComposioToolsResponse> {
+        let mut query: Vec<String> = Vec::new();
+        if let Some(joined) = comma_joined(toolkits) {
+            query.push(format!("toolkits={joined}"));
+        }
+        if let Some(joined) = comma_joined(tags) {
+            query.push(format!("tags={joined}"));
+        }
+        let path = if query.is_empty() {
+            "/tools".to_string()
+        } else {
+            format!("/tools?{}", query.join("&"))
+        };
+
+        tracing::debug!(path = %path, "[connectors][direct] list_tools");
+        let value = self.call(self.transport.get(&path)).await?;
+        Ok(ComposioToolsResponse {
+            tools: tool_schemas_from_v3(&value),
+        })
+    }
+
+    async fn execute(
+        &self,
+        tool: &str,
+        arguments: &serde_json::Value,
+        connection_id: Option<&str>,
+    ) -> Result<ComposioExecuteResponse> {
+        // v3 puts the action slug in the path, not the body. The slug is
+        // upper-snake-case and comes from a catalog rather than free text, but
+        // it still reaches here over the bus, so it is encoded before it
+        // becomes part of a URL.
+        let encoded =
+            percent_encoding::utf8_percent_encode(tool, percent_encoding::NON_ALPHANUMERIC);
+        let path = format!("/tools/execute/{encoded}");
+        tracing::debug!(tool = %tool, "[connectors][direct] execute");
+
+        let mut body = serde_json::json!({
+            "arguments": arguments,
+            "entity_id": self.entity_id,
+        });
+        if let Some(connection_id) = connection_id {
+            body["connected_account_id"] = serde_json::Value::String(connection_id.to_string());
+        }
+
+        let raw = self.call(self.transport.post(&path, &body)).await?;
+        Ok(execute_response_from_v3(raw))
+    }
+
     async fn delete_connection(&self, _connection_id: &str) -> Result<ComposioDeleteResponse> {
         // The proxy route's delete also clears memory sourced from the
         // connection, which is a TinyHumans concern Composio knows nothing
@@ -255,6 +308,82 @@ impl Route for DirectRoute {
             route: self.name(),
             member: "DeleteConnection",
         })
+    }
+}
+
+/// Join non-empty, trimmed, percent-encoded values for a query parameter.
+fn comma_joined(values: &[String]) -> Option<String> {
+    let joined = values
+        .iter()
+        .map(|value| value.trim())
+        .filter(|value| !value.is_empty())
+        .map(|value| {
+            percent_encoding::utf8_percent_encode(value, percent_encoding::NON_ALPHANUMERIC)
+                .to_string()
+        })
+        .collect::<Vec<_>>()
+        .join(",");
+    (!joined.is_empty()).then_some(joined)
+}
+
+/// Pull tool schemas out of a v3 listing, which nests them under `items`.
+fn tool_schemas_from_v3(value: &serde_json::Value) -> Vec<crate::ComposioToolSchema> {
+    let items = value
+        .get("items")
+        .or_else(|| value.get("data"))
+        .or_else(|| value.get("tools"))
+        .unwrap_or(value);
+    let Some(rows) = items.as_array() else {
+        return Vec::new();
+    };
+    rows.iter()
+        .filter_map(|row| {
+            // A v3 row is the function itself, not the `{type, function}`
+            // envelope a model expects, so it is wrapped here.
+            let name = field(row, &["slug", "name"])?;
+            Some(crate::ComposioToolSchema {
+                kind: "function".to_string(),
+                function: crate::ComposioToolFunction {
+                    name,
+                    description: field(row, &["description"]),
+                    parameters: row
+                        .get("input_parameters")
+                        .or_else(|| row.get("parameters"))
+                        .cloned(),
+                    output_parameters: row.get("output_parameters").cloned(),
+                },
+            })
+        })
+        .collect()
+}
+
+/// Reshape a v3 execute result into the envelope the proxy returns.
+///
+/// Two differences are load-bearing. `successful` defaults to *true* when the
+/// response carries no verdict at all: v3 answers a plain result for some
+/// actions, and defaulting to failure would report a completed action as
+/// broken. And `cost_usd` is zero because direct mode carries no billing
+/// margin — the user is paying Composio, not us.
+fn execute_response_from_v3(raw: serde_json::Value) -> ComposioExecuteResponse {
+    let successful = raw
+        .get("successful")
+        .or_else(|| raw.get("success"))
+        .and_then(serde_json::Value::as_bool)
+        .unwrap_or(true);
+    let error = raw
+        .get("error")
+        .and_then(serde_json::Value::as_str)
+        .map(str::to_string);
+    let data = raw.get("data").cloned().unwrap_or(raw);
+
+    ComposioExecuteResponse {
+        data,
+        successful,
+        error,
+        cost_usd: 0.0,
+        // The proxy backend renders compact markdown for known tools; Composio
+        // does not. Callers fall back to `data`.
+        markdown_formatted: None,
     }
 }
 

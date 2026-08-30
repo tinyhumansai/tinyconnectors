@@ -775,6 +775,7 @@ name = "tinyconnectors"
 version = "0.2.1"
 dependencies = [
  "async-trait",
+ "percent-encoding",
  "serde",
  "serde_json",
  "thiserror",

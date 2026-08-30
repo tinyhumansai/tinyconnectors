@@ -66,6 +66,10 @@ ureq = { version = "3", features = ["json"] }
 # `http://127.0.0.1:8080@evil.com`, which resolves to `evil.com` and would take
 # the credential header with it.
 url = "2"
+# Percent-encoding for values that become part of a URL — toolkit slugs, tags,
+# and action names all reach the module over the bus, where an unencoded `&`
+# would forge a query parameter.
+percent-encoding = "2"
 
 # Lints apply to every member that opts in with `[lints] workspace = true`, and
 # to every target of that member. CI runs clippy with `-D warnings`, so anything
