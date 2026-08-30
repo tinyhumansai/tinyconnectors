@@ -29,6 +29,7 @@ const PAGE: PageSpec = PageSpec {
     version_paths: &["historyId", "internalDate"],
     page_size_arg: "max_results",
     cursor_arg: "page_token",
+    clean_bodies: true,
 };
 
 /// The action that reads the connected account's identity.

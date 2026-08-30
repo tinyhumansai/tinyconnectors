@@ -29,6 +29,7 @@ const PAGE: PageSpec = PageSpec {
     version_paths: &["updatedAt"],
     page_size_arg: "first",
     cursor_arg: "after",
+    clean_bodies: false,
 };
 
 /// The action that reads the connected account's identity.

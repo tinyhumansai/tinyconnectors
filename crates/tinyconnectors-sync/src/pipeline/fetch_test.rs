@@ -16,6 +16,13 @@ const SPEC: PageSpec = PageSpec {
     version_paths: &["version", "etag"],
     page_size_arg: "max_results",
     cursor_arg: "page_token",
+    clean_bodies: true,
+};
+
+/// The same spec, for a toolkit whose bodies are written once and quote nothing.
+const UNCLEANED: PageSpec = PageSpec {
+    clean_bodies: false,
+    ..SPEC
 };
 
 #[test]
@@ -85,6 +92,41 @@ fn an_empty_payload_yields_an_empty_final_page() {
     let page = page_from(&json!({}), &SPEC);
     assert!(page.records.is_empty());
     assert!(page.next_cursor.is_none());
+}
+
+#[test]
+fn cleans_a_message_body_when_the_toolkit_asks_for_it() {
+    // Otherwise the same footer arrives on every message the user has ever
+    // received, and dominates any search run over the result.
+    let payload = json!({
+        "messages": [{
+            "id": "m1",
+            "body": "The real message.\n\nOn Tue, Ada wrote:\n> old thread\n\nUnsubscribe\n"
+        }]
+    });
+    let page = page_from(&payload, &SPEC);
+    assert_eq!(page.records[0].content, "The real message.");
+}
+
+#[test]
+fn leaves_a_body_alone_for_a_toolkit_that_does_not_quote() {
+    // An issue description is written once. Running the pass there only risks
+    // cutting a line that happens to resemble a footer.
+    let payload = json!({
+        "messages": [{ "id": "i1", "body": "Steps:\n> run the thing\n> it fails\n> every time" }]
+    });
+    let page = page_from(&payload, &UNCLEANED);
+    assert!(page.records[0].content.contains("every time"));
+}
+
+#[test]
+fn caps_a_body_that_would_outweigh_a_hundred_others() {
+    let huge = "word ".repeat(20_000);
+    let payload = json!({ "messages": [{ "id": "m1", "body": huge }] });
+    let page = page_from(&payload, &UNCLEANED);
+
+    assert!(page.records[0].content.chars().count() < 21_000);
+    assert!(page.records[0].content.ends_with("[truncated]"));
 }
 
 #[test]

@@ -12,6 +12,7 @@ use tinyconnectors_bus::ConnectorRecord;
 use super::json::{first_array, next_page_token, pick_str};
 use super::run::ProviderPage;
 use crate::Result;
+use crate::clean::{clean_body, truncate};
 use crate::provider::ProviderContext;
 
 /// How one toolkit's page read is shaped.
@@ -35,7 +36,22 @@ pub struct PageSpec {
     pub page_size_arg: &'static str,
     /// The argument naming where to resume.
     pub cursor_arg: &'static str,
+    /// Whether to strip quoted chains and boilerplate from the body.
+    ///
+    /// True for message-shaped toolkits, where a body carries the thread it
+    /// replied to and a footer repeated across every message the user has ever
+    /// received. False for issue and task toolkits, whose descriptions are
+    /// written once and quote nothing — running the pass there would only risk
+    /// cutting a line that happens to look like a footer.
+    pub clean_bodies: bool,
 }
+
+/// Longest body kept, in characters.
+///
+/// A cap rather than no limit: a single thread can run to hundreds of
+/// kilobytes, and one such record can outweigh a hundred useful ones in both
+/// storage and the attention of anything reading them back.
+const MAX_BODY_CHARS: usize = 20_000;
 
 /// Read one page of `spec` from the connection in `context`.
 ///
@@ -95,6 +111,16 @@ fn page_from(payload: &Value, spec: &PageSpec) -> ProviderPage {
         versions,
         next_cursor: next_page_token(payload),
     }
+}
+
+/// Prepare one item's text for ingestion.
+fn body(raw: &str, clean: bool) -> String {
+    let text = if clean {
+        clean_body(raw)
+    } else {
+        raw.trim().to_string()
+    };
+    truncate(&text, MAX_BODY_CHARS)
 }
 
 #[cfg(test)]

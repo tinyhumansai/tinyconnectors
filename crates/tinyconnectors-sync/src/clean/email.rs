@@ -107,7 +107,10 @@ pub fn drop_footer_noise(text: &str) -> String {
     let mut offset = 0usize;
     for line in text.split_inclusive('\n') {
         let lower = line.to_ascii_lowercase();
-        if FOOTER_TRIGGERS.iter().any(|trigger| lower.contains(trigger)) {
+        if FOOTER_TRIGGERS
+            .iter()
+            .any(|trigger| lower.contains(trigger))
+        {
             return cut_at(text, offset);
         }
         offset += line.len();
