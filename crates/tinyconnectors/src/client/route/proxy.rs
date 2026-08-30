@@ -51,7 +51,9 @@ impl ProxyRoute {
 struct Envelope<T> {
     #[serde(default)]
     success: bool,
-    #[serde(default)]
+    // Not `#[serde(default)]`: that would require `T: Default`, and the
+    // payload types are not all defaultable. `Option` already decodes a
+    // missing key as `None`.
     data: Option<T>,
     #[serde(default)]
     error: Option<String>,
