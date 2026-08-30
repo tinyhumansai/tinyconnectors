@@ -80,6 +80,11 @@ pub(crate) enum ModuleConfig {
     },
     /// Reach Composio directly with a user-supplied key.
     Direct {
+        /// Directory the module may keep state in. See the proxy variant —
+        /// though the direct route serves no trigger members, so this is
+        /// accepted for symmetry and goes unused.
+        #[serde(default)]
+        state_dir: Option<std::path::PathBuf>,
         /// The user's own Composio API key, sent as `x-api-key`.
         api_key: String,
         /// Composio entity the connections belong to. Defaults to `"default"`,
@@ -94,6 +99,15 @@ pub(crate) enum ModuleConfig {
 }
 
 impl ModuleConfig {
+    /// The directory the module may keep state in, if the host named one.
+    fn state_dir(&self) -> Option<&std::path::Path> {
+        match self {
+            Self::Proxy { state_dir, .. } | Self::Direct { state_dir, .. } => {
+                state_dir.as_deref()
+            }
+        }
+    }
+
     /// Build the route this configuration selects.
     ///
     /// # Errors
@@ -106,6 +120,7 @@ impl ModuleConfig {
             Self::Proxy {
                 base_url,
                 auth_token,
+                ..
             } => {
                 let transport = Arc::new(HttpTransport::bearer(&base_url, auth_token)?);
                 Ok(Arc::new(ProxyRoute::new(transport)))
@@ -114,6 +129,7 @@ impl ModuleConfig {
                 api_key,
                 entity_id,
                 base_url,
+                ..
             } => {
                 let base_url = base_url.unwrap_or_else(|| COMPOSIO_API_BASE.to_string());
                 let transport = Arc::new(HttpTransport::api_key(&base_url, api_key.clone())?);
