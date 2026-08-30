@@ -140,7 +140,9 @@ fn a_configuration_round_trips_through_the_wire_form() {
             assert_eq!(entity_id.as_deref(), Some("ent_1"));
             assert!(base_url.is_none());
         }
-        ComposioConfigureRequest::Proxy { .. } => panic!("decoded as the wrong route"),
+        ComposioConfigureRequest::Proxy { .. } | ComposioConfigureRequest::None => {
+            panic!("decoded as the wrong route")
+        }
     }
 }
 
@@ -159,4 +161,17 @@ fn the_response_names_the_route_now_in_use() {
     })
     .expect("serialize");
     assert_eq!(json["route"], "proxy");
+}
+
+#[test]
+fn signing_out_is_a_route_of_its_own_rather_than_an_absent_field() {
+    // A host that could only *replace* a route would leave a revoked bearer in
+    // place after sign-out, and every member would answer 401 — which reads to
+    // a user as a broken account rather than as being signed out.
+    let json = serde_json::to_value(ComposioConfigureRequest::None).expect("serialize");
+    assert_eq!(json["route"], "none");
+
+    let decoded: ComposioConfigureRequest =
+        serde_json::from_value(serde_json::json!({ "route": "none" })).expect("decode");
+    assert!(matches!(decoded, ComposioConfigureRequest::None));
 }

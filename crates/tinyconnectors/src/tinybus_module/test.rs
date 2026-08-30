@@ -1387,3 +1387,21 @@ async fn a_reconfigured_route_reaches_the_action_runner_too() {
     .to_string();
     assert!(!after.contains("without a connector route"), "{after}");
 }
+
+#[tokio::test]
+async fn configure_none_drops_the_credential_the_module_was_holding() {
+    // Sign-out. Keeping the route would leave every member answering 401,
+    // which a user reads as a broken account rather than as being signed out —
+    // and would leave a credential alive past the session that supplied it.
+    let transport = Arc::new(StubTransport::default());
+    let service = service_over(transport);
+
+    let reply = service
+        .configure(ComposioConfigureRequest::None)
+        .await
+        .expect("dropping the route is allowed");
+    assert_eq!(reply.route, "none");
+
+    let error = service.list_toolkits().await.unwrap_err().to_string();
+    assert!(error.contains("without a connector route"), "{error}");
+}

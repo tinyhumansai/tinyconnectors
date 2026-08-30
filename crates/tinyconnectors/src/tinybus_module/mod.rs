@@ -174,7 +174,7 @@ impl ModuleConfig {
     }
 }
 
-impl From<ComposioConfigureRequest> for RouteConfig {
+impl RouteConfig {
     /// Reuse the load-time route builder for a runtime reconfiguration.
     ///
     /// The two carry the same description of a route, so building one from the
@@ -185,26 +185,27 @@ impl From<ComposioConfigureRequest> for RouteConfig {
     /// `state_dir` is dropped rather than carried: the trigger archive is
     /// opened once at load, and letting a later call move it would leave
     /// already-archived history behind with nothing pointing at it.
-    fn from(request: ComposioConfigureRequest) -> Self {
+    fn try_from(request: ComposioConfigureRequest) -> Option<Self> {
         match request {
+            ComposioConfigureRequest::None => None,
             ComposioConfigureRequest::Proxy {
                 base_url,
                 auth_token,
-            } => Self::Proxy {
+            } => Some(Self::Proxy {
                 base_url,
                 auth_token,
                 state_dir: None,
-            },
+            }),
             ComposioConfigureRequest::Direct {
                 api_key,
                 entity_id,
                 base_url,
-            } => Self::Direct {
+            } => Some(Self::Direct {
                 api_key,
                 entity_id,
                 base_url,
                 state_dir: None,
-            },
+            }),
         }
     }
 }
@@ -405,7 +406,9 @@ impl ConnectorService {
     ///
     /// Replacing is deliberately unconditional. The host owns the decision of
     /// which route to use — this module implements both and chooses neither —
-    /// so a `Configure` is an instruction, not a proposal.
+    /// so a `Configure` is an instruction, not a proposal. That includes
+    /// [`ComposioConfigureRequest::None`], which drops the credential rather
+    /// than keeping one whose session has ended.
     // `async` with nothing awaited: swapping a route is a lock and a move, but
     // every member of a `#[tinybus::interface]` impl has to be async to be
     // dispatched. Narrow, and on this one member only.
@@ -418,15 +421,22 @@ impl ConnectorService {
         &self,
         request: ComposioConfigureRequest,
     ) -> TinyBusResult<ComposioConfigureResponse> {
-        let route = RouteConfig::from(request)
-            .into_route()
-            .map_err(|error| to_bus_error(&error))?;
-        let name = route.name().to_string();
+        let (client, name) = match RouteConfig::try_from(request) {
+            Some(config) => {
+                let route = config.into_route().map_err(|error| to_bus_error(&error))?;
+                let name = route.name().to_string();
+                (Some(ComposioClient::new(route)), name)
+            }
+            // Not a failure: the host is telling us its user signed out. The
+            // members that need a credential go back to saying so, which is
+            // what a signed-out user should be told.
+            None => (None, "none".to_string()),
+        };
         tracing::info!(route = %name, "[connectors] route reconfigured");
         *self
             .client
             .write()
-            .unwrap_or_else(std::sync::PoisonError::into_inner) = Some(ComposioClient::new(route));
+            .unwrap_or_else(std::sync::PoisonError::into_inner) = client;
         Ok(ComposioConfigureResponse { route: name })
     }
 

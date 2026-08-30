@@ -105,6 +105,12 @@ and uses it for both. The module replaces the route unconditionally: which
 route to use is the host's decision, and a `Configure` is an instruction rather
 than a proposal.
 
+Sign-out sends `{"route": "none"}` rather than nothing at all. A host that
+could only *replace* a route would leave a revoked bearer in place, and every
+member would answer 401 — which a user reads as a broken account rather than as
+being signed out. It also keeps a credential from outliving the session that
+supplied it, which matters on a shared machine.
+
 `state_dir` is deliberately absent from the request. The trigger archive is
 opened once at load, and letting a later call move it would strand history that
 is already written.
