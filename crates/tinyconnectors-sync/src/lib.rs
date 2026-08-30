@@ -51,4 +51,4 @@ pub use provider::{
     ActionRunner, ConnectorProvider, ProviderContext, ProviderRegistry, ProviderUserProfile,
     SyncLimits, SyncReason,
 };
-pub use state::{DailyBudget, SyncState, SyncStateStore};
+pub use state::{DailyBudget, STATE_NAMESPACE, SyncState, SyncStateStore};

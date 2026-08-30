@@ -71,6 +71,7 @@ mod error;
 pub mod execute;
 pub mod oauth;
 pub mod providers;
+pub mod state;
 mod tinybus_module;
 pub mod triggers;
 
