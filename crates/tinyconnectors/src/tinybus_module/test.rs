@@ -80,9 +80,13 @@ fn service_over(transport: Arc<StubTransport>) -> ConnectorService {
 }
 
 /// Stand a broker up, serve `service` on it, and return a proxy to it.
+///
+/// The serving connection comes back with the proxy and must be held: dropping
+/// it releases the bus name, and every call then fails with `NameHasNoOwner`
+/// rather than anything that points at the real cause.
 async fn proxy_to(
     service: ConnectorService,
-) -> tinybus::Result<(Connection, tinybus::Proxy, MemoryBus)> {
+) -> tinybus::Result<(Connection, Connection, tinybus::Proxy, MemoryBus)> {
     let bus = MemoryBus::new();
     Broker::new().spawn(bus.clone());
 
@@ -94,7 +98,7 @@ async fn proxy_to(
 
     let client = Connection::connect(bus.connect().await?).await?;
     let proxy = client.proxy(names::INTERFACE, names::OBJECT_PATH, names::INTERFACE)?;
-    Ok((client, proxy, bus))
+    Ok((serving, client, proxy, bus))
 }
 
 #[test]
@@ -141,7 +145,7 @@ fn the_module_config_requires_a_credential() {
 #[tokio::test]
 async fn serves_the_toolkit_allowlist_over_a_real_bus() -> tinybus::Result<()> {
     let transport = StubTransport::replying(json!({ "toolkits": ["gmail", "notion"] }));
-    let (_client, proxy, _bus) = proxy_to(service_over(transport)).await?;
+    let (_serving, _client, proxy, _bus) = proxy_to(service_over(transport)).await?;
 
     let reply: ComposioToolkitsResponse = proxy.call(names::methods::LIST_TOOLKITS, ()).await?;
     assert_eq!(reply.toolkits, vec!["gmail", "notion"]);
@@ -156,7 +160,7 @@ async fn serves_connections_including_the_inactive_ones() -> tinybus::Result<()>
             { "id": "b", "toolkit": "instagram", "status": "PENDING" }
         ]
     }));
-    let (_client, proxy, _bus) = proxy_to(service_over(transport)).await?;
+    let (_serving, _client, proxy, _bus) = proxy_to(service_over(transport)).await?;
 
     let reply: ComposioConnectionsResponse =
         proxy.call(names::methods::LIST_CONNECTIONS, ()).await?;
@@ -171,7 +175,7 @@ async fn carries_authorize_arguments_across_the_bus() -> tinybus::Result<()> {
         "connectUrl": "https://composio.dev/oauth/abc",
         "connectionId": "conn_1"
     }));
-    let (_client, proxy, _bus) = proxy_to(service_over(transport.clone())).await?;
+    let (_serving, _client, proxy, _bus) = proxy_to(service_over(transport.clone())).await?;
 
     let reply: ComposioAuthorizeResponse = proxy
         .call(
@@ -196,7 +200,7 @@ async fn deletes_a_connection_over_the_bus() -> tinybus::Result<()> {
     let transport = StubTransport::replying(json!({
         "deleted": true, "memory_chunks_deleted": 3
     }));
-    let (_client, proxy, _bus) = proxy_to(service_over(transport)).await?;
+    let (_serving, _client, proxy, _bus) = proxy_to(service_over(transport)).await?;
 
     let reply: ComposioDeleteResponse = proxy
         .call(
@@ -216,7 +220,7 @@ async fn deletes_a_connection_over_the_bus() -> tinybus::Result<()> {
 #[tokio::test]
 async fn reports_a_backend_failure_to_the_caller() -> tinybus::Result<()> {
     let transport = StubTransport::failing("502 bad gateway");
-    let (_client, proxy, _bus) = proxy_to(service_over(transport)).await?;
+    let (_serving, _client, proxy, _bus) = proxy_to(service_over(transport)).await?;
 
     let result = proxy
         .call::<ComposioToolkitsResponse>(names::methods::LIST_TOOLKITS, ())
@@ -241,7 +245,7 @@ async fn reports_a_backend_failure_to_the_caller() -> tinybus::Result<()> {
 #[tokio::test]
 async fn rejects_an_empty_toolkit_over_the_bus() -> tinybus::Result<()> {
     let transport = StubTransport::replying(json!({}));
-    let (_client, proxy, _bus) = proxy_to(service_over(transport)).await?;
+    let (_serving, _client, proxy, _bus) = proxy_to(service_over(transport)).await?;
 
     let result = proxy
         .call::<ComposioAuthorizeResponse>(
