@@ -316,10 +316,16 @@ impl Route for DirectRoute {
     }
 
     async fn delete_connection(&self, _connection_id: &str) -> Result<ComposioDeleteResponse> {
-        // The proxy route's delete also clears memory sourced from the
-        // connection, which is a `TinyHumans` concern Composio knows nothing
-        // about. Wiring a bare v3 delete here would silently drop that half and
-        // leave the user's synced content behind after they disconnected.
+        // Not implemented rather than impossible. Composio's v3 API almost
+        // certainly exposes a delete for a connected account, but the direct
+        // client this route was ported from never covered it, so there is no
+        // verified request shape to port — and inventing one would ship an
+        // endpoint nothing in either source repository has ever exercised.
+        //
+        // No behaviour is lost by refusing: the host this was extracted from
+        // resolves a backend client for its delete path too, so direct mode
+        // could not disconnect an account there either. When someone confirms
+        // the v3 shape against a live tenant, this becomes a real call.
         Err(self.unsupported("DeleteConnection"))
     }
 
