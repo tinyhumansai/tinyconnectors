@@ -139,16 +139,14 @@ pub async fn run_sync(
         }
 
         cursor = page.next_cursor;
-        match cursor.as_deref() {
-            Some(next) => state.advance_cursor(next),
-            None => {
-                // The provider has no more to give: this is the only path that
-                // completes a run.
-                outcome.stage = SyncStage::Completed;
-                outcome.batch.complete = true;
-                break;
-            }
-        }
+        let Some(next) = cursor.as_deref() else {
+            // The provider has no more to give: the only path that completes
+            // a run.
+            outcome.stage = SyncStage::Completed;
+            outcome.batch.complete = true;
+            break;
+        };
+        state.advance_cursor(next);
     }
 
     outcome.batch.cursor = state.cursor.clone();

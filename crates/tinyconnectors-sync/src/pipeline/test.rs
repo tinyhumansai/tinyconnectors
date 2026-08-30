@@ -187,10 +187,7 @@ impl ConnectorProvider for ScriptedProvider {
         if pages.is_empty() {
             return Ok(ProviderPage::default());
         }
-        match pages.remove(0) {
-            Ok(page) => Ok(page),
-            Err(error) => Err(error),
-        }
+        pages.remove(0)
     }
 }
 
@@ -202,12 +199,12 @@ fn record(id: &str) -> ConnectorRecord {
     }
 }
 
-fn page(ids: &[&str], next: Option<&str>) -> Result<ProviderPage> {
-    Ok(ProviderPage {
+fn page(ids: &[&str], next: Option<&str>) -> ProviderPage {
+    ProviderPage {
         records: ids.iter().map(|id| record(id)).collect(),
         versions: Vec::new(),
         next_cursor: next.map(str::to_string),
-    })
+    }
 }
 
 fn context(store: Arc<MemoryStore>, max_items: usize) -> ProviderContext {
@@ -248,7 +245,7 @@ async fn pages_until_the_provider_runs_out() {
 async fn stops_at_the_item_limit_and_leaves_the_run_incomplete() {
     // Stopped by a limit means there is more to read: the batch must not claim
     // completion, or the host stops asking.
-    let provider = ScriptedProvider::new(vec![page(&["m1", "m2", "m3"], Some("p2"))]);
+    let provider = ScriptedProvider::new(vec![Ok(page(&["m1", "m2", "m3"], Some("p2")))]);
     let store = Arc::new(MemoryStore::default());
 
     let outcome = run_sync(&provider, &context(store, 2), SyncReason::Scheduled)
@@ -267,7 +264,7 @@ async fn resumes_from_the_stored_cursor() {
     state.advance_cursor("p5");
     state.save(store.as_ref()).await.unwrap();
 
-    let provider = ScriptedProvider::new(vec![page(&["m9"], None)]);
+    let provider = ScriptedProvider::new(vec![Ok(page(&["m9"], None))]);
     run_sync(&provider, &context(store, 100), SyncReason::Scheduled)
         .await
         .unwrap();
@@ -286,7 +283,7 @@ async fn skips_records_already_ingested() {
     state.mark_synced("m1", None);
     state.save(store.as_ref()).await.unwrap();
 
-    let provider = ScriptedProvider::new(vec![page(&["m1", "m2"], None)]);
+    let provider = ScriptedProvider::new(vec![Ok(page(&["m1", "m2"], None))]);
     let outcome = run_sync(&provider, &context(store, 100), SyncReason::Scheduled)
         .await
         .unwrap();
@@ -321,7 +318,7 @@ async fn re_ingests_a_record_whose_version_changed() {
 async fn keeps_what_it_read_when_a_later_page_fails() {
     // A connection failing on its fifth page must still ingest its first four.
     let provider = ScriptedProvider::new(vec![
-        page(&["m1"], Some("p2")),
+        Ok(page(&["m1"], Some("p2"))),
         Err(Error::Action {
             action: "GMAIL_FETCH_EMAILS".into(),
             message: "upstream 503".into(),
@@ -352,7 +349,7 @@ async fn does_not_start_when_the_day_s_budget_is_spent() {
     state.record_action(state.daily_budget.limit, 0.0);
     state.save(store.as_ref()).await.unwrap();
 
-    let provider = ScriptedProvider::new(vec![page(&["m1"], None)]);
+    let provider = ScriptedProvider::new(vec![Ok(page(&["m1"], None))]);
     let outcome = run_sync(&provider, &context(store, 100), SyncReason::Scheduled)
         .await
         .unwrap();
@@ -367,7 +364,7 @@ async fn does_not_start_when_the_day_s_budget_is_spent() {
 
 #[tokio::test]
 async fn records_the_batch_provenance() {
-    let provider = ScriptedProvider::new(vec![page(&["m1"], None)]);
+    let provider = ScriptedProvider::new(vec![Ok(page(&["m1"], None))]);
     let store = Arc::new(MemoryStore::default());
 
     let outcome = run_sync(&provider, &context(store, 100), SyncReason::InitialConnect)

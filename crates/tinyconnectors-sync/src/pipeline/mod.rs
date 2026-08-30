@@ -11,7 +11,7 @@
 //!
 //! # Why the provider does not loop
 //!
-//! [`ConnectorProvider::fetch_page`] reads exactly one page. The loop is here
+//! [`crate::ConnectorProvider::fetch_page`] reads exactly one page. The loop is here
 //! because the things that stop it — a budget, an item limit, a duplicate — are
 //! not the provider's business, and a provider that looped internally would
 //! have to re-implement all three, differently, five times.
