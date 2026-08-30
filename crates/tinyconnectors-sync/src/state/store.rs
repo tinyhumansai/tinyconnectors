@@ -122,6 +122,16 @@ impl SyncState {
         self.synced_ids.insert(id);
     }
 
+    /// Resume the next run from `cursor`.
+    pub fn advance_cursor(&mut self, cursor: impl Into<String>) {
+        self.cursor = Some(cursor.into());
+    }
+
+    /// Record when a run finished, in milliseconds since the Unix epoch.
+    pub fn set_last_sync_at_ms(&mut self, timestamp_ms: u64) {
+        self.last_sync_at_ms = Some(timestamp_ms);
+    }
+
     /// Whether today's request allowance is spent.
     #[must_use]
     pub fn budget_exhausted(&self) -> bool {

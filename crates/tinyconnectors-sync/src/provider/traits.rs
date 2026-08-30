@@ -2,9 +2,8 @@
 
 use async_trait::async_trait;
 use serde::{Deserialize, Serialize};
-use tinyconnectors_bus::ConnectorRecordBatch;
-
 use super::context::ProviderContext;
+use crate::pipeline::ProviderPage;
 use crate::Result;
 use crate::scope::CuratedTool;
 
@@ -119,27 +118,26 @@ pub trait ConnectorProvider: Send + Sync + std::fmt::Debug {
     /// Returns [`crate::Error::Action`] when the underlying action fails.
     async fn fetch_user_profile(&self, context: &ProviderContext) -> Result<ProviderUserProfile>;
 
-    /// Read one batch of records.
+    /// Read exactly one page, starting at `cursor`.
     ///
-    /// Returns what it read plus whether more remains — the caller drives
-    /// resumption rather than the provider looping internally, so a run can be
-    /// stopped between batches.
+    /// One page, not a loop: the things that stop a sync — a request budget, an
+    /// item limit, a record already ingested — are not a provider's business,
+    /// and a provider that looped internally would have to re-implement all
+    /// three, differently, once per toolkit. [`crate::pipeline::run_sync`]
+    /// owns the loop.
     ///
-    /// The default produces nothing and reports completion, which is right for
-    /// a provider whose [`Self::can_sync`] is false.
+    /// The default reads nothing and reports no next page, which is right for a
+    /// provider whose [`Self::can_sync`] is false.
     ///
     /// # Errors
     ///
-    /// Returns [`crate::Error::Action`] when a provider call fails, or
-    /// [`crate::Error::Store`] when sync state cannot be read or written.
-    async fn fetch_records(&self, context: &ProviderContext) -> Result<ConnectorRecordBatch> {
-        Ok(ConnectorRecordBatch {
-            source_id: context.source_id.clone(),
-            toolkit: context.toolkit.clone(),
-            connection_id: Some(context.connection_id.clone()),
-            records: Vec::new(),
-            cursor: None,
-            complete: true,
-        })
+    /// Returns [`crate::Error::Action`] when a provider call fails.
+    async fn fetch_page(
+        &self,
+        context: &ProviderContext,
+        cursor: Option<&str>,
+    ) -> Result<ProviderPage> {
+        let _ = (context, cursor);
+        Ok(ProviderPage::default())
     }
 }
