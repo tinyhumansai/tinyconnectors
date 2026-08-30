@@ -41,8 +41,8 @@ pub mod triggers;
 mod serde_compat;
 
 pub use connections::{
-    ComposioAuthorizeResponse, ComposioConnection, ComposioConnectionsResponse,
-    ComposioDeleteResponse,
+    ComposioAuthorizeRequest, ComposioAuthorizeResponse, ComposioConnection,
+    ComposioConnectionsResponse, ComposioDeleteConnectionRequest, ComposioDeleteResponse,
 };
 pub use execute::ComposioExecuteResponse;
 pub use github::{ComposioGithubRepo, ComposioGithubReposResponse};

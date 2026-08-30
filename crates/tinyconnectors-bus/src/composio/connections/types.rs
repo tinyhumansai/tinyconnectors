@@ -65,6 +65,31 @@ pub struct ComposioConnectionsResponse {
     pub connections: Vec<ComposioConnection>,
 }
 
+/// Arguments for beginning an OAuth handoff.
+#[derive(Debug, Clone, Default, Serialize, Deserialize)]
+pub struct ComposioAuthorizeRequest {
+    /// Toolkit slug to authorize. Must be on the backend allowlist.
+    pub toolkit: String,
+    /// Extra body fields for toolkits that need them — a WhatsApp Business
+    /// account id, for instance.
+    ///
+    /// Keys the backend derives itself are refused rather than merged: a value
+    /// that arrived over the bus must not be able to redirect the handoff at a
+    /// different toolkit or credential.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub extra_params: Option<serde_json::Value>,
+}
+
+/// Arguments for disconnecting a connection.
+#[derive(Debug, Clone, Default, Serialize, Deserialize)]
+pub struct ComposioDeleteConnectionRequest {
+    /// Id of the connection to remove.
+    pub connection_id: String,
+    /// Whether to delete memory sourced from that connection along with it.
+    #[serde(default)]
+    pub clear_memory: bool,
+}
+
 /// Response body of `POST /agent-integrations/composio/authorize`.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ComposioAuthorizeResponse {

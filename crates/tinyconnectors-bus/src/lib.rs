@@ -99,10 +99,11 @@ pub mod version;
 
 pub use composio::{
     ComposioActiveTrigger, ComposioActiveTriggersResponse, ComposioAgentReadyToolkitsResponse,
-    ComposioAuthorizeResponse, ComposioAvailableTrigger, ComposioAvailableTriggerRepo,
+    ComposioAuthorizeRequest, ComposioAuthorizeResponse, ComposioAvailableTrigger,
+    ComposioAvailableTriggerRepo,
     ComposioAvailableTriggersResponse, ComposioCapabilitiesResponse, ComposioCapability,
     ComposioConnection, ComposioConnectionsResponse, ComposioCreateTriggerResponse,
-    ComposioDeleteResponse, ComposioDisableTriggerResponse, ComposioEnableTriggerResponse,
+    ComposioDeleteConnectionRequest, ComposioDeleteResponse, ComposioDisableTriggerResponse, ComposioEnableTriggerResponse,
     ComposioExecuteResponse, ComposioGithubRepo, ComposioGithubReposResponse,
     ComposioToolFunction, ComposioToolSchema, ComposioToolkitCatalogEntry,
     ComposioToolkitsResponse, ComposioToolsResponse, ComposioTriggerEvent,

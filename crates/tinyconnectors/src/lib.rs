@@ -70,10 +70,10 @@ pub use error::{Error, Result};
 pub use tinyconnectors_bus;
 pub use tinyconnectors_bus::{
     CONTRACT_VERSION, ComposioActiveTrigger, ComposioActiveTriggersResponse,
-    ComposioAgentReadyToolkitsResponse, ComposioAuthorizeResponse, ComposioAvailableTrigger,
-    ComposioAvailableTriggerRepo, ComposioAvailableTriggersResponse, ComposioCapabilitiesResponse,
+    ComposioAgentReadyToolkitsResponse, ComposioAuthorizeRequest, ComposioAuthorizeResponse,
+    ComposioAvailableTrigger, ComposioAvailableTriggerRepo, ComposioAvailableTriggersResponse, ComposioCapabilitiesResponse,
     ComposioCapability, ComposioConnection, ComposioConnectionsResponse,
-    ComposioCreateTriggerResponse, ComposioDeleteResponse, ComposioDisableTriggerResponse,
+    ComposioCreateTriggerResponse, ComposioDeleteConnectionRequest, ComposioDeleteResponse, ComposioDisableTriggerResponse,
     ComposioEnableTriggerResponse, ComposioExecuteResponse, ComposioGithubRepo,
     ComposioGithubReposResponse, ComposioToolFunction, ComposioToolSchema,
     ComposioToolkitCatalogEntry, ComposioToolkitsResponse, ComposioToolsResponse,
