@@ -54,11 +54,17 @@ struct ConnectorService {
 #[tinybus::interface(name = "ai.tinyhumans.connectors.Composio")]
 impl ConnectorService {
     async fn list_toolkits(&self) -> TinyBusResult<ComposioToolkitsResponse> {
-        self.client.list_toolkits().await.map_err(|error| to_bus_error(&error))
+        self.client
+            .list_toolkits()
+            .await
+            .map_err(|error| to_bus_error(&error))
     }
 
     async fn list_connections(&self) -> TinyBusResult<ComposioConnectionsResponse> {
-        self.client.list_connections().await.map_err(|error| to_bus_error(&error))
+        self.client
+            .list_connections()
+            .await
+            .map_err(|error| to_bus_error(&error))
     }
 
     async fn authorize(
