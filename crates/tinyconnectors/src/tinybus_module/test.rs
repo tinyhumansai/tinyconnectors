@@ -76,8 +76,12 @@ impl Transport for StubTransport {
 }
 
 fn service_over(transport: Arc<StubTransport>) -> ConnectorService {
+    let client = ComposioClient::new(Arc::new(ProxyRoute::new(transport)));
     ConnectorService {
-        client: ComposioClient::new(Arc::new(ProxyRoute::new(transport))),
+        actions: Arc::new(crate::providers::ClientActions::new(client.clone())),
+        state: Arc::new(super::EphemeralStateStore::default()),
+        registry: crate::providers::default_registry(),
+        client,
         // No archive: these tests exercise the backend-facing members. The
         // history member's own behaviour without one is tested separately.
         archive: None,

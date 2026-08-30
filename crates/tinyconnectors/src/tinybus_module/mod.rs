@@ -55,6 +55,7 @@ use crate::client::{
 use tinyconnectors_sync::{ProviderContext, ProviderRegistry, SyncLimits, SyncStateStore};
 
 use crate::providers::ClientActions;
+use crate::state::FileStateStore;
 use crate::triggers::TriggerArchive;
 
 /// Configuration the host hands the module at load time.
@@ -450,6 +451,54 @@ impl ConnectorService {
     }
 }
 
+/// The state store for a host that named a directory, or an ephemeral one.
+fn state_store(state_dir: Option<&std::path::Path>) -> Arc<dyn SyncStateStore> {
+    match state_dir {
+        Some(dir) => Arc::new(FileStateStore::new(dir)),
+        None => Arc::new(EphemeralStateStore::default()),
+    }
+}
+
+/// Sync state that lives only as long as the module.
+///
+/// A sync running on this re-reads a connection's history after every restart,
+/// which is why a host that means to sync should name a `state_dir`. It exists
+/// so the members that need no state — profiles, capabilities — work without
+/// one, rather than making every deployment carry a path it does not use.
+#[derive(Debug, Default)]
+struct EphemeralStateStore {
+    values: std::sync::Mutex<std::collections::HashMap<(String, String), serde_json::Value>>,
+}
+
+#[async_trait::async_trait]
+impl SyncStateStore for EphemeralStateStore {
+    async fn get(
+        &self,
+        namespace: &str,
+        key: &str,
+    ) -> tinyconnectors_sync::Result<Option<serde_json::Value>> {
+        Ok(self
+            .values
+            .lock()
+            .unwrap_or_else(std::sync::PoisonError::into_inner)
+            .get(&(namespace.to_string(), key.to_string()))
+            .cloned())
+    }
+
+    async fn set(
+        &self,
+        namespace: &str,
+        key: &str,
+        value: &serde_json::Value,
+    ) -> tinyconnectors_sync::Result<()> {
+        self.values
+            .lock()
+            .unwrap_or_else(std::sync::PoisonError::into_inner)
+            .insert((namespace.to_string(), key.to_string()), value.clone());
+        Ok(())
+    }
+}
+
 /// Flatten a crate error onto the bus.
 fn to_bus_error(error: &crate::Error) -> tinybus::Error {
     tinybus::Error::failed(error.to_string())
@@ -458,8 +507,9 @@ fn to_bus_error(error: &crate::Error) -> tinybus::Error {
 async fn setup(connection: Connection, config: ModuleConfig) -> TinyBusResult<()> {
     // Opened before the route so a bad state directory fails at load rather
     // than on the first trigger, weeks later.
-    let archive = config
-        .state_dir()
+    let config_state_dir = config.state_dir().map(std::path::Path::to_path_buf);
+    let archive = config_state_dir
+        .as_deref()
         .map(TriggerArchive::open)
         .transpose()
         .map_err(|error| to_bus_error(&error))?;
@@ -470,8 +520,15 @@ async fn setup(connection: Connection, config: ModuleConfig) -> TinyBusResult<()
         archiving_triggers = archive.is_some(),
         "[connectors] serving connector surface"
     );
+    let client = ComposioClient::new(route);
     let service = ConnectorService {
-        client: ComposioClient::new(route),
+        actions: Arc::new(ClientActions::new(client.clone())),
+        // A host that named no state directory gets an in-memory store: profile
+        // and capability members need none, and a sync run without persistence
+        // is better than a module that refuses to load.
+        state: state_store(config_state_dir.as_deref()),
+        registry: crate::providers::default_registry(),
+        client,
         archive,
     };
 
