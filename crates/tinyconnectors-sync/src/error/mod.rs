@@ -16,6 +16,19 @@ pub enum Error {
         message: String,
     },
 
+    /// A Composio action could not be run, or the provider refused it.
+    ///
+    /// A provider reading a page of a user's mailbox has nothing useful to do
+    /// with a half-answer, so a refused action is an error here even though the
+    /// module's own execute member reports one as a successful reply.
+    #[error("action `{action}` failed: {message}")]
+    Action {
+        /// Action slug that failed.
+        action: String,
+        /// What the failure was.
+        message: String,
+    },
+
     /// Stored state could not be read back into its type.
     ///
     /// Separate from [`Error::Store`] because the two mean opposite things: a

@@ -22,6 +22,8 @@
 //!
 //! - [`scope`] — how invasive an action is, and the curated catalogs that keep
 //!   a toolkit's sixty-odd actions from all reaching the agent.
+//! - [`provider`] — what a connector knows about one toolkit, and the registry
+//!   that looks one up by slug.
 //! - [`state`] — per-connection cursors, dedupe sets, and the daily request
 //!   budget, persisted through the host's key-value seam.
 //!
@@ -39,9 +41,14 @@
 //! ```
 
 mod error;
+pub mod provider;
 pub mod scope;
 pub mod state;
 
 pub use error::{Error, Result};
 pub use scope::{CuratedTool, ToolScope, classify_unknown, find_curated, toolkit_from_slug};
+pub use provider::{
+    ActionRunner, ConnectorProvider, ProviderContext, ProviderRegistry, ProviderUserProfile,
+    SyncLimits, SyncReason,
+};
 pub use state::{DailyBudget, SyncState, SyncStateStore};
