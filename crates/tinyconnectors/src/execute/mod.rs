@@ -37,7 +37,7 @@
 //!
 //! # What is deliberately not here
 //!
-//! **Egress enforcement.** OpenHuman refuses outbound tool calls under its
+//! **Egress enforcement.** `OpenHuman` refuses outbound tool calls under its
 //! local-only privacy mode, and emits a disclosure for every external transfer.
 //! That is host policy about the user's data, and the host applies it before
 //! calling this member — a module that enforced it would be trusting a

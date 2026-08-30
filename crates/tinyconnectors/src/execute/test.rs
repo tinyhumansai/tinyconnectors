@@ -1,6 +1,14 @@
 //! Unit tests for the execute pipeline.
 
-#![allow(clippy::unwrap_used, clippy::expect_used, clippy::panic)]
+#![allow(
+    clippy::unwrap_used,
+    clippy::expect_used,
+    clippy::panic,
+    // `ScriptedRoute` implements the whole `Route` trait but the execute tests
+    // drive one member. The others panic loudly rather than returning a
+    // plausible empty value that could make a wrong call look like it passed.
+    clippy::unimplemented
+)]
 
 use std::sync::{Arc, Mutex};
 
