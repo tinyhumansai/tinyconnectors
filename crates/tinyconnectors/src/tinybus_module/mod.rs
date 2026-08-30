@@ -37,6 +37,7 @@ use serde::Deserialize;
 use tinybus::{Connection, Result as TinyBusResult};
 use tinyconnectors_bus::{
     ComposioActiveTriggersResponse, ComposioAgentReadyToolkitsResponse, ComposioAuthorizeRequest,
+    ComposioConfigureRequest, ComposioConfigureResponse,
     ComposioAuthorizeResponse, ComposioAvailableTriggersResponse, ComposioCapabilitiesResponse,
     ComposioConnectionsResponse, ComposioCreateTriggerRequest, ComposioCreateTriggerResponse,
     ComposioDeleteConnectionRequest, ComposioDeleteResponse, ComposioDisableTriggerRequest,
@@ -170,6 +171,41 @@ impl ModuleConfig {
     /// would send the credential somewhere it must not go.
     fn into_route(self) -> crate::Result<Option<Arc<dyn Route>>> {
         self.route.map(RouteConfig::into_route).transpose()
+    }
+}
+
+impl From<ComposioConfigureRequest> for RouteConfig {
+    /// Reuse the load-time route builder for a runtime reconfiguration.
+    ///
+    /// The two carry the same description of a route, so building one from the
+    /// other keeps a single place that turns a description into a transport —
+    /// including the check that refuses to send a credential over plain HTTP to
+    /// anywhere but a loopback address.
+    ///
+    /// `state_dir` is dropped rather than carried: the trigger archive is
+    /// opened once at load, and letting a later call move it would leave
+    /// already-archived history behind with nothing pointing at it.
+    fn from(request: ComposioConfigureRequest) -> Self {
+        match request {
+            ComposioConfigureRequest::Proxy {
+                base_url,
+                auth_token,
+            } => Self::Proxy {
+                base_url,
+                auth_token,
+                state_dir: None,
+            },
+            ComposioConfigureRequest::Direct {
+                api_key,
+                entity_id,
+                base_url,
+            } => Self::Direct {
+                api_key,
+                entity_id,
+                base_url,
+                state_dir: None,
+            },
+        }
     }
 }
 
@@ -388,7 +424,9 @@ impl ConnectorService {
         &self,
         request: ComposioConfigureRequest,
     ) -> TinyBusResult<ComposioConfigureResponse> {
-        let route = crate::client::route::from_request(&request).map_err(|error| to_bus_error(&error))?;
+        let route = RouteConfig::from(request)
+            .into_route()
+            .map_err(|error| to_bus_error(&error))?;
         let name = route.name().to_string();
         tracing::info!(route = %name, "[connectors] route reconfigured");
         *self
