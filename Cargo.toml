@@ -2,10 +2,10 @@
 resolver = "3"
 # Every crate in this repository lives under `crates/`, one directory per
 # package, each directory named for the package it holds. There is no root
-# package: the crate a host loads is `crates/template`, the same as any other
+# package: the crate a host loads is `crates/tinyconnectors`, the same as any other
 # member. Keeping the root virtual is what makes that uniform — a root package
 # would make one crate structurally different from the rest for no reason other
-# than history, and it is the arrangement this template moved away from.
+# than history, and it is the arrangement this workspace deliberately keeps.
 members = ["crates/*"]
 # `vendor/` holds the pinned TinyBus submodule, which is its own workspace with
 # its own lockfile. `worktrees/` holds `git worktree` checkouts of this same
@@ -22,15 +22,21 @@ version = "0.2.1"
 edition = "2024"
 rust-version = "1.88"
 license = "GPL-3.0-only"
-repository = "https://github.com/tinyhumansai/rust-template"
+repository = "https://github.com/tinyhumansai/tinyconnectors"
 
 [workspace.dependencies]
-# The wire contract. `crates/template` depends on it and re-exports it, so a
+# The wire contract. `crates/tinyconnectors` depends on it and re-exports it, so a
 # host that only makes calls takes this crate alone.
 # No `version` requirement on purpose: the workspace version moves on every
 # release, and a pinned requirement here would stop resolving the moment it did.
 # Nothing in this workspace is published, so the path is the whole address.
-template-bus = { path = "crates/template-bus" }
+tinyconnectors-bus = { path = "crates/tinyconnectors-bus" }
+# The provider registry and the sync pipelines. The module crate depends on it
+# for the capability and profile members, which are answered from what the
+# registered providers know. It stays a separate crate so a host that only
+# ingests can take the pipelines without the module, and so the pipelines keep
+# their own dependency rules — no transport, no memory.
+tinyconnectors-sync = { path = "crates/tinyconnectors-sync" }
 # TinyBus defines the message types, interface macro, and frozen module ABI
 # used by the generated integration. Socket and CLI features are unnecessary
 # here.
@@ -41,7 +47,7 @@ tinybus = { path = "vendor/tinybus/crates/tinybus", version = "0.1.0", default-f
 # The module-side SDK owns the isolated runtime and exports the ABI entrypoints
 # required by TinyBus's dynamic loader.
 tinybus-module = { path = "vendor/tinybus/crates/tinybus-module", version = "0.1.0" }
-# Derive macros for the crate-wide error type in `crates/template/src/error/`.
+# Derive macros for the crate-wide error type in `crates/tinyconnectors/src/error/`.
 # Every dependency entry should carry a comment like this one saying why it is
 # here.
 thiserror = "2"
@@ -50,7 +56,34 @@ serde = { version = "1", features = ["derive"] }
 # Positional argument arrays and the module configuration blob.
 serde_json = "1"
 # Module integration tests exercise the real asynchronous in-memory TinyBus.
-tokio = { version = "1", features = ["macros", "rt-multi-thread", "time"] }
+tokio = { version = "1", features = ["macros", "rt-multi-thread", "time", "fs"] }
+# Structured diagnostics. The OAuth handoff paths are the ones worth tracing:
+# their failures are minutes apart and happen in a browser we cannot see.
+tracing = "0.1"
+# Object-safe async traits. Used for the host-supplied `Transport` seam, which
+# has to be `dyn` because the host chooses the implementation at runtime.
+async-trait = "0.1"
+# The module's HTTP transport to the connector backend. Blocking by design —
+# it runs on a blocking task, which keeps a second async runtime out of a
+# cdylib that already owns one.
+ureq = { version = "3", features = ["json"] }
+# Base-URL validation in the HTTP transport. A parser, not a prefix match: a
+# `starts_with("http://127.0.0.1")` check is fooled by userinfo smuggling like
+# `http://127.0.0.1:8080@evil.com`, which resolves to `evil.com` and would take
+# the credential header with it.
+url = "2"
+# Percent-encoding for values that become part of a URL — toolkit slugs, tags,
+# and action names all reach the module over the bus, where an unencoded `&`
+# would forge a query parameter.
+percent-encoding = "2"
+# Civil dates for the sync daily-request budget, which rolls over at a calendar
+# boundary rather than after a fixed number of elapsed seconds. No default
+# features: the `clock` and `oldtime` trees are not needed.
+chrono = { version = "0.4", default-features = false, features = ["std", "clock", "serde"] }
+# Safe advisory file locking for the trigger archive's appends. `unsafe` is
+# forbidden workspace-wide, so the `flock` call has to come from a crate that
+# encapsulates it rather than from a hand-rolled `extern "C"` block.
+fs4 = { version = "1", default-features = false, features = ["sync"] }
 
 # Lints apply to every member that opts in with `[lints] workspace = true`, and
 # to every target of that member. CI runs clippy with `-D warnings`, so anything

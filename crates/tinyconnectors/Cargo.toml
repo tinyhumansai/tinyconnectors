@@ -1,0 +1,69 @@
+[package]
+name = "tinyconnectors"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+repository.workspace = true
+description = "OAuth connector integrations (Composio and future backends) as an installable TinyBus module."
+documentation = "https://docs.rs/tinyconnectors"
+readme = "../../README.md"
+keywords = ["tinybus", "oauth", "composio", "connectors"]
+categories = ["api-bindings"]
+publish = false
+
+[lib]
+# Keep the ordinary Rust library for tests and downstream reuse while also
+# producing the native module artifact that TinyBus loads at runtime.
+crate-type = ["rlib", "cdylib"]
+
+[dependencies]
+# The wire contract: member names, payload types, and the contract version.
+# Re-exported wholesale from `src/lib.rs` so a consumer takes one dependency
+# rather than two, and so `tinyconnectors::ComposioConnection` and
+# `tinyconnectors_bus::ComposioConnection` are the same type.
+tinyconnectors-bus = { workspace = true }
+# The provider registry, which answers the capability and profile members: what
+# this build knows how to do for a toolkit is a property of its providers.
+tinyconnectors-sync = { workspace = true }
+tinybus = { workspace = true }
+tinybus-module = { workspace = true }
+thiserror = { workspace = true }
+# `Transport` is an object-safe trait with `async fn` methods, which native
+# `async fn in trait` cannot express behind `dyn`.
+async-trait = { workspace = true }
+# The OAuth authorize backoff sleeps between attempts, the trigger archive runs
+# its reads on a blocking task, and the state store does async file I/O. The
+# runtime itself comes from `tinybus-module`, which owns the reactor.
+tokio = { workspace = true }
+# Structured diagnostics for the handoff paths, where the interesting failures
+# happen minutes apart in a browser and are otherwise invisible.
+tracing = { workspace = true }
+# Payload round-tripping in the crate-level doc example and the bus adapter.
+serde_json = { workspace = true }
+# Payload derives for the module configuration blob the host supplies.
+serde = { workspace = true }
+# The HTTP transport. Blocking and small: the module runs it on a blocking task
+# rather than pulling a second async stack in beside the module runtime.
+ureq = { workspace = true }
+# Validates the configured base URL before any credential is sent over it.
+url = { workspace = true }
+# Encodes bus-supplied values before they become part of a request URL.
+percent-encoding = { workspace = true }
+# Exclusive locking for trigger-archive appends.
+fs4 = { workspace = true }
+# Daily rotation of the trigger archive needs a civil date.
+chrono = { workspace = true }
+
+[dev-dependencies]
+# The bundled example implements `Transport`, which is an `async_trait`.
+async-trait = { workspace = true }
+# `test-util` gives the retry tests paused time, so a backoff that really sleeps
+# for over a minute in production costs them nothing.
+tokio = { workspace = true, features = ["test-util"] }
+
+[features]
+default = []
+
+[lints]
+workspace = true
