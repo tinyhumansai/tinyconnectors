@@ -204,7 +204,10 @@ async fn run_totals_do_not_persist_into_the_next_run() {
 #[tokio::test]
 async fn state_is_written_under_the_pinned_namespace() {
     let store = MemoryStore::default();
-    SyncState::new("gmail", "conn_1").save(&store).await.unwrap();
+    SyncState::new("gmail", "conn_1")
+        .save(&store)
+        .await
+        .unwrap();
 
     let values = store.values.lock().unwrap();
     assert!(
