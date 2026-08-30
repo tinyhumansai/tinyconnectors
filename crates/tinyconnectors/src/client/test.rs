@@ -215,6 +215,82 @@ async fn authorize_leaves_a_toolkit_with_no_extra_scopes_alone() {
 }
 
 #[tokio::test]
+async fn clears_abandoned_meta_handoffs_before_authorizing() {
+    // Every authorize creates a connection row immediately, in a non-active
+    // state. Instagram and Facebook share an OAuth host that 429s once too many
+    // exist — so a user who clicked Connect twice is rate-limited out of the
+    // retry that would have worked. Clearing first is the mitigation.
+    let transport = FakeTransport::replying(json!({
+        "connections": [
+            { "id": "stale-1", "toolkit": "instagram", "status": "PENDING" },
+            { "id": "stale-2", "toolkit": "instagram", "status": "FAILED" },
+            { "id": "live", "toolkit": "instagram", "status": "ACTIVE" },
+            { "id": "other", "toolkit": "gmail", "status": "PENDING" }
+        ]
+    }));
+    let client = ComposioClient::new(Arc::new(ProxyRoute::new(transport.clone())));
+
+    client.authorize("instagram", None).await.unwrap();
+
+    let deleted: Vec<_> = transport
+        .calls()
+        .into_iter()
+        .filter(|call| call.verb == "DELETE")
+        .map(|call| call.path)
+        .collect();
+
+    assert_eq!(deleted.len(), 2, "only the abandoned rows: {deleted:?}");
+    assert!(deleted.iter().any(|path| path.ends_with("stale-1")));
+    assert!(deleted.iter().any(|path| path.ends_with("stale-2")));
+    assert!(
+        !deleted.iter().any(|path| path.ends_with("live")),
+        "an active connection must never be cleared"
+    );
+    assert!(
+        !deleted.iter().any(|path| path.ends_with("other")),
+        "another toolkit's rows are not ours to clear"
+    );
+}
+
+#[tokio::test]
+async fn does_not_clear_anything_for_a_toolkit_that_is_not_rate_limited() {
+    // The cleanup exists for Meta's shared OAuth host. Deleting rows for every
+    // toolkit would destroy in-flight handoffs for no benefit.
+    let transport = FakeTransport::replying(json!({
+        "connectUrl": "u", "connectionId": "c"
+    }));
+    let client = ComposioClient::new(Arc::new(ProxyRoute::new(transport.clone())));
+
+    client.authorize("gmail", None).await.unwrap();
+
+    assert!(
+        !transport.calls().iter().any(|call| call.verb == "DELETE"),
+        "no cleanup for a non-Meta toolkit"
+    );
+    assert_eq!(transport.calls().len(), 1, "just the authorize");
+}
+
+#[tokio::test]
+async fn a_failed_cleanup_does_not_stop_the_handoff() {
+    // The user asked to connect an account. Refusing to start because the
+    // *cleanup* failed turns a possible rate limit into a certain failure.
+    let transport = FakeTransport::failing("502 bad gateway");
+    let client = ComposioClient::new(Arc::new(ProxyRoute::new(transport.clone())));
+
+    // The authorize itself still fails here — but on its own error, having
+    // tried, rather than being abandoned during cleanup.
+    let error = client.authorize("instagram", None).await.unwrap_err();
+    assert!(error.to_string().contains("502 bad gateway"));
+    assert!(
+        transport
+            .calls()
+            .iter()
+            .any(|call| call.path.contains("/authorize")),
+        "the handoff must still have been attempted"
+    );
+}
+
+#[tokio::test]
 async fn authorize_rejects_an_empty_toolkit_without_calling_out() {
     let transport = FakeTransport::replying(json!({}));
     let client = ComposioClient::new(Arc::new(ProxyRoute::new(transport.clone())));
