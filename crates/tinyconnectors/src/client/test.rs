@@ -287,6 +287,95 @@ async fn delete_rejects_an_empty_connection_id_without_calling_out() {
 }
 
 #[tokio::test]
+async fn lists_available_triggers_with_both_filters_encoded() {
+    let transport = FakeTransport::replying(json!({ "triggers": [] }));
+    let client = ComposioClient::new(Arc::new(ProxyRoute::new(transport.clone())));
+
+    client
+        .list_available_triggers("gmail", Some("conn_1"))
+        .await
+        .unwrap();
+
+    let path = &transport.calls()[0].path;
+    assert!(path.contains("toolkit=gmail"), "{path}");
+    // Underscores are unreserved and must survive: an encoded id is a
+    // different string from the one the backend stored.
+    assert!(path.contains("connectionId=conn_1"), "{path}");
+}
+
+#[tokio::test]
+async fn omits_an_absent_trigger_filter_rather_than_sending_an_empty_one() {
+    // An empty parameter reads as "match nothing" on several endpoints, which
+    // is the opposite of the "no filter" a caller meant.
+    let transport = FakeTransport::replying(json!({ "triggers": [] }));
+    let client = ComposioClient::new(Arc::new(ProxyRoute::new(transport.clone())));
+
+    client.list_triggers(None).await.unwrap();
+    assert_eq!(
+        transport.calls()[0].path,
+        "/agent-integrations/composio/triggers"
+    );
+
+    client.list_triggers(Some("   ")).await.unwrap();
+    assert_eq!(
+        transport.calls()[1].path,
+        "/agent-integrations/composio/triggers",
+        "a blank filter is absent, not a filter on the empty string"
+    );
+}
+
+#[tokio::test]
+async fn enables_a_trigger_with_its_configuration() {
+    let transport = FakeTransport::replying(json!({
+        "triggerId": "ti_1", "slug": "GMAIL_NEW_GMAIL_MESSAGE", "connectionId": "conn_1"
+    }));
+    let client = ComposioClient::new(Arc::new(ProxyRoute::new(transport.clone())));
+
+    let resp = client
+        .enable_trigger(
+            "conn_1",
+            "GMAIL_NEW_GMAIL_MESSAGE",
+            Some(json!({ "labelIds": ["INBOX"] })),
+        )
+        .await
+        .unwrap();
+    assert_eq!(resp.trigger_id, "ti_1");
+
+    let body = transport.calls()[0].body.clone().unwrap();
+    assert_eq!(body["connectionId"], "conn_1");
+    assert_eq!(body["triggerConfig"]["labelIds"][0], "INBOX");
+}
+
+#[tokio::test]
+async fn refuses_an_empty_identifier_before_it_reaches_a_url() {
+    // An empty id in a path addresses the collection instead of the item — a
+    // DELETE on every trigger rather than on one.
+    let transport = FakeTransport::replying(json!({}));
+    let client = ComposioClient::new(Arc::new(ProxyRoute::new(transport.clone())));
+
+    assert!(client.disable_trigger("  ").await.is_err());
+    assert!(client.enable_trigger("", "slug", None).await.is_err());
+    assert!(client.enable_trigger("conn_1", " ", None).await.is_err());
+    assert!(client.create_trigger("", None, None).await.is_err());
+    assert!(client.list_available_triggers("", None).await.is_err());
+    assert!(
+        transport.calls().is_empty(),
+        "nothing may reach the backend"
+    );
+}
+
+#[tokio::test]
+async fn disables_a_trigger_by_id() {
+    let transport = FakeTransport::replying(json!({ "deleted": true }));
+    let client = ComposioClient::new(Arc::new(ProxyRoute::new(transport.clone())));
+
+    assert!(client.disable_trigger("ti_1").await.unwrap().deleted);
+    let call = &transport.calls()[0];
+    assert_eq!(call.verb, "DELETE");
+    assert_eq!(call.path, "/agent-integrations/composio/triggers/ti_1");
+}
+
+#[tokio::test]
 async fn reports_a_transport_failure_unchanged() {
     let transport = FakeTransport::failing("502 bad gateway");
     let client = ComposioClient::new(Arc::new(ProxyRoute::new(transport)));

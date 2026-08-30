@@ -131,6 +131,38 @@ async fn refuses_to_delete_a_connection_and_says_why() {
 }
 
 #[tokio::test]
+async fn refuses_every_trigger_member_and_says_why() {
+    // A trigger is a webhook, and a webhook has to arrive somewhere. The proxy
+    // backend HMAC-verifies deliveries and fans them out over the user's
+    // sockets; this module has no socket and no public endpoint. A direct-mode
+    // subscription would be created and then deliver to nobody.
+    let transport = FakeTransport::replying(json!({}));
+    let direct = route(transport.clone());
+
+    assert!(matches!(
+        direct
+            .list_available_triggers("gmail", None)
+            .await
+            .unwrap_err(),
+        Error::UnsupportedByRoute {
+            route: "direct",
+            ..
+        }
+    ));
+    assert!(direct.list_triggers(None).await.is_err());
+    assert!(direct.create_trigger("slug", None, None).await.is_err());
+    assert!(direct.enable_trigger("c", "s", None).await.is_err());
+    assert!(direct.disable_trigger("t").await.is_err());
+    assert!(direct.list_github_repos(None).await.is_err());
+
+    assert_eq!(
+        transport.calls(),
+        0,
+        "a refusal must not cost a request to Composio"
+    );
+}
+
+#[tokio::test]
 async fn translates_v3_connected_accounts_into_connections() {
     let transport = FakeTransport::replying(json!({
         "items": [{
