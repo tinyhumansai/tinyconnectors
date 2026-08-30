@@ -13,9 +13,31 @@
 #[derive(Debug, thiserror::Error, PartialEq, Eq)]
 #[non_exhaustive]
 pub enum Error {
-    /// A required name was empty or contained only whitespace.
-    #[error("name must not be empty")]
-    EmptyName,
+    /// The connector backend rejected an OAuth authorize call.
+    ///
+    /// `message` is the upstream failure as the backend rendered it. It is kept
+    /// verbatim because the backend proxies several providers and its message
+    /// is usually the only thing that says which one refused, and why.
+    #[error("authorize failed for {toolkit}: {message}")]
+    Authorize {
+        /// Toolkit slug the handoff was for.
+        toolkit: String,
+        /// Upstream failure, as rendered by the backend.
+        message: String,
+    },
+
+    /// An OAuth host rate-limited the handoff and retries were exhausted.
+    ///
+    /// Distinct from [`Error::Authorize`] because it is not the user's request
+    /// that was wrong — waiting fixes it — and because the message is guidance
+    /// written for the user rather than an upstream string.
+    #[error("{message}")]
+    OauthRateLimited {
+        /// Toolkit slug the handoff was for.
+        toolkit: String,
+        /// User-facing guidance explaining the wait and its likely cause.
+        message: String,
+    },
 }
 
 /// The crate's standard result type.
