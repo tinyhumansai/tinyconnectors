@@ -4,71 +4,72 @@ This file is the single source of truth for how humans and coding agents work
 in this repository. `CLAUDE.md` is a symlink to this file, so every agent reads
 the same instructions.
 
-When you generate a new project from this template, keep this file and adapt
-the project-specific parts (crate name, module map, feature flags, commands).
-Delete guidance that no longer applies rather than leaving it to rot.
+This repository ships **TinyConnectors**: OAuth connector integrations as an
+installable TinyBus module. Composio is the backend today; the design assumes
+it will not be the only one, so anything not Composio-specific names it nowhere.
 
-## Template Checklist
-
-Do this once, in a single commit, before writing feature code:
-
-- [ ] Rename `crates/template` and `crates/template-bus` to the project's crate
-      names, and update `name` in each manifest plus the `template-bus` entry in
-      the root `[workspace.dependencies]`.
-- [ ] Set `description`, `keywords`, and `categories` in each manifest, and
-      `repository` in the root `[workspace.package]`.
-- [ ] Rename the crate references in `README.md`, both `src/lib.rs` files,
-      `crates/template/examples/`, and `crates/template/tests/` (search for
-      `template` and `template_bus`).
-- [ ] Replace the placeholder `greeting` module in both crates with the first
-      real feature area — payload types in the contract crate, behavior in the
-      module crate — keeping the `mod.rs` / `types.rs` / `test.rs` layout.
-- [ ] Confirm `license` and `LICENSE` match the project's intended license.
-- [ ] Update the security contact in `SECURITY.md`.
-- [ ] Rename the TinyBus interface, object path, and member constants in
-      `crates/template-bus/src/names/`, and the matching `provides` / `methods`
-      declarations in `crates/template/src/tinybus_module/`, while keeping
-      `vendor/tinybus` pinned.
-- [ ] Reset `CONTRACT_VERSION` in `crates/template-bus/src/version/` for the new
-      contract.
-- [ ] Replace `ROADMAP.md` with the real plan, or delete it.
-- [ ] Rewrite the "Project Structure" section below to describe this workspace.
+Read [`docs/specs/2026-08-30-connector-extraction.md`](docs/specs/2026-08-30-connector-extraction.md)
+before touching the connector surface — it records why the seams are where they
+are — and [`docs/plans/2026-08-30-connector-extraction.md`](docs/plans/2026-08-30-connector-extraction.md)
+for what is still being migrated in from `openhuman` and `tinymemory`.
 
 ## Project Structure
 
 This is a Rust 2024 cargo workspace rooted at a virtual `Cargo.toml`. Every
 crate lives under `crates/`, one directory per package, each directory named for
 the package it holds. There is no root package: the crate that ships as the
-loadable module is `crates/template`, the same as any other member.
+loadable module is `crates/tinyconnectors`, the same as any other member.
 
 ```text
-Cargo.toml              # virtual workspace: members, [workspace.package],
-                        # [workspace.dependencies], [workspace.lints]
+Cargo.toml                   # virtual workspace: members, [workspace.package],
+                             # [workspace.dependencies], [workspace.lints]
 crates/
-├── template-bus/       # the wire contract: what crosses the bus, nothing else
-│   ├── README.md       # why the contract is its own crate
+├── tinyconnectors-bus/      # the wire contract: what crosses the bus, nothing else
+│   ├── README.md            # why the contract is its own crate
 │   └── src/
-│       ├── lib.rs      # crate docs + the entire public re-export surface
-│       ├── names/      # interface, object path, one constant per member
-│       ├── version/    # contract version and the host bind rule
-│       └── <family>/   # one directory per payload family
-└── template/           # the module: behavior, adapter, and the cdylib
+│       ├── lib.rs           # crate docs + the entire public re-export surface
+│       ├── names/           # interface, object path, one constant per member
+│       ├── version/         # contract version and the host bind rule
+│       └── composio/        # one backend's vocabulary, one directory per family
+│           ├── serde_compat.rs   # deserializers absorbing upstream shape drift
+│           └── <family>/         # toolkits, connections, tools, execute,
+│                                 # triggers, github
+└── tinyconnectors/          # the module: behavior, adapter, and the cdylib
     ├── src/
-    │   ├── lib.rs      # crate docs + public surface, re-exporting the contract
-    │   ├── error/mod.rs      # crate-wide `Error` and `Result<T>`
-    │   ├── tinybus_module/   # TinyBus interface, ABI exports, integration tests
-    │   └── <feature>/        # one directory per feature area
-    │       ├── mod.rs        # module docs, wiring, smallest useful public API
-    │       ├── types.rs      # substantial type definitions
-    │       └── test.rs       # module-local unit tests
-    ├── tests/          # integration tests against the public API only
-    └── examples/       # runnable, compiled-in-CI usage examples
-vendor/tinybus/         # pinned TinyBus host types and module SDK
+    │   ├── lib.rs           # crate docs + public surface, re-exporting the contract
+    │   ├── error/mod.rs     # crate-wide `Error` and `Result<T>`
+    │   ├── client/          # the `Transport` seam, `ComposioClient`, `HttpTransport`
+    │   ├── oauth/           # account-linking policy: statuses, Meta rate limits
+    │   └── tinybus_module/  # TinyBus interface, ABI exports, integration tests
+    ├── tests/               # integration tests against the public API only
+    └── examples/            # runnable, compiled-in-CI usage examples
+vendor/tinybus/              # pinned TinyBus host types and module SDK
 docs/
-├── specs/              # behavior and architecture specifications
-├── plans/              # test-first implementation plans
-└── adr/                # immutable architecture decision records
+├── specs/                   # behavior and architecture specifications
+├── plans/                   # test-first implementation plans
+└── adr/                     # immutable architecture decision records
 ```
+
+### Naming
+
+`tinyconnectors`, not `tinycomposio`. Composio is one OAuth connector backend.
+
+- **Neutral** — the crates, the `connectors` path segment, and anything not
+  backend-specific: the OAuth handoff policy, the transport seam, the error type.
+- **`composio`** — the module namespace holding one backend's vocabulary,
+  client, paths, and interface.
+- **`Composio`-prefixed types** — kept. They mirror Composio's own response
+  envelopes; renaming them to look neutral would misrepresent them the first
+  time a second backend disagreed about a field.
+
+### The module holds no connector credential
+
+It never calls Composio. Requests go through a backend that owns the API key and
+the allowlist, and that backend authenticates the *user* — whose credential is
+the host's. The module takes `base_url` and `auth_token` in its configuration
+blob at load time, holds them in the transport, and never logs, returns, or
+interpolates them. Do not add a code path that reads a credential from anywhere
+else.
 
 ### The two-crate split
 
