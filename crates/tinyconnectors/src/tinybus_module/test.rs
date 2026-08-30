@@ -18,16 +18,17 @@ use tinybus::{Connection, Interface};
 use tinyconnectors_bus::{
     ComposioActiveTriggersResponse, ComposioAgentReadyToolkitsResponse, ComposioAuthorizeRequest,
     ComposioAuthorizeResponse, ComposioAvailableTriggersResponse, ComposioCapabilitiesResponse,
-    ComposioConnectionsResponse, ComposioCreateTriggerRequest, ComposioCreateTriggerResponse,
-    ComposioDeleteConnectionRequest, ComposioDeleteResponse, ComposioDisableTriggerRequest,
-    ComposioDisableTriggerResponse, ComposioEnableTriggerRequest, ComposioEnableTriggerResponse,
-    ComposioExecuteRequest, ComposioExecuteResponse, ComposioGetUserScopesRequest,
-    ComposioGithubReposResponse, ComposioListAvailableTriggersRequest,
-    ComposioListGithubReposRequest, ComposioListToolsRequest, ComposioListTriggerHistoryRequest,
-    ComposioListTriggersRequest, ComposioRefreshIdentitiesResponse, ComposioSetUserScopesRequest,
-    ComposioToolkitsResponse, ComposioToolsResponse, ComposioTriggerHistoryResult,
-    ComposioUserProfile, ComposioUserProfileRequest, ComposioUserScopes,
-    ComposioUserScopesResponse, ConnectorSyncRequest, ConnectorSyncResponse, SyncStage, names,
+    ComposioConfigureRequest, ComposioConnectionsResponse, ComposioCreateTriggerRequest,
+    ComposioCreateTriggerResponse, ComposioDeleteConnectionRequest, ComposioDeleteResponse,
+    ComposioDisableTriggerRequest, ComposioDisableTriggerResponse, ComposioEnableTriggerRequest,
+    ComposioEnableTriggerResponse, ComposioExecuteRequest, ComposioExecuteResponse,
+    ComposioGetUserScopesRequest, ComposioGithubReposResponse,
+    ComposioListAvailableTriggersRequest, ComposioListGithubReposRequest, ComposioListToolsRequest,
+    ComposioListTriggerHistoryRequest, ComposioListTriggersRequest,
+    ComposioRefreshIdentitiesResponse, ComposioSetUserScopesRequest, ComposioToolkitsResponse,
+    ComposioToolsResponse, ComposioTriggerHistoryResult, ComposioUserProfile,
+    ComposioUserProfileRequest, ComposioUserScopes, ComposioUserScopesResponse,
+    ConnectorSyncRequest, ConnectorSyncResponse, SyncStage, names,
 };
 
 use super::{ConnectorService, ModuleConfig};
