@@ -3,7 +3,8 @@
 //! [`tinyconnectors_sync`] describes what a connector knows about a toolkit but
 //! deliberately cannot reach Composio — it has no transport and takes no
 //! dependency on one. [`ClientActions`] closes that: it adapts this module's
-//! [`ComposioClient`] to the [`ActionRunner`] seam a provider calls through.
+//! [`crate::client::ComposioClient`] to the
+//! [`tinyconnectors_sync::ActionRunner`] seam a provider calls through.
 //!
 //! # Why a provider's failures are stricter than a member's
 //!
