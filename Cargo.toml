@@ -31,6 +31,10 @@ repository = "https://github.com/tinyhumansai/tinyconnectors"
 # release, and a pinned requirement here would stop resolving the moment it did.
 # Nothing in this workspace is published, so the path is the whole address.
 tinyconnectors-bus = { path = "crates/tinyconnectors-bus" }
+# The sync pipelines. Separate from the module crate so the loadable module does
+# not grow a sync dependency it does not serve, and so the pipelines can be
+# taken on their own by a host that only ingests.
+tinyconnectors-sync = { path = "crates/tinyconnectors-sync" }
 # TinyBus defines the message types, interface macro, and frozen module ABI
 # used by the generated integration. Socket and CLI features are unnecessary
 # here.
@@ -70,6 +74,10 @@ url = "2"
 # and action names all reach the module over the bus, where an unencoded `&`
 # would forge a query parameter.
 percent-encoding = "2"
+# Civil dates for the sync daily-request budget, which rolls over at a calendar
+# boundary rather than after a fixed number of elapsed seconds. No default
+# features: the `clock` and `oldtime` trees are not needed.
+chrono = { version = "0.4", default-features = false, features = ["std", "clock", "serde"] }
 
 # Lints apply to every member that opts in with `[lints] workspace = true`, and
 # to every target of that member. CI runs clippy with `-D warnings`, so anything

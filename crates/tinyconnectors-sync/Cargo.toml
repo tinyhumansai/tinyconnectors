@@ -1,0 +1,36 @@
+[package]
+name = "tinyconnectors-sync"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+repository.workspace = true
+description = "Connector sync pipelines: pull records out of connected accounts for a host to ingest."
+documentation = "https://docs.rs/tinyconnectors-sync"
+readme = "README.md"
+keywords = ["tinybus", "oauth", "composio", "sync"]
+categories = ["api-bindings"]
+publish = false
+
+# Deliberately free of any memory dependency. A pipeline returns records; the
+# host writes them. That is the whole reason this crate can exist separately
+# from the memory system the pipelines used to live inside — see `src/lib.rs`.
+[dependencies]
+# The record vocabulary a pipeline emits, and the Composio payloads it reads.
+tinyconnectors-bus = { workspace = true }
+serde = { workspace = true }
+serde_json = { workspace = true }
+thiserror = { workspace = true }
+# Provider traits and the state store seam are object-safe and async.
+async-trait = { workspace = true }
+# Daily request budgets roll over at a calendar boundary, which needs a real
+# civil date rather than an elapsed-seconds count.
+chrono = { workspace = true }
+# Sync runs are long and their failures are invisible without it.
+tracing = { workspace = true }
+
+[dev-dependencies]
+tokio = { workspace = true }
+
+[lints]
+workspace = true
