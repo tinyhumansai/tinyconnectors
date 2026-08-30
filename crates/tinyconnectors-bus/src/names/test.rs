@@ -36,6 +36,8 @@ fn the_method_table_holds_the_declared_members() {
             methods::LIST_AGENT_READY_TOOLKITS,
             methods::GET_USER_PROFILE,
             methods::REFRESH_ALL_IDENTITIES,
+            methods::GET_USER_SCOPES,
+            methods::SET_USER_SCOPES,
             methods::LIST_GITHUB_REPOS,
             methods::LIST_AVAILABLE_TRIGGERS,
             methods::LIST_TRIGGERS,

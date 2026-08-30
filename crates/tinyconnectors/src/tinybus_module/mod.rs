@@ -648,6 +648,8 @@ tinybus_module::module_export! {
         "ListAgentReadyToolkits",
         "GetUserProfile",
         "RefreshAllIdentities",
+        "GetUserScopes",
+        "SetUserScopes",
         "ListGithubRepos",
         "ListAvailableTriggers",
         "ListTriggers",
