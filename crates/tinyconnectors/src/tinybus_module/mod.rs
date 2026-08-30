@@ -317,13 +317,23 @@ fn to_bus_error(error: &crate::Error) -> tinybus::Error {
 }
 
 async fn setup(connection: Connection, config: ModuleConfig) -> TinyBusResult<()> {
+    // Opened before the route so a bad state directory fails at load rather
+    // than on the first trigger, weeks later.
+    let archive = config
+        .state_dir()
+        .map(TriggerArchive::open)
+        .transpose()
+        .map_err(|error| to_bus_error(&error))?;
+
     let route = config.into_route().map_err(|error| to_bus_error(&error))?;
     tracing::info!(
         route = route.name(),
+        archiving_triggers = archive.is_some(),
         "[connectors] serving connector surface"
     );
     let service = ConnectorService {
         client: ComposioClient::new(route),
+        archive,
     };
 
     connection
