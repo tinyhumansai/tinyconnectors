@@ -1,7 +1,7 @@
-//! Every type that crosses the TinyConnectors module's `TinyBus` boundary, and
+//! Every type that crosses the `TinyConnectors` module's `TinyBus` boundary, and
 //! the names of the members that carry them.
 //!
-//! TinyConnectors owns the OAuth-connector surface: linking a user's accounts,
+//! `TinyConnectors` owns the OAuth-connector surface: linking a user's accounts,
 //! listing what those accounts can do, running actions against them, and
 //! subscribing to the webhooks they emit. `crates/tinyconnectors` ships that as
 //! a loadable `TinyBus` module — built as a `cdylib`, exporting one object. A

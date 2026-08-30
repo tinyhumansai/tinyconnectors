@@ -48,6 +48,11 @@ pub struct ComposioToolkitsResponse {
 /// It describes what the compiled module knows how to do for a toolkit, so a UI
 /// can distinguish "you cannot connect this" from "you can connect it but
 /// nothing will read it yet".
+// Seven bools is a lot, and `clippy::struct_excessive_bools` is right to say
+// so about a type someone designed. This one is a wire shape: each flag is a
+// separate field a UI reads by name, and folding them into a bitflag or a
+// nested enum would change the JSON every consumer already parses.
+#[allow(clippy::struct_excessive_bools)]
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ComposioCapability {
     /// Toolkit slug the row describes, e.g. `"gmail"`.

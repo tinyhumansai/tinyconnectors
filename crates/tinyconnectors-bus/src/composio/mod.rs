@@ -20,7 +20,7 @@
 //!
 //! # These shapes are not ours to choose
 //!
-//! Every type here mirrors a response envelope emitted by the OpenHuman
+//! Every type here mirrors a response envelope emitted by the `OpenHuman`
 //! backend under `/agent-integrations/composio/*`, which in turn forwards
 //! Composio's own shapes. Field names and `#[serde(...)]` attributes are a wire
 //! contract: a host and a module that disagree about a field name fail at

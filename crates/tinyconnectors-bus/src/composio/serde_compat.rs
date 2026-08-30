@@ -56,7 +56,6 @@ pub(super) fn de_opt_string_or_object<'de, D: Deserializer<'de>>(
 ) -> Result<Option<String>, D::Error> {
     let v = Option::<serde_json::Value>::deserialize(d)?;
     Ok(match v {
-        None | Some(serde_json::Value::Null) => None,
         Some(serde_json::Value::String(s)) => Some(s),
         Some(serde_json::Value::Object(map)) => {
             let mut found = None;
@@ -68,6 +67,7 @@ pub(super) fn de_opt_string_or_object<'de, D: Deserializer<'de>>(
             }
             found
         }
+        // Missing, null, and any other scalar all mean "not reported".
         _ => None,
     })
 }
