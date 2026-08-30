@@ -294,6 +294,10 @@ impl ConnectorService {
             .map_err(|error| to_bus_error(&error))
     }
 
+    // Reads a local file rather than the network, so there is nothing to
+    // await. `async` is the shape the interface macro dispatches, not a claim
+    // that the work is asynchronous.
+    #[allow(clippy::unused_async)]
     async fn list_trigger_history(
         &self,
         request: ComposioListTriggerHistoryRequest,

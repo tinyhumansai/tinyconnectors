@@ -142,7 +142,8 @@ impl Route for ProxyRoute {
             encode(toolkit)
         );
         if let Some(id) = connection_id {
-            path.push_str(&format!("&connectionId={}", encode(id)));
+            use std::fmt::Write as _;
+            let _ = write!(path, "&connectionId={}", encode(id));
         }
         tracing::debug!(path = %path, "[connectors][proxy] list_available_triggers");
         self.get(&path).await

@@ -140,7 +140,7 @@ fn a_corrupt_line_does_not_hide_the_rest() {
     let path = archive.current_day_file();
     let mut contents = fs::read_to_string(&path).expect("reads file");
     contents.push_str("{\"received_at_ms\": tru\n");
-    contents.push_str("\n");
+    contents.push('\n');
     fs::write(&path, contents).expect("writes file");
 
     archive
@@ -170,10 +170,17 @@ fn ignores_files_that_are_not_archive_days() {
 
 #[test]
 fn the_default_limit_is_a_window_not_everything() {
-    // The archive can grow without bound; the default has to be a window or a
-    // history read eventually returns a user's entire trigger history.
-    assert!(DEFAULT_HISTORY_LIMIT > 0);
-    assert!(DEFAULT_HISTORY_LIMIT <= 200);
+    // The archive grows without bound, so the default has to be a window — or
+    // a history read eventually returns a user's entire trigger history.
+    let (_dir, archive) = archive("default-limit");
+    for index in 0..(DEFAULT_HISTORY_LIMIT + 10) {
+        archive
+            .record("gmail", "T", &format!("evt-{index}"), "u", &json!({}))
+            .expect("records");
+    }
+
+    let history = archive.list_recent(None).expect("reads");
+    assert_eq!(history.entries.len(), DEFAULT_HISTORY_LIMIT);
 }
 
 #[test]
