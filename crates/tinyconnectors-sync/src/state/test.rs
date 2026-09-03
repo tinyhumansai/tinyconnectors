@@ -241,3 +241,24 @@ async fn state_that_no_longer_matches_its_shape_is_a_decode_failure() {
         .unwrap_err();
     assert!(matches!(error, Error::Decode { .. }));
 }
+
+#[test]
+fn restarting_from_the_top_forgets_only_the_cursor() {
+    // The position goes; what was ingested, and what the day has already
+    // spent, stay — a restart is a re-read as skips, not a second ingest and
+    // not a fresh allowance.
+    let mut state = SyncState::new("gmail", "conn_1");
+    state.advance_cursor("p9");
+    state.mark_synced("m1", Some("v1"));
+    state.record_action(3, 0.0);
+
+    state.restart_from_top();
+
+    assert!(state.cursor.is_none());
+    assert!(state.is_synced("m1"));
+    assert_eq!(
+        state.item_versions.get("m1").map(String::as_str),
+        Some("v1")
+    );
+    assert_eq!(state.run_requests, 3);
+}

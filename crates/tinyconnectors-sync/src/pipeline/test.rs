@@ -392,3 +392,63 @@ async fn a_provider_with_nothing_to_read_completes_immediately() {
     assert!(outcome.batch.complete);
     assert_eq!(outcome.stage, SyncStage::Completed);
 }
+
+#[tokio::test]
+async fn a_drained_provider_restarts_the_next_run_from_the_top() {
+    // A walk that reaches the provider's last page must not park the cursor
+    // there: resumed from it, every later run re-reads that page, skips it,
+    // and completes — and never asks for page one again, where a newest-first
+    // mailbox puts everything that arrived since. Hidden by small mailboxes
+    // (one page keeps the cursor at `None`), it bit every account deeper than
+    // one page the moment its first walk finished.
+    let store = Arc::new(MemoryStore::default());
+
+    let first = ScriptedProvider::new(vec![
+        Ok(page(&["m1", "m2"], Some("p2"))),
+        Ok(page(&["m3"], None)),
+    ]);
+    let outcome = run_sync(
+        &first,
+        &context(Arc::clone(&store), 100),
+        SyncReason::Manual,
+    )
+    .await
+    .unwrap();
+    assert!(outcome.batch.complete);
+    assert!(
+        outcome.batch.cursor.is_none(),
+        "a complete batch carries no position"
+    );
+
+    let state = SyncState::load(store.as_ref(), "gmail", "conn_1")
+        .await
+        .unwrap();
+    assert!(
+        state.cursor.is_none(),
+        "the drained walk forgot its position"
+    );
+
+    // New mail on page one, the old mail behind it: the next run starts at the
+    // top, ingests only what is new, and skips the rest instead of re-reading
+    // the last page forever.
+    let second = ScriptedProvider::new(vec![
+        Ok(page(&["m4", "m1", "m2"], Some("p2"))),
+        Ok(page(&["m3"], None)),
+    ]);
+    let outcome = run_sync(&second, &context(store, 100), SyncReason::Scheduled)
+        .await
+        .unwrap();
+    assert_eq!(
+        *second.requested_cursors.lock().unwrap(),
+        vec![None, Some("p2".to_string())]
+    );
+    let ingested: Vec<&str> = outcome
+        .batch
+        .records
+        .iter()
+        .map(|record| record.item_id.as_str())
+        .collect();
+    assert_eq!(ingested, vec!["m4"]);
+    assert_eq!(outcome.records_skipped, 3);
+    assert!(outcome.batch.complete);
+}

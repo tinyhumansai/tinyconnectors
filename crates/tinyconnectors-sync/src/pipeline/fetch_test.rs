@@ -16,6 +16,8 @@ const SPEC: PageSpec = PageSpec {
     version_paths: &["version", "etag"],
     page_size_arg: "max_results",
     cursor_arg: "page_token",
+
+    depth_window: None,
     clean_bodies: true,
 };
 

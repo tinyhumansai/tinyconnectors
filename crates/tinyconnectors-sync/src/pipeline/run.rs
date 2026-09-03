@@ -142,6 +142,16 @@ pub async fn run_sync(
         let Some(next) = cursor.as_deref() else {
             // The provider has no more to give: the only path that completes
             // a run.
+            //
+            // The position saved here must not be the page just read. It is
+            // the *last* page, and a run resumed from it re-reads that one
+            // page, skips everything on it, and completes again — forever.
+            // Page one, where a newest-first source such as Gmail puts every
+            // message that arrived since, is never requested again, so a
+            // mailbox deeper than one page stopped picking up new mail the
+            // moment its first walk reached the end. Restarting from the top
+            // is cheap: the seen-set turns the re-read into skips.
+            state.restart_from_top();
             outcome.stage = SyncStage::Completed;
             outcome.batch.complete = true;
             break;

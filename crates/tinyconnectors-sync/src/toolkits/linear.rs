@@ -28,6 +28,7 @@ const PAGE: PageSpec = PageSpec {
     url_paths: &["url"],
     version_paths: &["updatedAt"],
     page_size_arg: "first",
+    depth_window: None,
     cursor_arg: "after",
     clean_bodies: false,
 };

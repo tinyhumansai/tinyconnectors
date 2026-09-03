@@ -59,7 +59,7 @@ pub mod toolkits;
 
 pub use clean::clean_body;
 pub use error::{Error, Result};
-pub use pipeline::{PageSpec, ProviderPage, SyncOutcome, run_sync};
+pub use pipeline::{DepthWindow, PageSpec, ProviderPage, SyncOutcome, run_sync};
 pub use prefs::{PREFS_NAMESPACE, UserScopePref};
 pub use provider::{
     ActionRunner, ConnectorProvider, ProviderContext, ProviderRegistry, ProviderUserProfile,

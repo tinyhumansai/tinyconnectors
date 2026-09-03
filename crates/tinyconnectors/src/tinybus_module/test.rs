@@ -611,6 +611,7 @@ async fn syncs_a_toolkit_into_records_without_storing_them() -> tinybus::Result<
                 connection_id: Some("conn_1".into()),
                 source_id: Some("gmail:primary".into()),
                 max_items: Some(10),
+                depth_days: None,
                 reason: Some("scheduled".into()),
             },),
         )
@@ -1428,4 +1429,58 @@ async fn a_failed_execute_carries_an_error_class() {
 
     assert!(error.contains("[composio:error:"), "{error}");
     assert!(error.contains("rate limited"), "{error}");
+}
+
+#[tokio::test]
+async fn a_depth_window_reaches_gmail_as_a_search_query() -> tinybus::Result<()> {
+    // The host's "sync depth (days)" setting was a no-op for every connector:
+    // the request had no field for it and the page read never asked. It now
+    // crosses the bus and lands in the one place Gmail can honour it — the
+    // `after:` term of the fetch action's query.
+    let transport = StubTransport::replying(json!({
+        "successful": true,
+        "data": { "data": { "messages": [{ "id": "m1", "subject": "Hi" }] } }
+    }));
+    let (_serving, _client, proxy, _bus) = proxy_to(service_over(Arc::clone(&transport))).await?;
+    let _reply: ConnectorSyncResponse = proxy
+        .call(
+            names::methods::SYNC,
+            (ConnectorSyncRequest {
+                toolkit: "gmail".into(),
+                connection_id: Some("conn_1".into()),
+                depth_days: Some(30),
+                ..ConnectorSyncRequest::default()
+            },),
+        )
+        .await?;
+    let body = transport.last_body.lock().unwrap().clone().unwrap();
+    assert_eq!(body["tool"], "GMAIL_FETCH_EMAILS");
+    let query = body["arguments"]["query"].as_str().unwrap_or_default();
+    assert!(query.starts_with("after:"), "{body}");
+    Ok(())
+}
+
+#[tokio::test]
+async fn a_request_without_a_window_reads_unbounded() -> tinybus::Result<()> {
+    // A host built before the field — or one whose setting is cleared — must
+    // get what every earlier release gave it: the whole account, no `query`.
+    // The library's default window is for direct callers, not for the bus.
+    let transport = StubTransport::replying(json!({
+        "successful": true,
+        "data": { "data": { "messages": [{ "id": "m1", "subject": "Hi" }] } }
+    }));
+    let (_serving, _client, proxy, _bus) = proxy_to(service_over(Arc::clone(&transport))).await?;
+    let _reply: ConnectorSyncResponse = proxy
+        .call(
+            names::methods::SYNC,
+            (ConnectorSyncRequest {
+                toolkit: "gmail".into(),
+                connection_id: Some("conn_1".into()),
+                ..ConnectorSyncRequest::default()
+            },),
+        )
+        .await?;
+    let body = transport.last_body.lock().unwrap().clone().unwrap();
+    assert!(body["arguments"].get("query").is_none(), "{body}");
+    Ok(())
 }

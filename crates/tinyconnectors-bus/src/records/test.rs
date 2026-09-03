@@ -9,7 +9,7 @@
 
 #![allow(clippy::unwrap_used, clippy::expect_used, clippy::panic)]
 
-use super::{ConnectorRecord, ConnectorRecordBatch, SyncEvent, SyncStage};
+use super::{ConnectorRecord, ConnectorRecordBatch, ConnectorSyncRequest, SyncEvent, SyncStage};
 use serde_json::json;
 
 /// The wire keys memory's ingestion item accepts, in its own contract.
@@ -199,4 +199,31 @@ fn a_sync_event_omits_an_absent_message_and_connection() {
     let value = serde_json::to_value(&event).expect("serializes");
     assert!(value.get("message").is_none());
     assert!(value.get("connection_id").is_none());
+}
+
+#[test]
+fn a_sync_request_carries_the_depth_window_only_when_set() {
+    // Additive on the wire (contract 1.8): absent reads as `None` for a host
+    // built before the field, and `None` is not sent, so a module older than
+    // the field never sees a key it does not know.
+    let unbounded = ConnectorSyncRequest {
+        toolkit: "gmail".into(),
+        ..ConnectorSyncRequest::default()
+    };
+    let value = serde_json::to_value(&unbounded).expect("serializes");
+    assert!(value.get("depth_days").is_none());
+
+    let bounded = ConnectorSyncRequest {
+        toolkit: "gmail".into(),
+        depth_days: Some(30),
+        ..ConnectorSyncRequest::default()
+    };
+    let value = serde_json::to_value(&bounded).expect("serializes");
+    assert_eq!(value["depth_days"], 30);
+    let back: ConnectorSyncRequest = serde_json::from_value(value).expect("round-trips");
+    assert_eq!(back.depth_days, Some(30));
+
+    let legacy: ConnectorSyncRequest =
+        serde_json::from_value(serde_json::json!({ "toolkit": "gmail" })).expect("decodes");
+    assert_eq!(legacy.depth_days, None);
 }

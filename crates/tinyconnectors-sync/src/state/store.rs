@@ -127,6 +127,18 @@ impl SyncState {
         self.cursor = Some(cursor.into());
     }
 
+    /// Forget the pagination position so the next run reads from the top.
+    ///
+    /// For a provider that has just reported its last page. The cursor held at
+    /// that moment names that last page, and resuming from it re-reads the one
+    /// page on every later run while page one — where a newest-first source
+    /// puts everything that arrived since — is never asked for again. Only the
+    /// position is forgotten: the seen-set and the versions stay, so the
+    /// restart re-reads page one as skips, not as re-ingests.
+    pub fn restart_from_top(&mut self) {
+        self.cursor = None;
+    }
+
     /// Record when a run finished, in milliseconds since the Unix epoch.
     pub fn set_last_sync_at_ms(&mut self, timestamp_ms: u64) {
         self.last_sync_at_ms = Some(timestamp_ms);

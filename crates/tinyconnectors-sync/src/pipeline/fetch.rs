@@ -6,6 +6,7 @@
 //! reading. Writing each one out by hand instead produced five copies of the
 //! same envelope-unwrapping, which is exactly where they drifted.
 
+use chrono::{TimeDelta, Utc};
 use serde_json::{Value, json};
 use tinyconnectors_bus::ConnectorRecord;
 
@@ -36,6 +37,13 @@ pub struct PageSpec {
     pub page_size_arg: &'static str,
     /// The argument naming where to resume.
     pub cursor_arg: &'static str,
+    /// How the toolkit expresses "no older than N days" on a page read, when
+    /// it can. `None` reads without a lower bound whatever the limits say.
+    ///
+    /// A window the *provider* applies, never one applied here after the
+    /// fact: reading everything and dropping the old would spend exactly the
+    /// requests the bound exists to save.
+    pub depth_window: Option<DepthWindow>,
     /// Whether to strip quoted chains and boilerplate from the body.
     ///
     /// True for message-shaped toolkits, where a body carries the thread it
@@ -53,6 +61,39 @@ pub struct PageSpec {
 /// storage and the attention of anything reading them back.
 const MAX_BODY_CHARS: usize = 20_000;
 
+/// How a toolkit's page read is told to stop at an age.
+///
+/// One variant per provider syntax. Gmail takes a search string, so the bound
+/// is an `after:` term; a provider whose API has no such argument has no
+/// variant and reads unbounded.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum DepthWindow {
+    /// Gmail search syntax: `query: "after:YYYY/MM/DD"`.
+    GmailQueryAfter,
+}
+
+impl DepthWindow {
+    /// Add the bound for `days` back from now to `arguments`.
+    fn apply(self, arguments: &mut Value, days: u32) {
+        match self {
+            Self::GmailQueryAfter => {
+                arguments["query"] = Value::String(gmail_after_query(days));
+            }
+        }
+    }
+}
+
+/// The Gmail search term for "newer than `days` days".
+///
+/// A calendar date in UTC rather than an epoch: Gmail reads `after:` dates in
+/// the mailbox's own zone, so the window can land a few hours wide of the mark
+/// at either end. That is the right side to err on for a bound whose job is to
+/// stop a years-deep backfill, not to cut a day in half.
+pub(crate) fn gmail_after_query(days: u32) -> String {
+    let since = Utc::now() - TimeDelta::days(i64::from(days));
+    format!("after:{}", since.format("%Y/%m/%d"))
+}
+
 /// Read one page of `spec` from the connection in `context`.
 ///
 /// # Errors
@@ -69,6 +110,9 @@ pub async fn fetch_page(
     let mut arguments = json!({ spec.page_size_arg: page_size });
     if let Some(cursor) = cursor {
         arguments[spec.cursor_arg] = Value::String(cursor.to_string());
+    }
+    if let (Some(days), Some(window)) = (context.limits.depth_days, spec.depth_window) {
+        window.apply(&mut arguments, days);
     }
 
     let payload = context.run(spec.action, arguments).await?;
