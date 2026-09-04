@@ -23,6 +23,7 @@ const PAGE: PageSpec = PageSpec {
     url_paths: &["url"],
     version_paths: &["date_updated"],
     page_size_arg: "page",
+    depth_window: None,
     cursor_arg: "page",
     clean_bodies: false,
 };

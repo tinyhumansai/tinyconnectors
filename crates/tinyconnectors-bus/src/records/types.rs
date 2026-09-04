@@ -90,6 +90,15 @@ pub struct ConnectorSyncRequest {
     /// request budget, and the provider running out comes first.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub max_items: Option<usize>,
+    /// How far back to read, in days. `None` reads without a lower bound.
+    ///
+    /// A window the provider applies, where its API can express one — Gmail
+    /// as an `after:` search term. A provider that cannot is not approximated
+    /// by reading everything and dropping the old, which would spend exactly
+    /// the requests a bound exists to save: it reads unbounded. Added in
+    /// contract 1.8; a module older than that ignores the field.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub depth_days: Option<u32>,
     /// Why the run was started, for the log and the status line.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub reason: Option<String>,

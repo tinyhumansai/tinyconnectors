@@ -525,6 +525,12 @@ impl ConnectorService {
         if let Some(max_items) = request.max_items.filter(|max| *max > 0) {
             limits.max_items = max_items;
         }
+        // The host owns the window. A request carrying none means unbounded:
+        // every release before the field existed read that way, and a module
+        // update must not start truncating a mailbox to the library default
+        // on its own. That default stays for direct callers of `run_sync`,
+        // who take it knowingly.
+        limits.depth_days = request.depth_days.filter(|days| *days > 0);
 
         let context = ProviderContext {
             toolkit: request.toolkit.clone(),

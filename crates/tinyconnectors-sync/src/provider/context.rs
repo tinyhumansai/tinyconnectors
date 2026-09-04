@@ -52,6 +52,11 @@ impl Default for SyncLimits {
     /// the agent has real context immediately, small enough that it finishes
     /// while the user is still looking at the screen. Later runs resume from
     /// the cursor, so nothing is lost by starting small.
+    ///
+    /// The window is honoured only where a toolkit can say it (see
+    /// [`crate::pipeline::DepthWindow`]), and the module replaces it with
+    /// whatever the host's request carries — including nothing — so this
+    /// default binds direct callers of [`crate::run_sync`] alone.
     fn default() -> Self {
         Self {
             max_items: 200,

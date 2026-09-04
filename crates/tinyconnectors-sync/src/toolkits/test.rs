@@ -406,3 +406,71 @@ async fn every_toolkit_resumes_from_a_cursor() {
         );
     }
 }
+
+#[tokio::test]
+async fn gmail_bounds_the_read_to_the_depth_window() {
+    // The window is the provider's to apply: it arrives as Gmail's own
+    // `after:` search term, so the request costs one page of recent mail
+    // rather than the walk through the years that a client-side filter would
+    // have paid for and thrown away.
+    let (actions, mut context) = context("gmail", json!({}));
+    context.limits.depth_days = Some(30);
+    default_registry()
+        .get("gmail")
+        .unwrap()
+        .fetch_page(&context, None)
+        .await
+        .unwrap();
+
+    let arguments = actions.last_arguments.lock().unwrap().clone().unwrap();
+    let query = arguments["query"].as_str().expect("gmail received a query");
+    let date = query.strip_prefix("after:").expect("an after: term");
+    let parts: Vec<&str> = date.split('/').collect();
+    assert_eq!(parts.len(), 3, "YYYY/MM/DD: {query}");
+    assert!(
+        parts
+            .iter()
+            .all(|part| part.chars().all(|c| c.is_ascii_digit())),
+        "{query}"
+    );
+    assert_eq!(
+        (parts[0].len(), parts[1].len(), parts[2].len()),
+        (4, 2, 2),
+        "{query}"
+    );
+}
+
+#[tokio::test]
+async fn a_read_without_a_window_stays_unbounded() {
+    // No window means no `query` at all — not an empty one, which Gmail would
+    // read as a search for nothing.
+    let (actions, mut context) = context("gmail", json!({}));
+    context.limits.depth_days = None;
+    default_registry()
+        .get("gmail")
+        .unwrap()
+        .fetch_page(&context, None)
+        .await
+        .unwrap();
+
+    let arguments = actions.last_arguments.lock().unwrap().clone().unwrap();
+    assert!(arguments.get("query").is_none(), "{arguments}");
+}
+
+#[tokio::test]
+async fn toolkits_without_a_window_syntax_ignore_the_depth() {
+    // Ignored rather than approximated: a provider that cannot express the
+    // bound is not asked for everything so the old can be dropped here.
+    for toolkit in ["github", "notion", "linear", "clickup"] {
+        let (actions, mut context) = context(toolkit, json!({}));
+        context.limits.depth_days = Some(30);
+        default_registry()
+            .get(toolkit)
+            .unwrap()
+            .fetch_page(&context, None)
+            .await
+            .unwrap();
+        let arguments = actions.last_arguments.lock().unwrap().clone().unwrap();
+        assert!(arguments.get("query").is_none(), "{toolkit}: {arguments}");
+    }
+}

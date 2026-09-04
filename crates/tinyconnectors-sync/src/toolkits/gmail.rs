@@ -5,7 +5,7 @@ use async_trait::async_trait;
 use super::gmail_catalog::CURATED;
 use super::identity::pick;
 use crate::Result;
-use crate::pipeline::{PageSpec, ProviderPage, fetch_page};
+use crate::pipeline::{DepthWindow, PageSpec, ProviderPage, fetch_page};
 use crate::provider::{ConnectorProvider, ProviderContext, ProviderUserProfile};
 use crate::scope::CuratedTool;
 
@@ -29,6 +29,7 @@ const PAGE: PageSpec = PageSpec {
     version_paths: &["historyId", "internalDate"],
     page_size_arg: "max_results",
     cursor_arg: "page_token",
+    depth_window: Some(DepthWindow::GmailQueryAfter),
     clean_bodies: true,
 };
 
