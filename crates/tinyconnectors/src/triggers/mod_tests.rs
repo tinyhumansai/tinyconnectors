@@ -125,7 +125,7 @@ fn an_empty_archive_reads_as_empty_rather_than_failing() {
     let (_dir, archive) = archive("empty");
     let history = archive.list_recent(None).expect("reads");
     assert!(history.entries.is_empty());
-    assert!(!history.archive_dir.is_empty());
+    assert_ne!(history.archive_dir.len(), 0);
 }
 
 #[test]

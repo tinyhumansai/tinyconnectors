@@ -213,7 +213,7 @@ async fn keeps_a_malformed_row_as_inactive_rather_than_dropping_it() {
     let resp = route(transport).list_connections().await.unwrap();
 
     assert_eq!(resp.connections.len(), 1);
-    assert!(resp.connections[0].toolkit.is_empty());
+    assert_eq!(resp.connections[0].toolkit.len(), 0);
     assert!(!resp.connections[0].is_active());
 }
 
@@ -241,7 +241,7 @@ async fn authorize_reads_the_v3_redirect_url_and_stamps_the_entity() {
     assert_eq!(resp.connect_url, "https://composio.dev/oauth/xyz");
     // v3's link response carries no connection id; an empty one is the
     // documented contract, not a decode failure.
-    assert!(resp.connection_id.is_empty());
+    assert_eq!(resp.connection_id.len(), 0);
 
     let body = transport.last_body.lock().unwrap().clone().unwrap();
     assert_eq!(body["entity_id"], "entity-1");

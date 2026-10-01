@@ -247,7 +247,7 @@ async fn a_provider_that_cannot_sync_reads_no_page() {
         .await
         .unwrap();
 
-    assert!(page.records.is_empty());
+    assert_eq!(page.records.len(), 0);
     assert!(
         page.next_cursor.is_none(),
         "no next page: the loop must not ask again"

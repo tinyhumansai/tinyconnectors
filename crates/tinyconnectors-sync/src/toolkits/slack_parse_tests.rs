@@ -140,5 +140,5 @@ fn a_join_notice_carrying_no_files_is_still_nothing() {
 
     let (records, _) = records_from(&[message], &channel("C1", "eng"), &users(), None);
 
-    assert!(records.is_empty());
+    assert_eq!(records.len(), 0);
 }

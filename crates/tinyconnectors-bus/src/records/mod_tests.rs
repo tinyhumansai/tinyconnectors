@@ -67,11 +67,11 @@ fn a_record_needs_only_an_id_and_content() {
         serde_json::from_value(json!({ "item_id": "x", "content": "body" })).expect("parses");
 
     assert_eq!(record.item_id, "x");
-    assert!(record.title.is_empty());
+    assert_eq!(record.title.len(), 0);
     assert!(record.mime.is_none());
     assert!(record.url.is_none());
     assert!(record.updated_at_ms.is_none());
-    assert!(record.tags.is_empty());
+    assert_eq!(record.tags.len(), 0);
 }
 
 #[test]
@@ -133,7 +133,7 @@ fn an_empty_page_can_still_have_more_to_come() {
     }))
     .expect("parses");
 
-    assert!(batch.records.is_empty());
+    assert_eq!(batch.records.len(), 0);
     assert!(!batch.complete);
     assert_eq!(batch.cursor.as_deref(), Some("page-3"));
 }

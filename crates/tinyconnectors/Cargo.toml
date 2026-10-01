@@ -84,6 +84,7 @@ required-features = ["module"]
 default = ["module"]
 # The TinyBus module adapter and its ABI exports (`src/tinybus_module/`).
 module = ["dep:tinybus", "dep:tinybus-module"]
+linked = ["static-link"]
 # Link the TinyBus module into a host binary with Rust-addressable entry points.
 static-link = ["module"]
 

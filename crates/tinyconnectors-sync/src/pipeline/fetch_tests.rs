@@ -87,7 +87,7 @@ fn keeps_the_whole_item_when_no_body_field_matches() {
     let payload = json!({ "messages": [{ "id": "m1", "snippetText": "hello" }] });
     let page = page_from(&payload, &SPEC);
     assert!(page.records[0].content.contains("snippetText"));
-    assert!(!page.records[0].content.is_empty());
+    assert_ne!(page.records[0].content.len(), 0);
 }
 
 #[test]
@@ -114,7 +114,7 @@ fn reads_the_next_cursor_from_the_envelope() {
 #[test]
 fn an_empty_payload_yields_an_empty_final_page() {
     let page = page_from(&json!({}), &SPEC);
-    assert!(page.records.is_empty());
+    assert_eq!(page.records.len(), 0);
     assert!(page.next_cursor.is_none());
 }
 

@@ -12,7 +12,7 @@ use serde_json::json;
 #[test]
 fn toolkits_response_defaults_to_empty() {
     let resp: ComposioToolkitsResponse = serde_json::from_str("{}").expect("empty object parses");
-    assert!(resp.toolkits.is_empty());
+    assert_eq!(resp.toolkits.len(), 0);
     assert!(resp.catalog.is_empty());
 }
 
@@ -63,8 +63,8 @@ fn catalog_entry_tolerates_a_slug_only_row() {
     let entry: ComposioToolkitCatalogEntry =
         serde_json::from_value(json!({ "slug": "notion" })).expect("parses");
     assert_eq!(entry.slug, "notion");
-    assert!(entry.name.is_empty());
+    assert_eq!(entry.name.len(), 0);
     assert!(entry.logo.is_none());
-    assert!(entry.categories.is_empty());
+    assert_eq!(entry.categories.len(), 0);
     assert!(entry.enabled.is_none());
 }

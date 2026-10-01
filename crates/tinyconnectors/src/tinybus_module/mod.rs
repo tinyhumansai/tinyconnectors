@@ -442,6 +442,7 @@ impl ConnectorService {
     // every member of a `#[tinybus::interface]` impl has to be async to be
     // dispatched. Narrow, and on this one member only.
     #[allow(clippy::unused_async, reason = "required by the interface dispatcher")]
+    #[allow(unknown_lints, clippy::unused_async_trait_impl)] // the bus trait method is async; this body has nothing to await
     async fn configure(
         &self,
         request: ComposioConfigureRequest,
@@ -648,12 +649,14 @@ impl ConnectorService {
     // The registry is in memory: there is nothing to await. `async` is the
     // shape the interface macro dispatches, not a claim about the work.
     #[allow(clippy::unused_async)]
+    #[allow(unknown_lints, clippy::unused_async_trait_impl)] // the bus trait method is async; this body has nothing to await
     async fn list_capabilities(&self) -> TinyBusResult<ComposioCapabilitiesResponse> {
         Ok(self.registry.capabilities())
     }
 
     // Same: reads the registry.
     #[allow(clippy::unused_async)]
+    #[allow(unknown_lints, clippy::unused_async_trait_impl)] // the bus trait method is async; this body has nothing to await
     async fn list_agent_ready_toolkits(&self) -> TinyBusResult<ComposioAgentReadyToolkitsResponse> {
         Ok(ComposioAgentReadyToolkitsResponse {
             toolkits: self.registry.agent_ready_toolkits(),
@@ -756,7 +759,16 @@ impl ConnectorService {
                 request.trigger_config,
             )
             .await
-            .map_err(|error| to_bus_error(&error))
+            // Enabling is the one trigger call a user drives from a settings
+            // screen, so a failure is classified like an execute failure
+            // (`[composio:error:<class>]`): "reconnect GitHub" reads better
+            // than the provider's own wording.
+            .map_err(|error| {
+                tinybus::Error::failed(crate::execute::format_provider_error(
+                    &request.slug,
+                    &error.to_string(),
+                ))
+            })
     }
 
     async fn disable_trigger(
@@ -939,22 +951,17 @@ async fn setup(connection: Connection, config: ModuleConfig) -> TinyBusResult<()
 
 macro_rules! export_module {
     ($($declaration:tt)*) => {
-        #[cfg(feature = "static-link")]
-        mod linked_exports {
+        mod exports {
             // TinyBus generates these three ABI items without rustdoc.
-            #![expect(missing_docs, reason = "generated TinyBus ABI entries")]
+            #![cfg_attr(feature = "static-link", expect(missing_docs, reason = "generated TinyBus ABI entries"))]
             use super::*;
-            tinybus_module::module_export_static! { $($declaration)* }
+            tinybus_module::module_export_optional_static! { $($declaration)* }
         }
         #[cfg(feature = "static-link")]
-        pub use linked_exports::{
-            TINYBUS_MODULE_ABI_V1, tinybus_module_init_v1, tinybus_module_manifest_v1,
+        pub use exports::{
+            TINYBUS_MODULE_ABI_V1, linked_module, tinybus_module_init_v1,
+            tinybus_module_manifest_v1,
         };
-        #[cfg(not(feature = "static-link"))]
-        mod dynamic_exports {
-            use super::*;
-            tinybus_module::module_export! { $($declaration)* }
-        }
     };
 }
 

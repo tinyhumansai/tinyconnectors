@@ -1159,7 +1159,7 @@ async fn setup_on_the_direct_route_serves_too() -> tinybus::Result<()> {
     let reply: ComposioAgentReadyToolkitsResponse = proxy
         .call(names::methods::LIST_AGENT_READY_TOOLKITS, ())
         .await?;
-    assert!(!reply.toolkits.is_empty());
+    assert_ne!(reply.toolkits.len(), 0);
     Ok(())
 }
 
@@ -1427,6 +1427,27 @@ async fn a_failed_execute_carries_an_error_class() {
             tool: "GMAIL_FETCH_EMAILS".to_string(),
             arguments: None,
             connection_id: None,
+        })
+        .await
+        .unwrap_err()
+        .to_string();
+
+    assert!(error.contains("[composio:error:"), "{error}");
+    assert!(error.contains("rate limited"), "{error}");
+}
+
+#[tokio::test]
+async fn a_failed_enable_trigger_carries_an_error_class() {
+    // Enabling is driven from a settings screen; the class prefix is what lets
+    // the host say "reconnect" instead of echoing the provider's wording.
+    let transport = StubTransport::failing("rate limited");
+    let service = service_over(transport);
+
+    let error = service
+        .enable_trigger(ComposioEnableTriggerRequest {
+            connection_id: "c1".to_string(),
+            slug: "GITHUB_COMMIT_EVENT".to_string(),
+            trigger_config: None,
         })
         .await
         .unwrap_err()

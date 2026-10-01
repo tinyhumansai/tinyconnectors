@@ -91,7 +91,7 @@ fn indexes_into_an_array_by_a_numeric_segment() {
 fn finds_the_first_array_that_exists() {
     let value = json!({ "data": { "messages": [1, 2] } });
     assert_eq!(first_array(&value, &["/items", "/data/messages"]).len(), 2);
-    assert!(first_array(&value, &["/nope"]).is_empty());
+    assert_eq!(first_array(&value, &["/nope"]).len(), 0);
 }
 
 #[test]
@@ -525,7 +525,7 @@ async fn a_provider_with_nothing_to_read_completes_immediately() {
         .await
         .unwrap();
 
-    assert!(outcome.batch.records.is_empty());
+    assert_eq!(outcome.batch.records.len(), 0);
     assert!(outcome.batch.complete);
     assert_eq!(outcome.stage, SyncStage::Completed);
 }

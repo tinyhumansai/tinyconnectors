@@ -96,15 +96,24 @@ fn a_file_without_an_id_or_anything_to_call_it_is_skipped() {
 #[test]
 fn a_message_without_files_or_a_timestamp_yields_nothing() {
     let plain = json!({ "ts": "1700000000.000100", "user": "U1", "text": "hello" });
-    assert!(file_records_from(&plain, &channel(), &users(), false).is_empty());
+    assert_eq!(
+        file_records_from(&plain, &channel(), &users(), false).len(),
+        0
+    );
 
     let undated = json!({ "user": "U1", "files": [{ "id": "F1", "name": "x.png" }] });
-    assert!(file_records_from(&undated, &channel(), &users(), false).is_empty());
+    assert_eq!(
+        file_records_from(&undated, &channel(), &users(), false).len(),
+        0
+    );
 
     // `files` present but not an array — Composio envelopes vary, and a shape
     // this code cannot walk must not panic.
     let malformed = json!({ "ts": "1700000000.000100", "files": "nope" });
-    assert!(file_records_from(&malformed, &channel(), &users(), false).is_empty());
+    assert_eq!(
+        file_records_from(&malformed, &channel(), &users(), false).len(),
+        0
+    );
 }
 
 #[test]

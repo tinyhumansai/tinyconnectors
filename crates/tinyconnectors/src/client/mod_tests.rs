@@ -337,7 +337,7 @@ async fn authorize_refuses_extra_params_that_are_not_an_object() {
         .await
         .unwrap_err();
     assert!(error.to_string().contains("must be a JSON object"));
-    assert!(transport.calls().is_empty());
+    assert_eq!(transport.calls().len(), 0);
 }
 
 #[tokio::test]
@@ -356,7 +356,7 @@ async fn authorize_refuses_to_let_extra_params_override_a_reserved_key() {
             error.to_string().contains(key),
             "{key} must be refused by name"
         );
-        assert!(transport.calls().is_empty());
+        assert_eq!(transport.calls().len(), 0);
     }
 }
 

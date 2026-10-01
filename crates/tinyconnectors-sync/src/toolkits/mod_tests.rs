@@ -80,7 +80,7 @@ fn every_provider_reports_a_slug_matching_its_registry_key() {
     for provider in default_registry().all() {
         let slug = provider.toolkit_slug();
         assert_eq!(slug, slug.trim().to_ascii_lowercase(), "{slug}");
-        assert!(!slug.is_empty());
+        assert_ne!(slug.len(), 0);
     }
 }
 

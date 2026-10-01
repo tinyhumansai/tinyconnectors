@@ -286,7 +286,7 @@ async fn one_unreadable_channel_is_skipped_not_fatal() {
     let provider = SlackProvider;
 
     let skipped = provider.fetch_page(&context, None).await.unwrap();
-    assert!(skipped.records.is_empty());
+    assert_eq!(skipped.records.len(), 0);
     let next = skipped.next_cursor.expect("the walk must move past it");
 
     let page = provider.fetch_page(&context, Some(&next)).await.unwrap();
@@ -618,7 +618,7 @@ async fn a_message_that_is_only_an_empty_reference_is_not_a_memory() {
 
     let context = context(actions, Arc::new(MemoryStore::default()));
     let page = SlackProvider.fetch_page(&context, None).await.unwrap();
-    assert!(page.records.is_empty());
+    assert_eq!(page.records.len(), 0);
 }
 
 // ── through the real pipeline ───────────────────────────────────────

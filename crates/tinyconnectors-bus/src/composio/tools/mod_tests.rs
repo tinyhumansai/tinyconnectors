@@ -55,7 +55,7 @@ fn a_tool_listing_applies_the_user_scopes_by_default() {
     // filtered one: showing an action that will then be refused wastes a turn.
     let request = ComposioListToolsRequest::default();
     assert!(request.apply_user_scopes);
-    assert!(request.toolkits.is_empty());
+    assert_eq!(request.toolkits.len(), 0);
 
     let parsed: ComposioListToolsRequest =
         serde_json::from_value(json!({ "toolkits": ["gmail"] })).expect("parses");

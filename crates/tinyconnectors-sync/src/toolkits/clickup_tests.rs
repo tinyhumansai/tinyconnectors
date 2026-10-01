@@ -217,7 +217,7 @@ async fn an_account_with_no_workspace_reads_nothing() {
 
     let page = read(&actions, None).await.unwrap();
 
-    assert!(page.records.is_empty());
+    assert_eq!(page.records.len(), 0);
     assert!(page.next_cursor.is_none());
     assert!(
         actions.calls_to(TASKS).is_empty(),
