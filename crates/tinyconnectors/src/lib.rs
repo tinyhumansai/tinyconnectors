@@ -88,7 +88,7 @@ pub mod state;
 mod tinybus_module;
 #[cfg(feature = "static-link")]
 pub mod tinybus_module;
-/// Constructs this module for registration with an in-process TinyBus host.
+/// Constructs this module for registration with an in-process `TinyBus` host.
 #[cfg(feature = "static-link")]
 pub use tinybus_module::linked_module;
 pub mod triggers;
