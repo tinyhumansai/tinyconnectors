@@ -343,5 +343,5 @@ fn body(raw: &str, clean: bool) -> String {
 }
 
 #[cfg(test)]
-#[path = "fetch_test.rs"]
+#[path = "fetch_tests.rs"]
 mod test;

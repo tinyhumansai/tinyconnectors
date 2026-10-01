@@ -24,4 +24,5 @@ mod types;
 pub use types::{CuratedTool, ToolScope, classify_unknown, find_curated, toolkit_from_slug};
 
 #[cfg(test)]
+#[path = "mod_tests.rs"]
 mod test;

@@ -32,4 +32,5 @@ pub use budget::{DEFAULT_DAILY_REQUEST_LIMIT, DailyBudget};
 pub use store::{STATE_NAMESPACE, SyncState, SyncStateStore};
 
 #[cfg(test)]
+#[path = "mod_tests.rs"]
 mod test;

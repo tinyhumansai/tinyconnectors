@@ -210,5 +210,5 @@ fn prefix_matches(network: u128, ip: u128, width: u32, bits: u8) -> bool {
 }
 
 #[cfg(test)]
-#[path = "network_test.rs"]
+#[path = "network_tests.rs"]
 mod test;

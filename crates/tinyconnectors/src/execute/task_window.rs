@@ -348,5 +348,5 @@ fn array_at_mut<'a>(root: &'a mut Value, path: &[&str]) -> Option<&'a mut Vec<Va
 }
 
 #[cfg(test)]
-#[path = "task_window_test.rs"]
+#[path = "task_window_tests.rs"]
 mod test;

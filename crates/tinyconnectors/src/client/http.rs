@@ -362,5 +362,5 @@ fn check_base_url(base_url: &str) -> Result<String> {
 }
 
 #[cfg(test)]
-#[path = "http_test.rs"]
+#[path = "http_tests.rs"]
 mod test;

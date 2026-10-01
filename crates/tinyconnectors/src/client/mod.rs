@@ -47,6 +47,7 @@ pub use route::{COMPOSIO_API_BASE, DirectRoute, INVALID_API_KEY_THRESHOLD, Proxy
 pub use transport::Transport;
 
 #[cfg(test)]
+#[path = "mod_tests.rs"]
 mod test;
 #[cfg(test)]
 pub(crate) mod test_support;

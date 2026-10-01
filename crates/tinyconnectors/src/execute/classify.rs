@@ -290,5 +290,5 @@ fn is_embedded_provider_failure(lower: &str) -> bool {
 }
 
 #[cfg(test)]
-#[path = "classify_test.rs"]
+#[path = "classify_tests.rs"]
 mod test;

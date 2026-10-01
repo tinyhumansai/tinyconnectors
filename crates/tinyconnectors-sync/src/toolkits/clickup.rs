@@ -165,5 +165,5 @@ fn next_workspace<'a>(workspaces: &'a [String], current: &str) -> Option<&'a str
 }
 
 #[cfg(test)]
-#[path = "clickup_test.rs"]
+#[path = "clickup_tests.rs"]
 mod test;

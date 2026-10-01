@@ -248,4 +248,5 @@ pub const METHODS: &[&str] = &[
 ];
 
 #[cfg(test)]
+#[path = "mod_tests.rs"]
 mod test;

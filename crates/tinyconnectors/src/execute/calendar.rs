@@ -83,5 +83,5 @@ pub fn apply_calendar_query_defaults(
 }
 
 #[cfg(test)]
-#[path = "calendar_test.rs"]
+#[path = "calendar_tests.rs"]
 mod test;

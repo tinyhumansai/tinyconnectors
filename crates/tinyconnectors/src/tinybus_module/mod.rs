@@ -995,7 +995,9 @@ export_module! {
 }
 
 #[cfg(test)]
+#[path = "mod_tests.rs"]
 mod test;
 
 #[cfg(test)]
+#[path = "direct_tests.rs"]
 mod direct_test;

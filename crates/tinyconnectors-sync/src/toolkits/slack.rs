@@ -749,5 +749,5 @@ fn empty_page(next: Option<String>) -> ProviderPage {
 }
 
 #[cfg(test)]
-#[path = "slack_test.rs"]
+#[path = "slack_tests.rs"]
 mod test;

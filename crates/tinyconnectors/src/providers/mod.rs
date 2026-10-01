@@ -22,4 +22,5 @@ pub use actions::ClientActions;
 pub use tinyconnectors_sync::default_registry;
 
 #[cfg(test)]
+#[path = "mod_tests.rs"]
 mod test;
