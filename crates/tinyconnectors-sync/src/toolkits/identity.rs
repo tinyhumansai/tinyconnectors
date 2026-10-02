@@ -25,5 +25,5 @@ pub(super) fn pick(payload: &serde_json::Value, paths: &[&str]) -> Option<String
 }
 
 #[cfg(test)]
-#[path = "identity_test.rs"]
+#[path = "identity_tests.rs"]
 mod test;

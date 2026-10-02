@@ -29,4 +29,5 @@ pub use registry::ProviderRegistry;
 pub use traits::{ConnectorProvider, ProviderUserProfile, SyncReason};
 
 #[cfg(test)]
+#[path = "mod_tests.rs"]
 mod test;

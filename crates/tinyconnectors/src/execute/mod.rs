@@ -68,4 +68,5 @@ pub use retry::{
 pub use task_window::{apply_window_args, filter_response};
 
 #[cfg(test)]
+#[path = "mod_tests.rs"]
 mod test;

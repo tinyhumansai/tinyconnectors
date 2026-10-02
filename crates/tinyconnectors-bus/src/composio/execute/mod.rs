@@ -9,4 +9,5 @@ mod types;
 pub use types::{ComposioExecuteRequest, ComposioExecuteResponse};
 
 #[cfg(test)]
+#[path = "mod_tests.rs"]
 mod test;

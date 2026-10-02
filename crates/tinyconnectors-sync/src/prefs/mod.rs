@@ -23,4 +23,5 @@ mod types;
 pub use types::{PREFS_NAMESPACE, UserScopePref};
 
 #[cfg(test)]
+#[path = "mod_tests.rs"]
 mod test;

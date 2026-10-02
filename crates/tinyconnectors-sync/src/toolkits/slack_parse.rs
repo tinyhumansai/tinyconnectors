@@ -250,5 +250,5 @@ pub(super) fn truncate(text: &str) -> String {
 }
 
 #[cfg(test)]
-#[path = "slack_parse_test.rs"]
+#[path = "slack_parse_tests.rs"]
 mod test;

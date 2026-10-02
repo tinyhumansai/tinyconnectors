@@ -73,4 +73,5 @@ pub fn default_registry() -> ProviderRegistry {
 }
 
 #[cfg(test)]
+#[path = "mod_tests.rs"]
 mod test;

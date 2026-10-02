@@ -25,4 +25,5 @@ mod file_store;
 pub use file_store::FileStateStore;
 
 #[cfg(test)]
+#[path = "mod_tests.rs"]
 mod test;

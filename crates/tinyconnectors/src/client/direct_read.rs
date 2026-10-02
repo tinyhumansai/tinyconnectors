@@ -119,5 +119,5 @@ fn render(error: Error, labels: &Labels) -> String {
 }
 
 #[cfg(test)]
-#[path = "direct_read_test.rs"]
+#[path = "direct_read_tests.rs"]
 mod test;

@@ -26,4 +26,5 @@ mod archive;
 pub use archive::{DEFAULT_HISTORY_LIMIT, TriggerArchive};
 
 #[cfg(test)]
+#[path = "mod_tests.rs"]
 mod test;

@@ -128,5 +128,5 @@ fn file_millis(file: &Value) -> Option<i64> {
 }
 
 #[cfg(test)]
-#[path = "slack_files_test.rs"]
+#[path = "slack_files_tests.rs"]
 mod test;

@@ -261,5 +261,5 @@ impl Route for ProxyRoute {
 }
 
 #[cfg(test)]
-#[path = "test.rs"]
+#[path = "proxy_tests.rs"]
 mod test;

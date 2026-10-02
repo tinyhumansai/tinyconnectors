@@ -498,5 +498,5 @@ fn execute_response_from_v3(raw: serde_json::Value) -> ComposioExecuteResponse {
 }
 
 #[cfg(test)]
-#[path = "direct_test.rs"]
+#[path = "direct_tests.rs"]
 mod test;

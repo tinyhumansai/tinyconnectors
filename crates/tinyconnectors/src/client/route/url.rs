@@ -40,5 +40,5 @@ pub(super) fn comma_joined(values: &[String]) -> Option<String> {
 }
 
 #[cfg(test)]
-#[path = "url_test.rs"]
+#[path = "url_tests.rs"]
 mod test;

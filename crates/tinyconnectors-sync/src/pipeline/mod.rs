@@ -37,4 +37,5 @@ pub use page_size::{MIN_PAGE_SIZE, is_payload_too_large, shrink_page_size};
 pub use run::{ProviderPage, SyncOutcome, run_sync};
 
 #[cfg(test)]
+#[path = "mod_tests.rs"]
 mod test;

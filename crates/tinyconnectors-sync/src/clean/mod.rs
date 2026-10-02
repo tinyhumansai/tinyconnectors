@@ -19,4 +19,5 @@ mod email;
 pub use email::{clean_body, collapse_blank_runs, drop_footer_noise, drop_reply_chain, truncate};
 
 #[cfg(test)]
+#[path = "mod_tests.rs"]
 mod test;

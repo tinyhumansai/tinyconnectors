@@ -11,4 +11,5 @@ mod types;
 pub use types::{ComposioGithubRepo, ComposioGithubReposResponse, ComposioListGithubReposRequest};
 
 #[cfg(test)]
+#[path = "mod_tests.rs"]
 mod test;
