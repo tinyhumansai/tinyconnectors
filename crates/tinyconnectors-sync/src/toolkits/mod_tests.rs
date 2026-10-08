@@ -287,3 +287,28 @@ async fn linear_reads_its_display_name() {
         .unwrap();
     assert_eq!(profile.display_name.as_deref(), Some("Ada"));
 }
+
+#[tokio::test]
+async fn slack_reads_its_workspace_as_the_identity() {
+    let (actions, context) = context(
+        "slack",
+        json!({ "team": { "name": "Acme", "domain": "acme", "icon": { "image_132": "https://example.com/i.png" } } }),
+    );
+    let profile = default_registry()
+        .get("slack")
+        .unwrap()
+        .fetch_user_profile(&context)
+        .await
+        .unwrap();
+    assert_eq!(
+        actions.last_action.lock().unwrap().as_deref(),
+        Some("SLACK_FETCH_TEAM_INFO")
+    );
+    assert_eq!(profile.toolkit, "slack");
+    assert_eq!(profile.display_name.as_deref(), Some("Acme"));
+    assert_eq!(profile.username.as_deref(), Some("acme"));
+    assert_eq!(
+        profile.avatar_url.as_deref(),
+        Some("https://example.com/i.png")
+    );
+}

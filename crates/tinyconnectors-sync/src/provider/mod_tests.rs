@@ -235,3 +235,24 @@ fn an_action_failure_names_the_action() {
     };
     assert!(error.to_string().contains("GMAIL_FETCH_EMAILS"));
 }
+
+#[derive(Debug)]
+struct BareProvider;
+
+#[async_trait]
+impl ConnectorProvider for BareProvider {
+    fn toolkit_slug(&self) -> &'static str {
+        "bare"
+    }
+    fn description(&self) -> &'static str {
+        "bare"
+    }
+    async fn fetch_user_profile(&self, _: &ProviderContext) -> Result<ProviderUserProfile> {
+        Ok(ProviderUserProfile::default())
+    }
+}
+
+#[test]
+fn a_provider_without_a_catalog_is_uncurated_by_default() {
+    assert!(BareProvider.curated_tools().is_none());
+}
