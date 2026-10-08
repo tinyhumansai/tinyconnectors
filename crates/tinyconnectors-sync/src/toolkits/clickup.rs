@@ -44,5 +44,4 @@ impl ConnectorProvider for ClickupProvider {
             ..ProviderUserProfile::default()
         })
     }
-
 }

@@ -106,10 +106,7 @@ async fn an_unreadable_preference_is_an_error_not_a_grant() {
     // Falling back to the default here would quietly hand the agent write
     // permission the user may have explicitly removed.
     let store = MemoryStore::default();
-    store
-        .set("gmail", &json!("not an object"))
-        .await
-        .unwrap();
+    store.set("gmail", &json!("not an object")).await.unwrap();
 
     let error = UserScopePref::load(&store, "gmail").await.unwrap_err();
     assert!(matches!(error, Error::Decode { .. }));

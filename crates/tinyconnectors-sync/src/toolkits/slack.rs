@@ -2,8 +2,8 @@
 
 use async_trait::async_trait;
 
-use super::slack_catalog::CURATED;
 use super::identity::pick;
+use super::slack_catalog::CURATED;
 use crate::Result;
 use crate::provider::{ConnectorProvider, ProviderContext, ProviderUserProfile};
 use crate::scope::CuratedTool;
@@ -43,5 +43,4 @@ impl ConnectorProvider for SlackProvider {
             ..ProviderUserProfile::default()
         })
     }
-
 }

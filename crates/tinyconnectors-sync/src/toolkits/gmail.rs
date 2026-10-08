@@ -42,5 +42,4 @@ impl ConnectorProvider for GmailProvider {
             ..ProviderUserProfile::default()
         })
     }
-
 }

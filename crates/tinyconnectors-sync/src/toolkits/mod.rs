@@ -27,8 +27,6 @@ mod notion;
 mod notion_catalog;
 mod slack;
 mod slack_catalog;
-mod slack_files;
-mod slack_parse;
 
 pub use clickup::ClickupProvider;
 pub use github::GithubProvider;

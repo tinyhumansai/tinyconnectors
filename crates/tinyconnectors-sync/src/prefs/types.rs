@@ -2,8 +2,8 @@
 
 use serde::{Deserialize, Serialize};
 
-use crate::scope::ToolScope;
 use super::store::PrefsStore;
+use crate::scope::ToolScope;
 use crate::{Error, Result};
 
 /// The key-value namespace holding one row per toolkit.

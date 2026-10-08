@@ -7,7 +7,9 @@ use std::sync::{Arc, Mutex};
 use async_trait::async_trait;
 use serde_json::json;
 
-use super::{ActionRunner, ConnectorProvider, ProviderContext, ProviderRegistry, ProviderUserProfile};
+use super::{
+    ActionRunner, ConnectorProvider, ProviderContext, ProviderRegistry, ProviderUserProfile,
+};
 use crate::scope::{CuratedTool, ToolScope};
 use crate::{Error, Result};
 

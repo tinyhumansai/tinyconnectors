@@ -287,4 +287,3 @@ async fn linear_reads_its_display_name() {
         .unwrap();
     assert_eq!(profile.display_name.as_deref(), Some("Ada"));
 }
-

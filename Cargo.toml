@@ -31,11 +31,10 @@ repository = "https://github.com/tinyhumansai/tinyconnectors"
 # release, and a pinned requirement here would stop resolving the moment it did.
 # Nothing in this workspace is published, so the path is the whole address.
 tinyconnectors-bus = { path = "crates/tinyconnectors-bus" }
-# The provider registry and the sync pipelines. The module crate depends on it
-# for the capability and profile members, which are answered from what the
-# registered providers know. It stays a separate crate so a host that only
-# ingests can take the pipelines without the module, and so the pipelines keep
-# their own dependency rules — no transport, no memory.
+# The provider registry, scope catalogs and scope preferences. The module crate
+# depends on it for the capability, profile and user-scope members, which are
+# answered from what the registered providers know. It stays a separate crate so
+# it keeps its own dependency rules — no transport, no storage engine.
 tinyconnectors-sync = { path = "crates/tinyconnectors-sync" }
 # TinyBus defines the message types, interface macro, and frozen module ABI
 # used by the generated integration. Socket and CLI features are unnecessary
@@ -79,9 +78,8 @@ url = "2"
 # and action names all reach the module over the bus, where an unencoded `&`
 # would forge a query parameter.
 percent-encoding = "2"
-# Civil dates for the sync daily-request budget, which rolls over at a calendar
-# boundary rather than after a fixed number of elapsed seconds. No default
-# features: the `clock` and `oldtime` trees are not needed.
+# Civil dates for the trigger archive, which rotates at a calendar boundary
+# rather than after a fixed number of elapsed seconds. No default features.
 chrono = { version = "0.4", default-features = false, features = ["std", "clock", "serde"] }
 # Safe advisory file locking for the trigger archive's appends. `unsafe` is
 # forbidden workspace-wide, so the `flock` call has to come from a crate that
