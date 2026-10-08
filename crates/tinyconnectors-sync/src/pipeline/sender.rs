@@ -1,9 +1,9 @@
 //! Who wrote an item, as an address and a display name.
 //!
 //! Providers render a sender as `Name <address>`, `"Name" <address>` or a bare
-//! address. Only an email address is kept: a sender named by a phone number
-//! (an SMS gateway, a messaging bridge) is left out, and so is a display name
-//! holding one, because a phone number is never stored.
+//! address. The address is an email address (an SMS or MMS gateway's
+//! `+15551234567@sms.example.com` included) or a phone number, kept as its
+//! dial digits (`+15551234567`) so it is one token wherever it is used.
 
 use serde_json::Value;
 use tinyconnectors_bus::RecordSender;
@@ -35,7 +35,7 @@ fn from_header(item: &Value) -> Option<String> {
 }
 
 /// `Name <address>` or a bare address as a sender; `None` for anything that
-/// is not an email address, or is a phone number's.
+/// is neither an email address nor a phone number.
 pub(super) fn parse(raw: &str) -> Option<RecordSender> {
     let raw = raw.trim();
     let (name, address) = if let Some((name, rest)) = raw.rsplit_once('<') {
@@ -46,35 +46,43 @@ pub(super) fn parse(raw: &str) -> Option<RecordSender> {
     } else {
         ("", raw)
     };
-    let (local, domain) = address.split_once('@')?;
-    let well_formed = !local.is_empty()
-        && domain.contains('.')
-        && !domain.contains('@')
-        && !address
-            .chars()
-            .any(|c| c.is_whitespace() || c == '<' || c == '>');
-    if !well_formed || looks_like_phone(local) {
+    let address = if looks_like_phone(address) {
+        dial_digits(address)
+    } else if is_email(address) {
+        address.to_owned()
+    } else {
         return None;
-    }
+    };
     let name = Some(name)
-        .filter(|name| !name.is_empty() && *name != address && !holds_phone(name))
+        .filter(|name| !name.is_empty() && *name != address)
         .map(str::to_owned);
-    Some(RecordSender {
-        address: address.to_owned(),
-        name,
-    })
+    Some(RecordSender { address, name })
 }
 
-/// Only phone characters, with enough digits to dial.
+/// One `@`, a non-empty local part, a dotted domain, no whitespace.
+fn is_email(address: &str) -> bool {
+    address.split_once('@').is_some_and(|(local, domain)| {
+        !local.is_empty() && domain.contains('.') && !domain.contains('@')
+    }) && !address
+        .chars()
+        .any(|c| c.is_whitespace() || c == '<' || c == '>')
+}
+
+/// Only phone characters, with enough digits (seven) to dial.
 fn looks_like_phone(text: &str) -> bool {
     text.chars()
         .all(|c| c.is_ascii_digit() || "+-(). ".contains(c))
-        && holds_phone(text)
+        && text.chars().filter(char::is_ascii_digit).count() >= 7
 }
 
-/// Seven or more digits: enough to be a phone number.
-fn holds_phone(text: &str) -> bool {
-    text.chars().filter(char::is_ascii_digit).count() >= 7
+/// `text`'s digits, with its leading `+` when it has one.
+fn dial_digits(text: &str) -> String {
+    let digits: String = text.chars().filter(char::is_ascii_digit).collect();
+    if text.starts_with('+') {
+        format!("+{digits}")
+    } else {
+        digits
+    }
 }
 
 #[cfg(test)]

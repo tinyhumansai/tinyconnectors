@@ -44,12 +44,10 @@ pub struct ConnectorRecord {
 }
 
 /// The person a [`ConnectorRecord`] came from.
-///
-/// Named by an email address, never a phone number: a connector leaves
-/// [`ConnectorRecord::sender`] unset rather than fill it with one.
 #[derive(Clone, Debug, Default, PartialEq, Eq, Serialize, Deserialize)]
 pub struct RecordSender {
-    /// The sender's address, e.g. `priya@acme.com`.
+    /// The sender's address: an email address (`priya@acme.com`) or a phone
+    /// number as its dial digits (`+15551234567`).
     pub address: String,
     /// The display name the source gives, when it gives one.
     #[serde(default, skip_serializing_if = "Option::is_none")]

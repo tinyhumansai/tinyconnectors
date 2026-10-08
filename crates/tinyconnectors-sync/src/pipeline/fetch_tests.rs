@@ -65,7 +65,10 @@ fn carries_the_sender_and_leaves_it_unset_when_absent() {
         .iter()
         .map(|record| record.sender.as_ref().map(|sender| sender.address.as_str()))
         .collect();
-    assert_eq!(senders, [Some("priya@acme.com"), None, None]);
+    assert_eq!(
+        senders,
+        [Some("priya@acme.com"), Some("+15551234567"), None]
+    );
 }
 
 #[test]

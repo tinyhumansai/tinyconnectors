@@ -36,14 +36,24 @@ fn reads_a_named_a_quoted_and_a_bare_address() {
 }
 
 #[test]
-fn never_keeps_a_phone_number() {
-    assert_eq!(parse("+15551234567@sms.example.com"), None);
-    assert_eq!(parse("Text <(555) 123-4567@mms.example.com>"), None);
-    assert_eq!(parse("+1 555 123 4567"), None, "not an address at all");
+fn keeps_a_phone_number_sender_as_its_dial_digits() {
+    assert_eq!(
+        parse("+15551234567@sms.example.com"),
+        Some(sender("+15551234567@sms.example.com", None)),
+        "an SMS gateway address is an email address"
+    );
+    assert_eq!(
+        parse("+1 (555) 123-4567"),
+        Some(sender("+15551234567", None))
+    );
+    assert_eq!(
+        parse("Mum <555.123.4567>"),
+        Some(sender("5551234567", Some("Mum")))
+    );
     assert_eq!(
         parse("Call me 555 123 4567 <priya@acme.com>"),
-        Some(sender("priya@acme.com", None)),
-        "the address stays, the name holding a number goes"
+        Some(sender("priya@acme.com", Some("Call me 555 123 4567"))),
+        "a name holding a number is kept"
     );
 }
 
