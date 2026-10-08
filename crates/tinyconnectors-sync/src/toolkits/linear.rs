@@ -1,50 +1,12 @@
-//! The Linear provider.
+//! The Linear provider: its identity read and its curated action catalog.
 
 use async_trait::async_trait;
 
 use super::identity::pick;
 use super::linear_catalog::CURATED;
 use crate::Result;
-use crate::pipeline::{PageSpec, Paging, ProviderPage, fetch_page};
 use crate::provider::{ConnectorProvider, ProviderContext, ProviderUserProfile};
 use crate::scope::CuratedTool;
-
-/// How one page of this toolkit is read.
-///
-/// The paths are alternatives, tried in order: Composio wraps provider payloads
-/// inconsistently, and the same field arrives under different names from
-/// different endpoints of the same API.
-const PAGE: PageSpec = PageSpec {
-    action: "LINEAR_LIST_LINEAR_ISSUES",
-    item_pointers: &[
-        "/data/issues",
-        "/issues",
-        "/data/data/issues",
-        "/data/issues/nodes",
-        "/data/nodes",
-    ],
-    id_paths: &["id", "identifier"],
-    title_paths: &["title"],
-    content_paths: &["description", "descriptionData"],
-    url_paths: &["url"],
-    sender_paths: &[],
-    version_paths: &["updatedAt"],
-    fixed_arguments: &[],
-    page_size_arg: "first",
-    depth_window: None,
-    cursor_arg: "after",
-    // Issues arrive as a GraphQL connection, whose `pageInfo` sits beside its
-    // `nodes`: `endCursor` names the next page only while `hasNextPage` is true.
-    paging: Paging::PageInfo {
-        page_info: &[
-            "/data/pageInfo",
-            "/pageInfo",
-            "/data/data/pageInfo",
-            "/data/issues/pageInfo",
-        ],
-    },
-    clean_bodies: false,
-};
 
 /// The action that reads the connected account's identity.
 const PROFILE_ACTION: &str = "LINEAR_LIST_LINEAR_USERS";
@@ -60,15 +22,11 @@ impl ConnectorProvider for LinearProvider {
     }
 
     fn description(&self) -> &'static str {
-        "Read Linear issues and projects, and ingest them as memory."
+        "Read Linear issues and projects."
     }
 
     fn curated_tools(&self) -> Option<&'static [CuratedTool]> {
         Some(CURATED)
-    }
-
-    fn sync_interval_secs(&self) -> Option<u64> {
-        Some(900)
     }
 
     async fn fetch_user_profile(&self, context: &ProviderContext) -> Result<ProviderUserProfile> {
@@ -83,13 +41,5 @@ impl ConnectorProvider for LinearProvider {
             extras: payload,
             ..ProviderUserProfile::default()
         })
-    }
-
-    async fn fetch_page(
-        &self,
-        context: &ProviderContext,
-        cursor: Option<&str>,
-    ) -> Result<ProviderPage> {
-        fetch_page(context, cursor, &PAGE).await
     }
 }

@@ -1,4 +1,4 @@
-//! Unit tests for the file-backed state store.
+//! Unit tests for the file-backed preference store.
 
 #![allow(clippy::unwrap_used, clippy::expect_used, clippy::panic)]
 
@@ -6,9 +6,9 @@ use std::fs;
 use std::path::PathBuf;
 
 use serde_json::json;
-use tinyconnectors_sync::{Error, STATE_NAMESPACE, SyncState, SyncStateStore};
+use tinyconnectors_sync::{Error, PREFS_NAMESPACE, PrefsStore, UserScopePref};
 
-use super::FileStateStore;
+use super::FilePrefsStore;
 
 struct TempDir(PathBuf);
 
@@ -33,95 +33,81 @@ impl Drop for TempDir {
 
 #[tokio::test]
 async fn a_key_that_was_never_written_reads_as_absent() {
-    // The normal first case for a connection that has never synced — not a
-    // failure, or every first run would report one.
+    // The normal case for a toolkit the user never configured — not a failure,
+    // or every first read would report one.
     let dir = TempDir::new("absent");
-    let store = FileStateStore::new(&dir.0);
-    assert!(
-        store
-            .get(STATE_NAMESPACE, "gmail:conn_1")
-            .await
-            .unwrap()
-            .is_none()
-    );
+    let store = FilePrefsStore::new(&dir.0);
+    assert!(store.get("gmail").await.unwrap().is_none());
 }
 
 #[tokio::test]
 async fn a_value_round_trips() {
     let dir = TempDir::new("roundtrip");
-    let store = FileStateStore::new(&dir.0);
+    let store = FilePrefsStore::new(&dir.0);
 
-    store
-        .set(
-            STATE_NAMESPACE,
-            "gmail:conn_1",
-            &json!({ "cursor": "page-2" }),
-        )
-        .await
-        .unwrap();
+    store.set("gmail", &json!({ "read": true })).await.unwrap();
 
-    let value = store.get(STATE_NAMESPACE, "gmail:conn_1").await.unwrap();
-    assert_eq!(value.unwrap()["cursor"], "page-2");
+    let value = store.get("gmail").await.unwrap();
+    assert_eq!(value.unwrap()["read"], true);
 }
 
 #[tokio::test]
-async fn sync_state_persists_through_it() {
-    let dir = TempDir::new("syncstate");
-    let store = FileStateStore::new(&dir.0);
+async fn a_scope_preference_persists_through_it() {
+    let dir = TempDir::new("pref");
+    let store = FilePrefsStore::new(&dir.0);
 
-    let mut state = SyncState::new("gmail", "conn_1");
-    state.cursor = Some("page-3".into());
-    state.mark_synced("m1", Some("v1"));
-    state.save(&store).await.unwrap();
+    let saved = UserScopePref {
+        read: true,
+        write: false,
+        admin: false,
+    };
+    saved.save(&store, "Gmail").await.unwrap();
 
-    let loaded = SyncState::load(&store, "gmail", "conn_1").await.unwrap();
-    assert_eq!(loaded.cursor.as_deref(), Some("page-3"));
-    assert!(loaded.is_synced("m1"));
+    // A second store over the same directory sees it: the file is the record.
+    let reopened = FilePrefsStore::new(&dir.0);
+    assert_eq!(
+        UserScopePref::load(&reopened, "gmail").await.unwrap(),
+        saved
+    );
 }
 
 #[tokio::test]
-async fn two_connections_do_not_share_a_file() {
-    // One connection's progress must never suppress another's.
+async fn the_file_layout_is_unchanged_so_saved_preferences_keep_reading() {
+    // `<state_dir>/composio-user-scopes/<toolkit>.json` is what earlier
+    // releases wrote; moving it would silently reset every user's choices.
+    let dir = TempDir::new("layout");
+    let store = FilePrefsStore::new(&dir.0);
+    store.set("gmail", &json!({})).await.unwrap();
+
+    assert!(
+        dir.0
+            .join("composio-user-scopes")
+            .join("gmail.json")
+            .is_file()
+    );
+    assert_eq!(PREFS_NAMESPACE, "composio-user-scopes");
+}
+
+#[tokio::test]
+async fn two_toolkits_do_not_share_a_file() {
     let dir = TempDir::new("separate");
-    let store = FileStateStore::new(&dir.0);
+    let store = FilePrefsStore::new(&dir.0);
 
-    store
-        .set(STATE_NAMESPACE, "gmail:conn_1", &json!({ "cursor": "a" }))
-        .await
-        .unwrap();
-    store
-        .set(STATE_NAMESPACE, "gmail:conn_2", &json!({ "cursor": "b" }))
-        .await
-        .unwrap();
+    store.set("gmail", &json!({ "v": "a" })).await.unwrap();
+    store.set("slack", &json!({ "v": "b" })).await.unwrap();
 
-    assert_eq!(
-        store
-            .get(STATE_NAMESPACE, "gmail:conn_1")
-            .await
-            .unwrap()
-            .unwrap()["cursor"],
-        "a"
-    );
-    assert_eq!(
-        store
-            .get(STATE_NAMESPACE, "gmail:conn_2")
-            .await
-            .unwrap()
-            .unwrap()["cursor"],
-        "b"
-    );
+    assert_eq!(store.get("gmail").await.unwrap().unwrap()["v"], "a");
+    assert_eq!(store.get("slack").await.unwrap().unwrap()["v"], "b");
 }
 
 #[tokio::test]
 async fn a_key_cannot_escape_the_state_directory() {
-    // Keys are `toolkit:connection_id`, and the connection id came from a
-    // backend response. Without sanitizing, one containing `../` would write
-    // wherever it liked.
+    // Without sanitizing, a key containing `../` would write wherever it liked.
     let dir = TempDir::new("traversal");
-    let store = FileStateStore::new(&dir.0);
+    let store = FilePrefsStore::new(&dir.0);
 
     store
-        .set(STATE_NAMESPACE, "../../escaped", &json!({ "leaked": true }))
+        .set("../../escaped", &json!({ "leaked": true }))
         .await
         .unwrap();
 
@@ -130,61 +116,42 @@ async fn a_key_cannot_escape_the_state_directory() {
         "the write must not land outside the state directory"
     );
     // And it still round-trips under its sanitized name.
-    let value = store.get(STATE_NAMESPACE, "../../escaped").await.unwrap();
+    let value = store.get("../../escaped").await.unwrap();
     assert_eq!(value.unwrap()["leaked"], true);
-}
-
-#[tokio::test]
-async fn a_namespace_cannot_escape_either() {
-    let dir = TempDir::new("nstraversal");
-    let store = FileStateStore::new(&dir.0);
-
-    store.set("../evil", "k", &json!({})).await.unwrap();
-    assert!(!dir.0.parent().unwrap().join("evil").exists());
 }
 
 #[tokio::test]
 async fn a_lone_dot_key_does_not_become_a_directory_reference() {
     let dir = TempDir::new("dots");
-    let store = FileStateStore::new(&dir.0);
+    let store = FilePrefsStore::new(&dir.0);
 
     for key in [".", "..", "..."] {
-        store
-            .set(STATE_NAMESPACE, key, &json!({ "k": key }))
-            .await
-            .unwrap();
-        assert!(store.get(STATE_NAMESPACE, key).await.unwrap().is_some());
+        store.set(key, &json!({ "k": key })).await.unwrap();
+        assert!(store.get(key).await.unwrap().is_some());
     }
 }
 
 #[tokio::test]
 async fn a_corrupt_file_is_reported_rather_than_read_as_absent() {
-    // Reading it as absent would silently restart the connection's history,
-    // re-ingesting everything the user already had.
+    // Reading it as absent would silently hand the agent the default scopes
+    // while the user's saved choice sat unreadable on disk.
     let dir = TempDir::new("corrupt");
-    let store = FileStateStore::new(&dir.0);
-    store
-        .set(STATE_NAMESPACE, "gmail:conn_1", &json!({}))
-        .await
-        .unwrap();
+    let store = FilePrefsStore::new(&dir.0);
+    store.set("gmail", &json!({})).await.unwrap();
 
-    let path = dir.0.join(STATE_NAMESPACE).join("gmail_conn_1.json");
+    let path = dir.0.join(PREFS_NAMESPACE).join("gmail.json");
     fs::write(&path, "{ not json").unwrap();
 
-    assert!(store.get(STATE_NAMESPACE, "gmail:conn_1").await.is_err());
+    assert!(store.get("gmail").await.is_err());
 }
 
 #[tokio::test]
 async fn a_write_leaves_no_temporary_file_behind() {
     let dir = TempDir::new("atomic");
-    let store = FileStateStore::new(&dir.0);
-    store
-        .set(STATE_NAMESPACE, "gmail:conn_1", &json!({ "cursor": "a" }))
-        .await
-        .unwrap();
+    let store = FilePrefsStore::new(&dir.0);
+    store.set("gmail", &json!({ "read": true })).await.unwrap();
 
-    let namespace_dir = dir.0.join(STATE_NAMESPACE);
-    let stray: Vec<_> = fs::read_dir(&namespace_dir)
+    let stray: Vec<_> = fs::read_dir(dir.0.join(PREFS_NAMESPACE))
         .unwrap()
         .filter_map(std::result::Result::ok)
         .filter(|entry| entry.path().to_string_lossy().ends_with(".tmp"))
@@ -194,50 +161,31 @@ async fn a_write_leaves_no_temporary_file_behind() {
 
 #[tokio::test]
 async fn a_write_creates_the_namespace_directory() {
-    // The first write for a namespace has nowhere to land otherwise, and a
-    // connection's very first sync is exactly that write.
+    // The first write has nowhere to land otherwise.
     let dir = TempDir::new("mkdir");
-    let store = FileStateStore::new(&dir.0);
-    assert!(!dir.0.join(STATE_NAMESPACE).exists());
+    let store = FilePrefsStore::new(&dir.0);
+    assert!(!dir.0.join(PREFS_NAMESPACE).exists());
 
-    store
-        .set(STATE_NAMESPACE, "gmail:conn_1", &json!({}))
-        .await
-        .unwrap();
-    assert!(dir.0.join(STATE_NAMESPACE).is_dir());
+    store.set("gmail", &json!({})).await.unwrap();
+    assert!(dir.0.join(PREFS_NAMESPACE).is_dir());
 }
 
 #[tokio::test]
 async fn a_write_into_an_unwritable_root_is_reported() {
-    // Reported rather than swallowed: a sync whose cursor silently fails to
-    // save re-reads the same pages forever and never says why.
-    let store = FileStateStore::new(std::path::Path::new("/proc/nonexistent-for-tests"));
-    let error = store
-        .set(STATE_NAMESPACE, "gmail:conn_1", &json!({}))
-        .await
-        .unwrap_err();
+    // Reported rather than swallowed: a preference that silently fails to save
+    // would revert at the next restart with no explanation.
+    let store = FilePrefsStore::new(std::path::Path::new("/proc/nonexistent-for-tests"));
+    let error = store.set("gmail", &json!({})).await.unwrap_err();
     assert!(matches!(error, Error::Store { .. }));
 }
 
 #[tokio::test]
 async fn a_read_of_an_unreadable_path_is_reported() {
-    // A directory where a file should be: not "absent", which would restart
-    // the connection's history.
+    // A directory where a file should be: not "absent", which would reset the
+    // user's choices to the default.
     let dir = TempDir::new("unreadable");
-    let store = FileStateStore::new(&dir.0);
-    let namespace_dir = dir.0.join(STATE_NAMESPACE);
-    fs::create_dir_all(namespace_dir.join("gmail_conn_1.json")).unwrap();
+    let store = FilePrefsStore::new(&dir.0);
+    fs::create_dir_all(dir.0.join(PREFS_NAMESPACE).join("gmail.json")).unwrap();
 
-    assert!(store.get(STATE_NAMESPACE, "gmail:conn_1").await.is_err());
-}
-
-#[tokio::test]
-async fn a_value_that_cannot_be_serialized_is_reported() {
-    // `f64::NAN` has no JSON representation.
-    let dir = TempDir::new("unserializable");
-    let store = FileStateStore::new(&dir.0);
-    let value = serde_json::json!({ "n": 1.0 });
-    // A well-formed value still round-trips; the guard is exercised by the
-    // error type existing on the path, which the store-failure test covers.
-    assert!(store.set(STATE_NAMESPACE, "k", &value).await.is_ok());
+    assert!(store.get("gmail").await.is_err());
 }

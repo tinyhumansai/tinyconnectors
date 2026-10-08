@@ -2,14 +2,14 @@
 
 use serde::{Deserialize, Serialize};
 
+use super::store::PrefsStore;
 use crate::scope::ToolScope;
-use crate::state::SyncStateStore;
 use crate::{Error, Result};
 
 /// The key-value namespace holding one row per toolkit.
 ///
-/// Deliberately distinct from the sync-state namespace, so a preference and a
-/// cursor for the same toolkit can never collide.
+/// Durable: changing it strands every user's saved choices, and each toolkit
+/// silently reads as the default again. Pinned by a test.
 pub const PREFS_NAMESPACE: &str = "composio-user-scopes";
 
 /// Which scopes an agent may use for one toolkit.
@@ -75,9 +75,9 @@ impl UserScopePref {
     /// when the stored row is not this shape. Neither falls back to the
     /// default: a preference that cannot be read must not quietly become
     /// permission the user did not grant.
-    pub async fn load(store: &dyn SyncStateStore, toolkit: &str) -> Result<Self> {
+    pub async fn load(store: &dyn PrefsStore, toolkit: &str) -> Result<Self> {
         let key = Self::key(toolkit);
-        let Some(value) = store.get(PREFS_NAMESPACE, &key).await? else {
+        let Some(value) = store.get(&key).await? else {
             return Ok(Self::default());
         };
         serde_json::from_value(value).map_err(|error| Error::Decode {
@@ -94,14 +94,12 @@ impl UserScopePref {
     /// value cannot fail — three booleans always serialize — so it is built
     /// directly rather than through a fallible conversion with a branch nothing
     /// can reach.
-    pub async fn save(self, store: &dyn SyncStateStore, toolkit: &str) -> Result<()> {
+    pub async fn save(self, store: &dyn PrefsStore, toolkit: &str) -> Result<()> {
         let value = serde_json::json!({
             "read": self.read,
             "write": self.write,
             "admin": self.admin,
         });
-        store
-            .set(PREFS_NAMESPACE, &Self::key(toolkit), &value)
-            .await
+        store.set(&Self::key(toolkit), &value).await
     }
 }

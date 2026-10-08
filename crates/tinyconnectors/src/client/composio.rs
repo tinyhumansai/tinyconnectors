@@ -16,7 +16,7 @@ const RESERVED_AUTHORIZE_KEYS: &[&str] = &["toolkit", "toolkit_version", "auth",
 
 /// Gmail's read scope is not in Composio's default set, and a connection made
 /// without it authorizes cleanly and then fails on the first read — hours later,
-/// as a sync error nobody connects back to the handoff.
+/// as a read error nobody connects back to the handoff.
 const GMAIL_REQUIRED_OAUTH_SCOPES: &[&str] = &["https://www.googleapis.com/auth/gmail.readonly"];
 
 const OAUTH_SCOPES_FIELD: &str = "oauth_scopes";

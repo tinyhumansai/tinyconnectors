@@ -12,7 +12,7 @@ fn a_store_failure_names_the_key_and_repeats_the_host_message() {
     };
     assert_eq!(
         error.to_string(),
-        "sync state store failed for gmail:conn_1: database is locked"
+        "preference store failed for gmail:conn_1: database is locked"
     );
 }
 

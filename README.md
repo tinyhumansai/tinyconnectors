@@ -17,8 +17,8 @@ calls depends on the contract crate alone and compiles neither the module nor
 
 Composio is the connector backend today, and the design does not assume it will
 be the only one. Everything Composio-shaped is namespaced under `composio`; the
-neutral parts — the OAuth handoff policy, the transport seam, the record
-vocabulary, the error type — name it nowhere. A second backend arrives as a
+neutral parts — the OAuth handoff policy, the transport seam, the
+error type — name it nowhere. A second backend arrives as a
 sibling interface and object path, not as a rename of the first.
 
 The `Composio`-prefixed payload types keep their names deliberately: they mirror
@@ -55,12 +55,13 @@ is refused before any request is made — parsed, not prefix-matched, because
 `http://127.0.0.1:8080@evil.com` resolves to `evil.com` and would carry the
 credential header there.
 
-## What a sync emits
+## No sync engine
 
-Connector sync does not write memory. It returns `ConnectorRecordBatch`, the
-host hands it to the memory engine over memory's own bus API, and neither side
-links the other. `ConnectorRecord`'s wire shape is memory's ingestion vocabulary
-exactly — asserted in a test — so the join needs no translation step.
+The module does not pull records out of connected accounts. Contract 1.12
+removed the `Sync` member and the pipelines behind it (cursors, request
+budgets, dedupe, per-toolkit paging). A host that wants data from a connected
+account asks for it through `Execute`, one action at a time. See
+[ADR 0002](docs/adr/0002-remove-the-sync-engine.md).
 
 ## Served surface
 

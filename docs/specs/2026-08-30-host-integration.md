@@ -4,6 +4,10 @@
 Implements phase 5 of
 [the extraction plan](../plans/2026-08-30-connector-extraction.md).
 
+> **Superseded in part by [ADR 0002](../adr/0002-remove-the-sync-engine.md).**
+> The `Sync` member, `ConnectorRecord*` types and sync pipelines described
+> below were removed in contract 1.12. The rest of this document stands.
+
 ## What a host has to do
 
 Three things, in order. Only the first is optional.
@@ -78,8 +82,9 @@ module gets a credential:
 `config.composio.mode` and the keychain lookup in
 `security::credentials::get_composio_api_key` stay in OpenHuman. They stop
 constructing a client and start choosing a blob. `state_dir` should be the
-host's existing state directory — the module keeps its sync cursors and the
-trigger archive there.
+host's existing state directory — the module keeps its scope-preference store
+and the trigger archive there. Until the preference migration in section 6
+lands, the host still owns the user's actual preference.
 
 The blob is also optional. A module loaded without one still answers the
 capability members, so a signed-out user is not locked out of the question
@@ -140,17 +145,15 @@ them out over the user's sockets. The module has no socket, so this stays
 exactly where it is. Feed each delivery to `ListTriggerHistory`'s archive by
 calling the module, so the history member has something to report.
 
-**Scope enforcement is now the module's.** `ListTools` hides what the user's
+**Scope enforcement is the module's once the store moves (section 6).** `ListTools` hides what the user's
 preference forbids and `Execute` refuses it. Do not re-filter host-side against
 a separately stored preference — two sources of truth for a permission is how
 one of them ends up stale and permissive.
 
 ## What changes for memory
 
-Nothing, until phase 4. `tinymemory` keeps its Composio sync until the host
-calls `Sync` on the module instead, and the sync returns records the host writes
-to memory over memory's own API. Phase 4 then deletes what nothing calls —
-see the ordering note at the top of that phase.
+Nothing. The `Sync` hand-off this section once described was removed in
+contract 1.12 (see ADR 0002): OpenHuman no longer syncs Composio into memory.
 
 
 ## 6. The scope store is not moved yet

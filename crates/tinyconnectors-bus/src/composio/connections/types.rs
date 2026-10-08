@@ -147,9 +147,6 @@ pub struct ComposioAuthorizeRequest {
 pub struct ComposioDeleteConnectionRequest {
     /// Id of the connection to remove.
     pub connection_id: String,
-    /// Whether to delete memory sourced from that connection along with it.
-    #[serde(default)]
-    pub clear_memory: bool,
 }
 
 /// Response body of `POST /agent-integrations/composio/authorize`.
@@ -238,8 +235,4 @@ pub struct ComposioDeleteResponse {
     /// Whether the connection row was removed.
     #[serde(default)]
     pub deleted: bool,
-    /// How many memory chunks sourced from that connection were removed with
-    /// it. Disconnecting an account must not leave its content behind.
-    #[serde(default)]
-    pub memory_chunks_deleted: usize,
 }

@@ -16,7 +16,7 @@
 //!    payload size / improves ordering — correctness never depends on it.
 //! 2. **Authoritative client-side post-filter** ([`filter_response`]): drop
 //!    rows whose timestamp predates `now - window`. This is the enforcement.
-//!    Mirrors the `sync_depth_days` floor in the native sync providers.
+//!    This is the enforcement; the server-side narrowing is only an optimization.
 //!
 //! Scope is intentionally narrow: only slugs with a *verified* response shape
 //! are listed. An unknown slug degrades to "no filtering" — never a crash and never a
@@ -147,7 +147,7 @@ fn spec_for(slug: &str) -> Option<TaskWindowSpec> {
         // created-or-modified semantics. `created_at` is kept as a harmless
         // defensive fallback (extra fields only ever keep, never drop).
         // CONFIRM-AT-RUNTIME: response envelope via composio_list_tools (Todoist
-        // is not a native sync provider, so there's no extractor to mirror).
+        // has no native provider, so there's no extractor to mirror).
         "TODOIST_GET_ALL_TASKS" => Some(TaskWindowSpec {
             items_paths: &[
                 &["tasks"],

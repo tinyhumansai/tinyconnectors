@@ -17,7 +17,7 @@ fn unrouted_service() -> ConnectorService {
     let client = Arc::new(RwLock::new(None));
     ConnectorService {
         actions: Arc::new(crate::providers::ClientActions::new(Arc::clone(&client))),
-        state: Arc::new(super::EphemeralStateStore::default()),
+        prefs: Arc::new(super::EphemeralPrefsStore::default()),
         registry: crate::providers::default_registry(),
         client,
         archive: None,

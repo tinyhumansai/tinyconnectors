@@ -362,6 +362,8 @@ async fn authorize_refuses_to_let_extra_params_override_a_reserved_key() {
 
 #[tokio::test]
 async fn deletes_a_connection_by_id() {
+    // A backend that still reports the retired `memory_chunks_deleted` count
+    // must not break the decode.
     let transport = FakeTransport::replying(json!({
         "deleted": true, "memory_chunks_deleted": 12
     }));
@@ -369,7 +371,6 @@ async fn deletes_a_connection_by_id() {
 
     let resp = client.delete_connection(" conn_9 ").await.unwrap();
     assert!(resp.deleted);
-    assert_eq!(resp.memory_chunks_deleted, 12);
 
     let call = &transport.calls()[0];
     assert_eq!(call.verb, "DELETE");

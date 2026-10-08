@@ -1,37 +1,22 @@
-//! Pulling records out of connected accounts, for a host to ingest.
+//! The provider registry, scope catalogs and preferences behind the connector
+//! module.
 //!
-//! A sync run reads a user's Gmail, Slack, or Notion through a connector and
-//! produces [`tinyconnectors_bus::ConnectorRecordBatch`]. It does not store
-//! anything. The host takes the batch and writes it to memory over memory's own
-//! bus API.
-//!
-//! # Why this crate has no memory dependency
-//!
-//! These pipelines used to live inside the memory system and call its store
-//! directly, which is why they could not be moved without taking half of memory
-//! with them. Returning records instead cuts that: a pipeline knows how to talk
-//! to Gmail, memory knows how to store things, and neither links the other.
-//!
-//! The one thing a pipeline genuinely needs to remember between runs — where it
-//! got to, what it has already seen, how much of today's request budget is left
-//! — goes through [`state::SyncStateStore`], a small key-value seam the host
-//! implements. That is deliberately not a memory dependency: it is two methods
-//! over JSON, and a host can back it with anything.
+//! A provider is what a connector knows about one toolkit: how to read the
+//! connected account's identity and which of the toolkit's actions are worth
+//! offering an agent. The module crate answers its capability, profile and
+//! scope members from the registry in this crate. Nothing here pulls records
+//! out of an account on a schedule, and nothing here stores anything: a
+//! preference goes through [`prefs::PrefsStore`], a small key-value seam the
+//! host implements.
 //!
 //! # What is here
 //!
 //! - [`scope`] — how invasive an action is, and the curated catalogs that keep
 //!   a toolkit's sixty-odd actions from all reaching the agent.
-//! - [`prefs`] — what the user has allowed an agent to do with each toolkit.
-//! - [`pipeline`] — the loop around a provider's page: cursors, budgets, item
-//!   limits, and dedupe.
-//! - [`clean`] — cutting quoted chains and boilerplate out of a body before it
-//!   is ingested, so a mailbox's worth of identical footers does not dominate
-//!   every search run over the result.
+//! - [`prefs`] — what the user has allowed an agent to do with each toolkit,
+//!   and the [`PrefsStore`] it is persisted through.
 //! - [`provider`] — what a connector knows about one toolkit, and the registry
 //!   that looks one up by slug.
-//! - [`state`] — per-connection cursors, dedupe sets, and the daily request
-//!   budget, persisted through the host's key-value seam.
 //! - [`toolkits`] — the toolkits this build knows, each with its curated action
 //!   catalog and how to read the connected account's identity.
 //!
@@ -48,23 +33,16 @@
 //! assert_eq!(toolkit_from_slug("GMAIL_SEND_EMAIL").as_deref(), Some("gmail"));
 //! ```
 
-pub mod clean;
 mod error;
-pub mod pipeline;
 pub mod prefs;
 pub mod provider;
 pub mod scope;
-pub mod state;
 pub mod toolkits;
 
-pub use clean::clean_body;
 pub use error::{Error, Result};
-pub use pipeline::{DepthWindow, PageSpec, Paging, ProviderPage, SyncOutcome, run_sync};
-pub use prefs::{PREFS_NAMESPACE, UserScopePref};
+pub use prefs::{PREFS_NAMESPACE, PrefsStore, UserScopePref};
 pub use provider::{
     ActionRunner, ConnectorProvider, ProviderContext, ProviderRegistry, ProviderUserProfile,
-    SyncLimits, SyncReason,
 };
 pub use scope::{CuratedTool, ToolScope, classify_unknown, find_curated, toolkit_from_slug};
-pub use state::{DailyBudget, STATE_NAMESPACE, SyncState, SyncStateStore};
 pub use toolkits::default_registry;

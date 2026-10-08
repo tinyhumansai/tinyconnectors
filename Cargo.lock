@@ -1190,13 +1190,11 @@ name = "tinyconnectors-sync"
 version = "0.12.4"
 dependencies = [
  "async-trait",
- "chrono",
  "serde",
  "serde_json",
  "thiserror",
  "tinyconnectors-bus",
  "tokio",
- "tracing",
 ]
 
 [[package]]

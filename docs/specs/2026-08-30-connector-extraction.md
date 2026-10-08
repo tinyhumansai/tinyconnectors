@@ -3,6 +3,10 @@
 **Status:** accepted. Phase 1 landed; phases 2–5 planned in
 [`docs/plans/2026-08-30-connector-extraction.md`](../plans/2026-08-30-connector-extraction.md).
 
+> **Superseded in part by [ADR 0002](../adr/0002-remove-the-sync-engine.md).**
+> The `Sync` member, `ConnectorRecord*` types and sync pipelines described
+> below were removed in contract 1.12. The rest of this document stands.
+
 ## What this is
 
 OAuth connector integrations currently live in two repositories that each own

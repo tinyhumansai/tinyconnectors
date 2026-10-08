@@ -1,18 +1,18 @@
-//! A key-value store backed by one JSON file per key.
+//! A preference store backed by one JSON file per toolkit.
 
 use std::path::{Path, PathBuf};
 
 use async_trait::async_trait;
-use tinyconnectors_sync::{Error as SyncError, Result as SyncResult, SyncStateStore};
+use tinyconnectors_sync::{Error as SyncError, PREFS_NAMESPACE, PrefsStore, Result as SyncResult};
 
-/// Sync state persisted under a directory the host named.
+/// Scope preferences persisted under a directory the host named.
 #[derive(Debug, Clone)]
-pub struct FileStateStore {
+pub struct FilePrefsStore {
     root: PathBuf,
 }
 
-impl FileStateStore {
-    /// Store state under `state_dir`.
+impl FilePrefsStore {
+    /// Store preferences under `state_dir`.
     #[must_use]
     pub fn new(state_dir: &Path) -> Self {
         Self {
@@ -22,13 +22,13 @@ impl FileStateStore {
 
     /// The file one key lives in.
     ///
-    /// Namespace and key both become path segments, so both are sanitized: a
-    /// key containing `/` or `..` would otherwise write outside the state
-    /// directory entirely. Keys arrive as `toolkit:connection_id`, where the
-    /// connection id came from a backend response.
-    fn path_for(&self, namespace: &str, key: &str) -> PathBuf {
+    /// The key becomes a path segment, so it is sanitized: a key containing `/`
+    /// or `..` would otherwise write outside the state directory entirely. Keys
+    /// are toolkit slugs, which arrive from a config file, a UI field and a
+    /// backend envelope.
+    fn path_for(&self, key: &str) -> PathBuf {
         self.root
-            .join(sanitize(namespace))
+            .join(sanitize(PREFS_NAMESPACE))
             .join(format!("{}.json", sanitize(key)))
     }
 }
@@ -58,9 +58,9 @@ fn sanitize(segment: &str) -> String {
 }
 
 #[async_trait]
-impl SyncStateStore for FileStateStore {
-    async fn get(&self, namespace: &str, key: &str) -> SyncResult<Option<serde_json::Value>> {
-        let path = self.path_for(namespace, key);
+impl PrefsStore for FilePrefsStore {
+    async fn get(&self, key: &str) -> SyncResult<Option<serde_json::Value>> {
+        let path = self.path_for(key);
         let failed = |message: String| SyncError::Store {
             key: key.to_string(),
             message,
@@ -68,8 +68,8 @@ impl SyncStateStore for FileStateStore {
 
         let contents = match tokio::fs::read_to_string(&path).await {
             Ok(contents) => contents,
-            // A connection that has never synced is the normal first case, not
-            // a failure.
+            // A toolkit the user never configured is the normal case, not a
+            // failure.
             Err(error) if error.kind() == std::io::ErrorKind::NotFound => return Ok(None),
             Err(error) => {
                 return Err(failed(format!(
@@ -84,8 +84,8 @@ impl SyncStateStore for FileStateStore {
             .map_err(|error| failed(format!("{} is not valid JSON: {error}", path.display())))
     }
 
-    async fn set(&self, namespace: &str, key: &str, value: &serde_json::Value) -> SyncResult<()> {
-        let path = self.path_for(namespace, key);
+    async fn set(&self, key: &str, value: &serde_json::Value) -> SyncResult<()> {
+        let path = self.path_for(key);
         let failed = |message: String| SyncError::Store {
             key: key.to_string(),
             message,
@@ -98,11 +98,11 @@ impl SyncStateStore for FileStateStore {
         }
 
         let serialized = serde_json::to_vec(value)
-            .map_err(|error| failed(format!("could not serialize the state: {error}")))?;
+            .map_err(|error| failed(format!("could not serialize the value: {error}")))?;
 
         // Write beside, then rename. A process killed mid-write would otherwise
-        // leave a truncated file, and a cursor that will not parse strands the
-        // connection until someone deletes it by hand.
+        // leave a truncated file, and a preference that will not parse is an
+        // error until someone deletes it by hand.
         let temporary = path.with_extension("json.tmp");
         tokio::fs::write(&temporary, &serialized)
             .await

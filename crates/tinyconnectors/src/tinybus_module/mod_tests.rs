@@ -27,8 +27,7 @@ use tinyconnectors_bus::{
     ComposioListTriggerHistoryRequest, ComposioListTriggersRequest,
     ComposioRefreshIdentitiesResponse, ComposioSetUserScopesRequest, ComposioToolkitsResponse,
     ComposioToolsResponse, ComposioTriggerHistoryResult, ComposioUserProfile,
-    ComposioUserProfileRequest, ComposioUserScopes, ComposioUserScopesResponse,
-    ConnectorSyncRequest, ConnectorSyncResponse, SyncStage, names,
+    ComposioUserProfileRequest, ComposioUserScopes, ComposioUserScopesResponse, names,
 };
 
 use super::{ConnectorService, ModuleConfig};
@@ -109,7 +108,7 @@ fn service_over(transport: Arc<StubTransport>) -> ConnectorService {
     let client = Arc::new(std::sync::RwLock::new(Some(client)));
     ConnectorService {
         actions: Arc::new(crate::providers::ClientActions::new(Arc::clone(&client))),
-        state: Arc::new(super::EphemeralStateStore::default()),
+        prefs: Arc::new(super::EphemeralPrefsStore::default()),
         registry: crate::providers::default_registry(),
         client,
         // No archive: these tests exercise the backend-facing members. The
@@ -316,7 +315,7 @@ async fn carries_authorize_arguments_across_the_bus() -> tinybus::Result<()> {
 #[tokio::test]
 async fn deletes_a_connection_over_the_bus() -> tinybus::Result<()> {
     let transport = StubTransport::replying(json!({
-        "deleted": true, "memory_chunks_deleted": 3
+        "deleted": true
     }));
     let (_serving, _client, proxy, _bus) = proxy_to(service_over(transport)).await?;
 
@@ -325,13 +324,11 @@ async fn deletes_a_connection_over_the_bus() -> tinybus::Result<()> {
             names::methods::DELETE_CONNECTION,
             (ComposioDeleteConnectionRequest {
                 connection_id: "conn_9".into(),
-                clear_memory: true,
             },),
         )
         .await?;
 
     assert!(reply.deleted);
-    assert_eq!(reply.memory_chunks_deleted, 3);
     Ok(())
 }
 
@@ -587,92 +584,6 @@ async fn local_argument_validation_fails_the_member_before_any_request() -> tiny
     };
     assert!(error.to_string().contains("recipient"));
     assert!(transport.last_body.lock().unwrap().is_none());
-    Ok(())
-}
-
-#[tokio::test]
-async fn syncs_a_toolkit_into_records_without_storing_them() -> tinybus::Result<()> {
-    // The module reads a connected account and hands the records back. It
-    // stores nothing: memory does that, over its own bus API.
-    let transport = StubTransport::replying(json!({
-        "successful": true,
-        "data": { "data": { "messages": [
-            { "id": "m1", "subject": "Hi", "snippet": "there" },
-            { "id": "m2", "subject": "Again", "snippet": "hello" }
-        ] } }
-    }));
-    let (_serving, _client, proxy, _bus) = proxy_to(service_over(transport)).await?;
-
-    let reply: ConnectorSyncResponse = proxy
-        .call(
-            names::methods::SYNC,
-            (ConnectorSyncRequest {
-                toolkit: "gmail".into(),
-                connection_id: Some("conn_1".into()),
-                source_id: Some("gmail:primary".into()),
-                max_items: Some(10),
-                depth_days: None,
-                reason: Some("scheduled".into()),
-            },),
-        )
-        .await?;
-
-    assert_eq!(reply.stage, SyncStage::Completed);
-    assert_eq!(reply.batch.records.len(), 2);
-    assert_eq!(reply.batch.toolkit, "gmail");
-    assert_eq!(reply.batch.source_id, "gmail:primary");
-    assert!(reply.batch.complete, "the provider had no next page");
-    assert_eq!(reply.pages_read, 1);
-    Ok(())
-}
-
-#[tokio::test]
-async fn a_second_sync_skips_what_the_first_already_read() -> tinybus::Result<()> {
-    // The cursor and the seen-set are the module's, so a caller does not carry
-    // one — and a re-run does not re-ingest a user's whole mailbox.
-    let transport = StubTransport::replying(json!({
-        "successful": true,
-        "data": { "data": { "messages": [{ "id": "m1", "subject": "Hi" }] } }
-    }));
-    let (_serving, _client, proxy, _bus) = proxy_to(service_over(transport)).await?;
-
-    let request = ConnectorSyncRequest {
-        toolkit: "gmail".into(),
-        connection_id: Some("conn_1".into()),
-        ..ConnectorSyncRequest::default()
-    };
-
-    let first: ConnectorSyncResponse = proxy.call(names::methods::SYNC, (request.clone(),)).await?;
-    assert_eq!(first.batch.records.len(), 1);
-
-    let second: ConnectorSyncResponse = proxy.call(names::methods::SYNC, (request,)).await?;
-    assert!(second.batch.records.is_empty(), "already ingested");
-    assert_eq!(second.records_skipped, 1);
-    Ok(())
-}
-
-#[tokio::test]
-async fn syncing_a_toolkit_with_no_provider_says_so() -> tinybus::Result<()> {
-    let transport = StubTransport::replying(json!({}));
-    let (_serving, _client, proxy, _bus) = proxy_to(service_over(transport)).await?;
-
-    let result = proxy
-        .call::<ConnectorSyncResponse>(
-            names::methods::SYNC,
-            (ConnectorSyncRequest {
-                toolkit: "dropbox".into(),
-                connection_id: Some("conn_1".into()),
-                ..ConnectorSyncRequest::default()
-            },),
-        )
-        .await;
-
-    let Err(error) = result else {
-        return Err(tinybus::Error::failed(
-            "an unknown toolkit unexpectedly synced",
-        ));
-    };
-    assert!(error.to_string().contains("no provider"));
     Ok(())
 }
 
@@ -1059,32 +970,17 @@ fn a_named_state_dir_is_carried_through() {
     );
 }
 
-#[test]
-fn an_unrecognized_sync_reason_is_treated_as_manual() {
-    // The reason is a log line and a status label. Failing a sync over one
-    // would break a working integration for a cosmetic field.
-    use tinyconnectors_sync::SyncReason;
-    assert_eq!(super::sync_reason(Some("scheduled")), SyncReason::Scheduled);
-    assert_eq!(super::sync_reason(Some("trigger")), SyncReason::Trigger);
-    assert_eq!(
-        super::sync_reason(Some("initial_connect")),
-        SyncReason::InitialConnect
-    );
-    assert_eq!(super::sync_reason(Some("nonsense")), SyncReason::Manual);
-    assert_eq!(super::sync_reason(None), SyncReason::Manual);
-}
-
 #[tokio::test]
-async fn the_ephemeral_state_store_round_trips() {
-    // The fallback for a host that named no directory: sync state that lives
+async fn the_ephemeral_prefs_store_round_trips() {
+    // The fallback for a host that named no directory: preferences that live
     // only as long as the module.
-    use tinyconnectors_sync::SyncStateStore;
-    let store = super::EphemeralStateStore::default();
+    use tinyconnectors_sync::PrefsStore;
+    let store = super::EphemeralPrefsStore::default();
 
-    assert!(store.get("ns", "k").await.unwrap().is_none());
-    store.set("ns", "k", &json!({ "a": 1 })).await.unwrap();
-    assert_eq!(store.get("ns", "k").await.unwrap().unwrap()["a"], 1);
-    assert!(store.get("other", "k").await.unwrap().is_none());
+    assert!(store.get("k").await.unwrap().is_none());
+    store.set("k", &json!({ "a": 1 })).await.unwrap();
+    assert_eq!(store.get("k").await.unwrap().unwrap()["a"], 1);
+    assert!(store.get("other").await.unwrap().is_none());
 }
 
 // ── setup ────────────────────────────────────────────────────────────
@@ -1232,7 +1128,7 @@ async fn a_named_state_dir_persists_the_scope_preference() {
     // The difference between the two stores, observable: a preference written
     // through one module instance is read back by the next.
     let dir = TempDir::new("persist");
-    let store = super::state_store(Some(&dir.0));
+    let store = super::prefs_store(Some(&dir.0));
     tinyconnectors_sync::UserScopePref {
         read: true,
         write: false,
@@ -1242,7 +1138,7 @@ async fn a_named_state_dir_persists_the_scope_preference() {
     .await
     .expect("saves");
 
-    let reopened = super::state_store(Some(&dir.0));
+    let reopened = super::prefs_store(Some(&dir.0));
     let pref = tinyconnectors_sync::UserScopePref::load(reopened.as_ref(), "gmail")
         .await
         .expect("loads");
@@ -1251,8 +1147,9 @@ async fn a_named_state_dir_persists_the_scope_preference() {
 
 #[tokio::test]
 async fn an_unnamed_state_dir_keeps_nothing_between_instances() {
-    // Documented, not accidental: a host that means to sync should name one.
-    let store = super::state_store(None);
+    // Documented, not accidental: a host that wants preferences to stick should
+    // name one.
+    let store = super::prefs_store(None);
     tinyconnectors_sync::UserScopePref {
         read: true,
         write: false,
@@ -1262,7 +1159,7 @@ async fn an_unnamed_state_dir_keeps_nothing_between_instances() {
     .await
     .expect("saves");
 
-    let fresh = super::state_store(None);
+    let fresh = super::prefs_store(None);
     let pref = tinyconnectors_sync::UserScopePref::load(fresh.as_ref(), "gmail")
         .await
         .expect("loads");
@@ -1281,7 +1178,7 @@ async fn a_module_loaded_without_a_route_becomes_usable_after_configure() {
         actions: Arc::new(crate::providers::ClientActions::new(Arc::new(
             std::sync::RwLock::new(None),
         ))),
-        state: Arc::new(super::EphemeralStateStore::default()),
+        prefs: Arc::new(super::EphemeralPrefsStore::default()),
         registry: crate::providers::default_registry(),
         client: Arc::new(std::sync::RwLock::new(None)),
         archive: None,
@@ -1349,13 +1246,13 @@ async fn configure_refuses_a_base_url_that_would_leak_the_credential() {
 #[tokio::test]
 async fn a_reconfigured_route_reaches_the_action_runner_too() {
     // The runner shares the client handle rather than holding a copy. If it
-    // did not, a sync started after a sign-out would keep using the credential
+    // did not, an action run after a sign-out would keep using the credential
     // the module happened to load with.
     let client = Arc::new(std::sync::RwLock::new(None));
     let actions = Arc::new(crate::providers::ClientActions::new(Arc::clone(&client)));
     let service = ConnectorService {
         actions: Arc::clone(&actions),
-        state: Arc::new(super::EphemeralStateStore::default()),
+        prefs: Arc::new(super::EphemeralPrefsStore::default()),
         registry: crate::providers::default_registry(),
         client,
         archive: None,
@@ -1455,58 +1352,4 @@ async fn a_failed_enable_trigger_carries_an_error_class() {
 
     assert!(error.contains("[composio:error:"), "{error}");
     assert!(error.contains("rate limited"), "{error}");
-}
-
-#[tokio::test]
-async fn a_depth_window_reaches_gmail_as_a_search_query() -> tinybus::Result<()> {
-    // The host's "sync depth (days)" setting was a no-op for every connector:
-    // the request had no field for it and the page read never asked. It now
-    // crosses the bus and lands in the one place Gmail can honour it — the
-    // `after:` term of the fetch action's query.
-    let transport = StubTransport::replying(json!({
-        "successful": true,
-        "data": { "data": { "messages": [{ "id": "m1", "subject": "Hi" }] } }
-    }));
-    let (_serving, _client, proxy, _bus) = proxy_to(service_over(Arc::clone(&transport))).await?;
-    let _reply: ConnectorSyncResponse = proxy
-        .call(
-            names::methods::SYNC,
-            (ConnectorSyncRequest {
-                toolkit: "gmail".into(),
-                connection_id: Some("conn_1".into()),
-                depth_days: Some(30),
-                ..ConnectorSyncRequest::default()
-            },),
-        )
-        .await?;
-    let body = transport.last_body.lock().unwrap().clone().unwrap();
-    assert_eq!(body["tool"], "GMAIL_FETCH_EMAILS");
-    let query = body["arguments"]["query"].as_str().unwrap_or_default();
-    assert!(query.starts_with("after:"), "{body}");
-    Ok(())
-}
-
-#[tokio::test]
-async fn a_request_without_a_window_reads_unbounded() -> tinybus::Result<()> {
-    // A host built before the field — or one whose setting is cleared — must
-    // get what every earlier release gave it: the whole account, no `query`.
-    // The library's default window is for direct callers, not for the bus.
-    let transport = StubTransport::replying(json!({
-        "successful": true,
-        "data": { "data": { "messages": [{ "id": "m1", "subject": "Hi" }] } }
-    }));
-    let (_serving, _client, proxy, _bus) = proxy_to(service_over(Arc::clone(&transport))).await?;
-    let _reply: ConnectorSyncResponse = proxy
-        .call(
-            names::methods::SYNC,
-            (ConnectorSyncRequest {
-                toolkit: "gmail".into(),
-                connection_id: Some("conn_1".into()),
-                ..ConnectorSyncRequest::default()
-            },),
-        )
-        .await?;
-    let body = transport.last_body.lock().unwrap().clone().unwrap();
-    assert!(body["arguments"].get("query").is_none(), "{body}");
-    Ok(())
 }

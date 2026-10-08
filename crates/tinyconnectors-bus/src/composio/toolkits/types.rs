@@ -69,16 +69,8 @@ pub struct ComposioCapability {
     pub tool_execution: bool,
     /// Whether a user profile can be fetched from the connected account.
     pub user_profile: bool,
-    /// Whether a first, backfilling sync runs on connect.
-    pub initial_sync: bool,
-    /// Whether the toolkit is re-synced on a schedule.
-    pub periodic_sync: bool,
-    /// Interval between periodic syncs, when one is scheduled.
-    pub sync_interval_secs: Option<u64>,
     /// Whether the toolkit delivers webhook-backed triggers.
     pub trigger_webhooks: bool,
-    /// Whether synced records are written into memory.
-    pub memory_ingest: bool,
 }
 
 /// Response body of the capability-matrix member.
