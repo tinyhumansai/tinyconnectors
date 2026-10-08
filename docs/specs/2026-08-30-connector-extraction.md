@@ -5,7 +5,7 @@
 
 > **Superseded in part by [ADR 0002](../adr/0002-remove-the-sync-engine.md).**
 > The `Sync` member, `ConnectorRecord*` types and sync pipelines described
-> below were removed in contract 2.0. The rest of this document stands.
+> below were removed in contract 1.12. The rest of this document stands.
 
 ## What this is
 

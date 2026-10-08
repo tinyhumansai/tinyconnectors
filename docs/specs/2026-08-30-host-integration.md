@@ -6,7 +6,7 @@ Implements phase 5 of
 
 > **Superseded in part by [ADR 0002](../adr/0002-remove-the-sync-engine.md).**
 > The `Sync` member, `ConnectorRecord*` types and sync pipelines described
-> below were removed in contract 2.0. The rest of this document stands.
+> below were removed in contract 1.12. The rest of this document stands.
 
 ## What a host has to do
 
@@ -152,7 +152,7 @@ one of them ends up stale and permissive.
 ## What changes for memory
 
 Nothing. The `Sync` hand-off this section once described was removed in
-contract 2.0 (see ADR 0002): OpenHuman no longer syncs Composio into memory.
+contract 1.12 (see ADR 0002): OpenHuman no longer syncs Composio into memory.
 
 
 ## 6. The scope store is not moved yet
