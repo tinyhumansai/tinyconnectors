@@ -6,7 +6,7 @@ use super::{CONTRACT_VERSION, binds, is_compatible};
 
 #[test]
 fn the_shipped_contract_version_is_pinned() {
-    assert_eq!(CONTRACT_VERSION, (2, 0));
+    assert_eq!(CONTRACT_VERSION, (1, 12));
 }
 
 #[test]
@@ -35,8 +35,14 @@ fn an_older_minor_on_the_module_side_is_rejected() {
 #[test]
 fn a_different_major_is_rejected() {
     assert!(!is_compatible((0, 0)));
-    // The 1.x line, which still served `Sync`, no longer binds.
-    assert!(!is_compatible((1, 11)));
+    assert!(!is_compatible((2, 0)));
     assert!(!is_compatible((3, 0)));
     assert!(!is_compatible((3, 97)));
+}
+
+#[test]
+fn a_module_from_before_the_sync_removal_is_rejected() {
+    // 1.11 still served `Sync`; a 1.12 host binds only to a module that
+    // reports the contract without it.
+    assert!(!is_compatible((1, 11)));
 }

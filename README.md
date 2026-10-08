@@ -57,7 +57,7 @@ credential header there.
 
 ## No sync engine
 
-The module does not pull records out of connected accounts. Contract 2.0
+The module does not pull records out of connected accounts. Contract 1.12
 removed the `Sync` member and the pipelines behind it (cursors, request
 budgets, dedupe, per-toolkit paging). A host that wants data from a connected
 account asks for it through `Execute`, one action at a time. See

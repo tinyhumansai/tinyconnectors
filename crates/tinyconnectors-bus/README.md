@@ -107,7 +107,7 @@ unanswered.
 
 ## Versioning
 
-Contract 2.0 removed the `Sync` member, the `records` module
+Contract 1.12 removed the `Sync` member, the `records` module
 (`ConnectorRecord`, `ConnectorRecordBatch`, `RecordSender`, `SyncEvent`,
 `SyncStage`, `ConnectorSyncRequest`, `ConnectorSyncResponse`) and the sync
 fields of `ComposioCapability` (`initial_sync`, `periodic_sync`,

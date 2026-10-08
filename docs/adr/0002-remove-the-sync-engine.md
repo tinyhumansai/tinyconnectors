@@ -39,13 +39,15 @@ through the sync state seam, so that seam shrinks to `PrefsStore`, and
 reading. The `tinyconnectors-sync` crate keeps its name to avoid churning
 downstream paths.
 
-`CONTRACT_VERSION` moves from 1.11 to 2.0: a member and several payload types
-were removed, which is a major change.
+`CONTRACT_VERSION` moves from 1.11 to 1.12. Removing a member is strictly a
+major change, but the only host that called `Sync` drops it in the same
+change and pins the module release it binds to, so a minor bump keeps the 1.x
+line without stranding any caller.
 
 ## Consequences
 
-- A host built against contract 1.x no longer binds; it must drop its `Sync`
-  call sites and stop reading the removed capability fields.
+- A host built against contract 1.12 no longer binds to a 1.11 module; it must
+  drop its `Sync` call sites and stop reading the removed capability fields.
 - Old `sync-state` rows under a host's `state_dir` are orphaned and can be
   deleted; the module never reads them.
 - The module cannot ingest account data on its own. Reading an account is an
