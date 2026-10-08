@@ -2,41 +2,9 @@
 
 use super::context::ProviderContext;
 use crate::Result;
-use crate::pipeline::ProviderPage;
 use crate::scope::CuratedTool;
 use async_trait::async_trait;
 use serde::{Deserialize, Serialize};
-
-/// Why a sync run was started.
-///
-/// Recorded on the outcome so an operator reading a log can tell a scheduled
-/// run from one a user asked for — the two have very different expectations
-/// about how long they may take.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
-#[serde(rename_all = "snake_case")]
-pub enum SyncReason {
-    /// The first run after a connection was made.
-    InitialConnect,
-    /// The periodic scheduler.
-    Scheduled,
-    /// A user asked for it.
-    Manual,
-    /// A webhook said something changed.
-    Trigger,
-}
-
-impl SyncReason {
-    /// The stable wire name.
-    #[must_use]
-    pub fn as_str(self) -> &'static str {
-        match self {
-            Self::InitialConnect => "initial_connect",
-            Self::Scheduled => "scheduled",
-            Self::Manual => "manual",
-            Self::Trigger => "trigger",
-        }
-    }
-}
 
 /// The connected account's identity, as far as a toolkit reports it.
 ///
@@ -86,14 +54,6 @@ pub trait ConnectorProvider: Send + Sync + std::fmt::Debug {
     /// A one-line description of what connecting this toolkit gets the user.
     fn description(&self) -> &'static str;
 
-    /// How often to re-sync, in seconds.
-    ///
-    /// `None` opts out of the periodic scheduler entirely — right for a
-    /// write-only toolkit, where there is nothing to read back.
-    fn sync_interval_secs(&self) -> Option<u64> {
-        Some(15 * 60)
-    }
-
     /// The actions worth offering an agent, if this provider curates them.
     ///
     /// `None` means uncurated: every action passes through, and scope gating
@@ -102,42 +62,10 @@ pub trait ConnectorProvider: Send + Sync + std::fmt::Debug {
         None
     }
 
-    /// Whether this provider can produce records at all.
-    ///
-    /// False for toolkits that are useful to act through but have nothing to
-    /// ingest. Distinguishing them is what lets a UI say "connected, and the
-    /// agent can use it" rather than implying a sync that will never run.
-    fn can_sync(&self) -> bool {
-        true
-    }
-
     /// Read the connected account's identity.
     ///
     /// # Errors
     ///
     /// Returns [`crate::Error::Action`] when the underlying action fails.
     async fn fetch_user_profile(&self, context: &ProviderContext) -> Result<ProviderUserProfile>;
-
-    /// Read exactly one page, starting at `cursor`.
-    ///
-    /// One page, not a loop: the things that stop a sync — a request budget, an
-    /// item limit, a record already ingested — are not a provider's business,
-    /// and a provider that looped internally would have to re-implement all
-    /// three, differently, once per toolkit. [`crate::pipeline::run_sync`]
-    /// owns the loop.
-    ///
-    /// The default reads nothing and reports no next page, which is right for a
-    /// provider whose [`Self::can_sync`] is false.
-    ///
-    /// # Errors
-    ///
-    /// Returns [`crate::Error::Action`] when a provider call fails.
-    async fn fetch_page(
-        &self,
-        context: &ProviderContext,
-        cursor: Option<&str>,
-    ) -> Result<ProviderPage> {
-        let _ = (context, cursor);
-        Ok(ProviderPage::default())
-    }
 }
