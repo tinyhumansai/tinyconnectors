@@ -13,7 +13,6 @@
 //! model's attention with the handful that matter. Each catalog here is the
 //! slice worth surfacing, ported action-for-action from the lists these
 //! toolkits were already curated against.
-//!
 
 mod clickup;
 mod clickup_catalog;
