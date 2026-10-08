@@ -21,6 +21,7 @@ const PAGE: PageSpec = PageSpec {
     title_paths: &["title", "properties.title.title.0.plain_text"],
     content_paths: &["content", "markdown", "plain_text"],
     url_paths: &["url", "public_url"],
+    sender_paths: &[],
     version_paths: &["last_edited_time"],
     fixed_arguments: &[],
     page_size_arg: "page_size",

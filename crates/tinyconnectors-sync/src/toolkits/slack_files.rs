@@ -92,6 +92,7 @@ fn record_for(
         // message timestamp is the fallback, not the first choice.
         updated_at_ms: file_millis(file).or_else(|| to_millis(ts)),
         tags: Vec::new(),
+        sender: None,
     })
 }
 

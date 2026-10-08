@@ -27,6 +27,7 @@ const PAGE: PageSpec = PageSpec {
     title_paths: &["title"],
     content_paths: &["description", "descriptionData"],
     url_paths: &["url"],
+    sender_paths: &[],
     version_paths: &["updatedAt"],
     fixed_arguments: &[],
     page_size_arg: "first",

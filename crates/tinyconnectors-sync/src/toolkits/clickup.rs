@@ -33,6 +33,7 @@ const PAGE: PageSpec = PageSpec {
     title_paths: &["name"],
     content_paths: &["description", "text_content"],
     url_paths: &["url"],
+    sender_paths: &[],
     version_paths: &["date_updated"],
     // Most recently updated first, with `reverse`, so whatever changed since
     // the last run is on the first page.

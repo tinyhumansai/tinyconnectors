@@ -12,6 +12,7 @@ use tinyconnectors_bus::ConnectorRecord;
 
 use super::json::{end_cursor, first_array, flag_at, pick_str, token_at};
 use super::run::ProviderPage;
+use super::sender::sender_of;
 use crate::Result;
 use crate::clean::{clean_body, truncate};
 use crate::provider::ProviderContext;
@@ -33,6 +34,10 @@ pub struct PageSpec {
     pub url_paths: &'static [&'static str],
     /// Dotted paths to try for an item's version, when the source reports one.
     pub version_paths: &'static [&'static str],
+    /// Dotted paths to try for who wrote the item (`Name <address>` or a bare
+    /// address), falling back to a `From` header under `payload.headers`.
+    /// Empty for a toolkit whose items have no sender.
+    pub sender_paths: &'static [&'static str],
     /// Arguments every page read sends unchanged, as `(name, value)` pairs.
     ///
     /// For an action that reads nothing without them: GitHub's issue search
@@ -316,6 +321,7 @@ fn page_from(payload: &Value, spec: &PageSpec) -> ProviderPage {
             url: pick_str(item, spec.url_paths),
             updated_at_ms: None,
             tags: Vec::new(),
+            sender: sender_of(item, spec.sender_paths),
         });
     }
 

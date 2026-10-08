@@ -21,6 +21,7 @@ const PAGE: PageSpec = PageSpec {
     title_paths: &["title"],
     content_paths: &["body"],
     url_paths: &["html_url", "url"],
+    sender_paths: &[],
     version_paths: &["updated_at"],
     // The search rejects a request without `q`. `involves:@me` is every issue
     // and pull request the connected account opened, was assigned, was
