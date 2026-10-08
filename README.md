@@ -17,8 +17,8 @@ calls depends on the contract crate alone and compiles neither the module nor
 
 Composio is the connector backend today, and the design does not assume it will
 be the only one. Everything Composio-shaped is namespaced under `composio`; the
-neutral parts — the OAuth handoff policy, the transport seam, the record
-vocabulary, the error type — name it nowhere. A second backend arrives as a
+neutral parts — the OAuth handoff policy, the transport seam, the
+error type — name it nowhere. A second backend arrives as a
 sibling interface and object path, not as a rename of the first.
 
 The `Composio`-prefixed payload types keep their names deliberately: they mirror
