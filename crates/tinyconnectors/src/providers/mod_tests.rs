@@ -76,8 +76,8 @@ async fn targets_the_connection_it_was_given() {
 #[tokio::test]
 async fn a_refused_action_is_an_error_here() {
     // `Execute` reports this as a successful reply. For a provider it must not
-    // be: a sync that treated a refused page as an empty one would advance its
-    // cursor past records it never read.
+    // be: a provider that treated a refusal as an empty answer would report an
+    // account with no fields.
     let (_transport, actions) = actions(json!({
         "successful": false,
         "error": "insufficient authentication scopes"
@@ -106,7 +106,7 @@ async fn a_refusal_with_no_message_still_says_something() {
 #[tokio::test]
 async fn a_transport_failure_becomes_an_action_failure() {
     // A provider cannot tell a refused action from an unreachable one apart in
-    // any useful way — both mean the page was not read — so both stop the sync.
+    // any useful way — both mean the read did not happen — so both are errors.
     #[derive(Debug, Default)]
     struct DeadTransport;
 
@@ -161,7 +161,7 @@ async fn an_invalid_argument_stops_the_action_before_the_call() {
 #[test]
 fn a_refusal_with_no_usable_message_still_says_something() {
     // "The provider said no and would not say why" beats an empty string in a
-    // sync log that someone has to read months later.
+    // log that someone has to read months later.
     use super::actions::refusal_message;
 
     assert_eq!(
