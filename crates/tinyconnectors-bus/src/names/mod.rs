@@ -199,22 +199,6 @@ pub mod methods {
     /// [`LIST_CONNECTIONS_DIRECT`]; the user's scope preference is not applied.
     /// Added in contract 1.10.
     pub const LIST_TOOLS_DIRECT: &str = "ListToolsDirect";
-
-    /// Reads one batch of records out of a connected account.
-    ///
-    /// Takes a [`crate::ConnectorSyncRequest`] and returns a
-    /// [`crate::ConnectorSyncResponse`].
-    ///
-    /// The module does **not** store what it reads. It hands the caller a
-    /// [`crate::ConnectorRecordBatch`] and the caller writes it to memory — a
-    /// connector knows how to talk to Gmail, memory knows how to store things,
-    /// and neither has to link the other.
-    ///
-    /// A run stops at the item limit, the day's request budget, or the provider
-    /// running out, whichever comes first. Call again while the batch reports
-    /// `complete: false`; the cursor is kept by the module, so a caller does
-    /// not carry one.
-    pub const SYNC: &str = "Sync";
 }
 
 /// Every member of [`INTERFACE`], in the order the interface dispatches them.
@@ -228,7 +212,6 @@ pub const METHODS: &[&str] = &[
     methods::AUTHORIZE,
     methods::DELETE_CONNECTION,
     methods::LIST_TOOLS,
-    methods::SYNC,
     methods::GET_USER_SCOPES,
     methods::SET_USER_SCOPES,
     methods::EXECUTE,
