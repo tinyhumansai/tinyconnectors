@@ -55,12 +55,13 @@ is refused before any request is made — parsed, not prefix-matched, because
 `http://127.0.0.1:8080@evil.com` resolves to `evil.com` and would carry the
 credential header there.
 
-## What a sync emits
+## No sync engine
 
-Connector sync does not write memory. It returns `ConnectorRecordBatch`, the
-host hands it to the memory engine over memory's own bus API, and neither side
-links the other. `ConnectorRecord`'s wire shape is memory's ingestion vocabulary
-exactly — asserted in a test — so the join needs no translation step.
+The module does not pull records out of connected accounts. Contract 2.0
+removed the `Sync` member and the pipelines behind it (cursors, request
+budgets, dedupe, per-toolkit paging). A host that wants data from a connected
+account asks for it through `Execute`, one action at a time. See
+[ADR 0002](docs/adr/0002-remove-the-sync-engine.md).
 
 ## Served surface
 

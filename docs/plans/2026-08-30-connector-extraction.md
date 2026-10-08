@@ -1,5 +1,9 @@
 # Connector extraction — implementation plan
 
+> **Superseded in part by [ADR 0002](../adr/0002-remove-the-sync-engine.md).**
+> The `Sync` member, `ConnectorRecord*` types and sync pipelines described
+> below were removed in contract 2.0. The rest of this document stands.
+
 Implements [`docs/specs/2026-08-30-connector-extraction.md`](../specs/2026-08-30-connector-extraction.md).
 
 Each phase lands on its own branch and leaves the four contract commands green.

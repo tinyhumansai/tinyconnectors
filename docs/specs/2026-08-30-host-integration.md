@@ -4,6 +4,10 @@
 Implements phase 5 of
 [the extraction plan](../plans/2026-08-30-connector-extraction.md).
 
+> **Superseded in part by [ADR 0002](../adr/0002-remove-the-sync-engine.md).**
+> The `Sync` member, `ConnectorRecord*` types and sync pipelines described
+> below were removed in contract 2.0. The rest of this document stands.
+
 ## What a host has to do
 
 Three things, in order. Only the first is optional.
