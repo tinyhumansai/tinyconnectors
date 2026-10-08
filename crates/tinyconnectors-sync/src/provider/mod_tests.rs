@@ -7,12 +7,8 @@ use std::sync::{Arc, Mutex};
 use async_trait::async_trait;
 use serde_json::json;
 
-use super::{
-    ActionRunner, ConnectorProvider, ProviderContext, ProviderRegistry, ProviderUserProfile,
-    SyncLimits, SyncReason,
-};
+use super::{ActionRunner, ConnectorProvider, ProviderContext, ProviderRegistry, ProviderUserProfile};
 use crate::scope::{CuratedTool, ToolScope};
-use crate::state::{SyncState, SyncStateStore};
 use crate::{Error, Result};
 
 // ── doubles ─────────────────────────────────────────────────────────
@@ -39,19 +35,6 @@ impl ActionRunner for FakeActions {
     }
 }
 
-#[derive(Debug, Default)]
-struct NullStore;
-
-#[async_trait]
-impl SyncStateStore for NullStore {
-    async fn get(&self, _: &str, _: &str) -> Result<Option<serde_json::Value>> {
-        Ok(None)
-    }
-    async fn set(&self, _: &str, _: &str, _: &serde_json::Value) -> Result<()> {
-        Ok(())
-    }
-}
-
 const CURATED: &[CuratedTool] = &[CuratedTool {
     slug: "GMAIL_FETCH_EMAILS",
     scope: ToolScope::Read,
@@ -61,7 +44,7 @@ const CURATED: &[CuratedTool] = &[CuratedTool {
 struct TestProvider {
     slug: &'static str,
     curated: Option<&'static [CuratedTool]>,
-    can_sync: bool,
+    description: &'static str,
 }
 
 #[async_trait]
@@ -70,13 +53,10 @@ impl ConnectorProvider for TestProvider {
         self.slug
     }
     fn description(&self) -> &'static str {
-        "a provider for tests"
+        self.description
     }
     fn curated_tools(&self) -> Option<&'static [CuratedTool]> {
         self.curated
-    }
-    fn can_sync(&self) -> bool {
-        self.can_sync
     }
     async fn fetch_user_profile(&self, context: &ProviderContext) -> Result<ProviderUserProfile> {
         let raw = context.run("TEST_GET_PROFILE", json!({})).await?;
@@ -96,7 +76,7 @@ fn provider(slug: &'static str) -> Arc<dyn ConnectorProvider> {
     Arc::new(TestProvider {
         slug,
         curated: Some(CURATED),
-        can_sync: true,
+        description: "a provider for tests",
     })
 }
 
@@ -104,10 +84,7 @@ fn context(actions: Arc<FakeActions>) -> ProviderContext {
     ProviderContext {
         toolkit: "gmail".into(),
         connection_id: "conn_1".into(),
-        source_id: "gmail:primary".into(),
-        limits: SyncLimits::default(),
         actions,
-        state: Arc::new(NullStore),
     }
 }
 
@@ -146,11 +123,11 @@ fn registering_the_same_toolkit_replaces_rather_than_duplicates() {
         .with(Arc::new(TestProvider {
             slug: "gmail",
             curated: None,
-            can_sync: false,
+            description: "an override",
         }));
 
     assert_eq!(registry.len(), 1);
-    assert!(!registry.get("gmail").unwrap().can_sync());
+    assert_eq!(registry.get("gmail").unwrap().description(), "an override");
 }
 
 #[test]
@@ -177,13 +154,13 @@ fn reports_only_toolkits_with_a_curated_catalog_as_agent_ready() {
         .with(Arc::new(TestProvider {
             slug: "notion",
             curated: None,
-            can_sync: true,
+            description: "a provider for tests",
         }))
         .with(Arc::new(TestProvider {
             slug: "slack",
             // An empty catalog is not a catalog: the agent has nothing to call.
             curated: Some(&[]),
-            can_sync: true,
+            description: "a provider for tests",
         }));
 
     assert_eq!(registry.agent_ready_toolkits(), vec!["gmail".to_string()]);
@@ -192,7 +169,7 @@ fn reports_only_toolkits_with_a_curated_catalog_as_agent_ready() {
 // ── context ─────────────────────────────────────────────────────────
 
 #[tokio::test]
-async fn running_an_action_targets_this_run_s_connection() {
+async fn running_an_action_targets_this_contexts_connection() {
     let actions = Arc::new(FakeActions {
         reply: Mutex::new(json!({ "email": "user@example.com" })),
         ..FakeActions::default()
@@ -214,67 +191,13 @@ async fn running_an_action_targets_this_run_s_connection() {
 }
 
 #[test]
-fn the_context_debug_output_hides_the_seams() {
-    // Both are host implementations whose own `Debug` could print anything —
-    // the action runner wraps a client holding a credential.
+fn the_context_debug_output_hides_the_action_runner() {
+    // The action runner is a host implementation whose own `Debug` could print
+    // anything — it wraps a client holding a credential.
     let context = context(Arc::new(FakeActions::default()));
     let rendered = format!("{context:?}");
     assert!(rendered.contains("gmail"));
     assert!(!rendered.contains("FakeActions"), "{rendered}");
-    assert!(!rendered.contains("NullStore"), "{rendered}");
-}
-
-#[test]
-fn the_default_limits_make_a_first_sync_finish() {
-    // A first sync of a years-old mailbox is otherwise unbounded: it costs
-    // money per request and buries what the user wanted in a backfill.
-    let limits = SyncLimits::default();
-    assert!(limits.max_items > 0 && limits.max_items <= 1000);
-    assert!(limits.depth_days.is_some());
-}
-
-// ── defaults ────────────────────────────────────────────────────────
-
-#[tokio::test]
-async fn a_provider_that_cannot_sync_reads_no_page() {
-    let provider = TestProvider {
-        slug: "slack",
-        curated: None,
-        can_sync: false,
-    };
-    let page = provider
-        .fetch_page(&context(Arc::new(FakeActions::default())), None)
-        .await
-        .unwrap();
-
-    assert_eq!(page.records.len(), 0);
-    assert!(
-        page.next_cursor.is_none(),
-        "no next page: the loop must not ask again"
-    );
-}
-
-#[test]
-fn every_sync_reason_has_a_stable_wire_name() {
-    for (reason, name) in [
-        (SyncReason::InitialConnect, "initial_connect"),
-        (SyncReason::Scheduled, "scheduled"),
-        (SyncReason::Manual, "manual"),
-        (SyncReason::Trigger, "trigger"),
-    ] {
-        assert_eq!(reason.as_str(), name);
-        assert_eq!(serde_json::to_value(reason).unwrap(), json!(name));
-    }
-}
-
-#[tokio::test]
-async fn state_flows_through_the_context() {
-    let context = context(Arc::new(FakeActions::default()));
-    let state = SyncState::load(context.state.as_ref(), "gmail", "conn_1")
-        .await
-        .unwrap();
-    assert_eq!(state.toolkit, "gmail");
-    assert!(state.cursor.is_none());
 }
 
 #[test]
@@ -284,7 +207,7 @@ fn the_capability_matrix_describes_the_build_not_the_user() {
         .with(Arc::new(TestProvider {
             slug: "slack",
             curated: None,
-            can_sync: false,
+            description: "an override",
         }));
 
     let rows = registry.capabilities().capabilities;
@@ -294,46 +217,12 @@ fn the_capability_matrix_describes_the_build_not_the_user() {
     assert_eq!(gmail.toolkit, "gmail");
     assert!(gmail.curated_tools);
     assert_eq!(gmail.curated_tool_count, 1);
-    assert!(gmail.initial_sync);
-    assert!(gmail.periodic_sync);
-    assert!(gmail.memory_ingest);
 
-    // A write-only toolkit is connectable and usable, but nothing will read it.
-    // Saying so is what stops a UI implying a sync that will never run.
+    // An uncurated toolkit is connectable and usable, but the agent is offered
+    // no hand-picked catalog for it.
     let slack = &rows[1];
     assert!(!slack.curated_tools);
-    assert!(!slack.initial_sync);
-    assert!(!slack.periodic_sync);
-    assert!(!slack.memory_ingest);
     assert!(slack.tool_execution, "it can still be acted through");
-}
-
-#[test]
-fn a_provider_that_opted_out_of_scheduling_reports_no_periodic_sync() {
-    #[derive(Debug)]
-    struct Unscheduled;
-
-    #[async_trait]
-    impl ConnectorProvider for Unscheduled {
-        fn toolkit_slug(&self) -> &'static str {
-            "webhookonly"
-        }
-        fn description(&self) -> &'static str {
-            "nothing to poll"
-        }
-        fn sync_interval_secs(&self) -> Option<u64> {
-            None
-        }
-        async fn fetch_user_profile(&self, _: &ProviderContext) -> Result<ProviderUserProfile> {
-            Ok(ProviderUserProfile::default())
-        }
-    }
-
-    let registry = ProviderRegistry::new().with(Arc::new(Unscheduled));
-    let row = &registry.capabilities().capabilities[0];
-    assert!(!row.periodic_sync);
-    assert!(row.sync_interval_secs.is_none());
-    assert!(row.initial_sync, "it can still be read once, on connect");
 }
 
 #[test]
