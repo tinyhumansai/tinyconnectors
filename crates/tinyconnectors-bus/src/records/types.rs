@@ -36,6 +36,22 @@ pub struct ConnectorRecord {
     /// Labels carried through from the source.
     #[serde(default)]
     pub tags: Vec<String>,
+    /// Who wrote the item, when the source names them by address: an
+    /// email's sender. Added in contract 1.11; absent on the wire when
+    /// unknown, so the key set is unchanged for a record without one.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub sender: Option<RecordSender>,
+}
+
+/// The person a [`ConnectorRecord`] came from.
+#[derive(Clone, Debug, Default, PartialEq, Eq, Serialize, Deserialize)]
+pub struct RecordSender {
+    /// The sender's address: an email address (`priya@acme.com`) or a phone
+    /// number as its dial digits (`+15551234567`).
+    pub address: String,
+    /// The display name the source gives, when it gives one.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub name: Option<String>,
 }
 
 /// One batch of records from one sync run.

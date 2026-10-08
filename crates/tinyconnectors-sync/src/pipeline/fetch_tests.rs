@@ -14,6 +14,7 @@ const SPEC: PageSpec = PageSpec {
     content_paths: &["body", "text"],
     url_paths: &["url", "webLink"],
     version_paths: &["version", "etag"],
+    sender_paths: &["sender"],
     fixed_arguments: &[],
     page_size_arg: "max_results",
     cursor_arg: "page_token",
@@ -48,6 +49,27 @@ const NUMBERED: PageSpec = PageSpec {
     },
     ..SPEC
 };
+
+#[test]
+fn carries_the_sender_and_leaves_it_unset_when_absent() {
+    let payload = json!({
+        "messages": [
+            { "id": "m1", "body": "lunch?", "sender": "Priya <priya@acme.com>" },
+            { "id": "m2", "body": "a text", "sender": "+15551234567" },
+            { "id": "m3", "body": "no sender" }
+        ]
+    });
+    let page = page_from(&payload, &SPEC);
+    let senders: Vec<Option<&str>> = page
+        .records
+        .iter()
+        .map(|record| record.sender.as_ref().map(|sender| sender.address.as_str()))
+        .collect();
+    assert_eq!(
+        senders,
+        [Some("priya@acme.com"), Some("+15551234567"), None]
+    );
+}
 
 #[test]
 fn reads_items_from_the_first_pointer_that_matches() {

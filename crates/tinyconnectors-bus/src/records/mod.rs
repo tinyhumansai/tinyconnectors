@@ -23,12 +23,17 @@
 //! that memory does not ingest — which toolkit, which connection — lives on
 //! [`ConnectorRecordBatch`] instead, because it is a property of the sync run
 //! rather than of any one record.
+//!
+//! The one optional addition is [`ConnectorRecord::sender`] (contract 1.11):
+//! who wrote the item, which a host records as the memory's observed actor.
+//! It is absent on the wire when unknown, so a record without one keeps the
+//! exact key set.
 
 mod types;
 
 pub use types::{
-    ConnectorRecord, ConnectorRecordBatch, ConnectorSyncRequest, ConnectorSyncResponse, SyncEvent,
-    SyncStage,
+    ConnectorRecord, ConnectorRecordBatch, ConnectorSyncRequest, ConnectorSyncResponse,
+    RecordSender, SyncEvent, SyncStage,
 };
 
 #[cfg(test)]

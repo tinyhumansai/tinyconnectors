@@ -159,6 +159,7 @@ pub(super) fn record_from(
         url: pick_str(message, &["permalink"]).or_else(|| Some(permalink(&channel.id, &ts))),
         updated_at_ms: to_millis(&ts),
         tags: Vec::new(),
+        sender: None,
     })
 }
 

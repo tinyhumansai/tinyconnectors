@@ -26,6 +26,7 @@ const PAGE: PageSpec = PageSpec {
     title_paths: &["subject", "payload.headers.0.value"],
     content_paths: &["messageText", "snippet", "body", "preview"],
     url_paths: &["messageUrl", "webLink"],
+    sender_paths: &["sender", "from"],
     version_paths: &["historyId", "internalDate"],
     fixed_arguments: &[],
     page_size_arg: "max_results",

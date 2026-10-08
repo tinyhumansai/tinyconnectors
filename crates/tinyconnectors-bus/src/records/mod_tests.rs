@@ -9,7 +9,9 @@
 
 #![allow(clippy::unwrap_used, clippy::expect_used, clippy::panic)]
 
-use super::{ConnectorRecord, ConnectorRecordBatch, ConnectorSyncRequest, SyncEvent, SyncStage};
+use super::{
+    ConnectorRecord, ConnectorRecordBatch, ConnectorSyncRequest, RecordSender, SyncEvent, SyncStage,
+};
 use serde_json::json;
 
 /// The wire keys memory's ingestion item accepts, in its own contract.
@@ -38,6 +40,7 @@ fn a_record_serializes_exactly_the_keys_memory_ingests() {
         url: Some("https://mail.example.com/msg-1".into()),
         updated_at_ms: Some(1_772_000_000_000),
         tags: vec!["inbox".into()],
+        sender: None,
     };
 
     let value = serde_json::to_value(&record).expect("serializes");
@@ -57,6 +60,31 @@ fn a_record_serializes_exactly_the_keys_memory_ingests() {
         "a record must carry memory's ingestion keys and nothing else — \
          provenance belongs on the batch"
     );
+}
+
+#[test]
+fn a_sender_is_carried_only_when_known() {
+    let record = ConnectorRecord {
+        item_id: "msg-1".into(),
+        content: "lunch?".into(),
+        sender: Some(RecordSender {
+            address: "priya@acme.com".into(),
+            name: Some("Priya".into()),
+        }),
+        ..ConnectorRecord::default()
+    };
+    let value = serde_json::to_value(&record).expect("serializes");
+    assert_eq!(
+        value["sender"],
+        json!({ "address": "priya@acme.com", "name": "Priya" })
+    );
+    let back: ConnectorRecord = serde_json::from_value(value).expect("parses");
+    assert_eq!(back, record);
+
+    // A record from a host or module before contract 1.11 has no sender.
+    let old: ConnectorRecord =
+        serde_json::from_value(json!({ "item_id": "x", "content": "body" })).expect("parses");
+    assert!(old.sender.is_none());
 }
 
 #[test]

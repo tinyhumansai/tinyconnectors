@@ -28,6 +28,7 @@ mod fetch;
 mod json;
 mod page_size;
 mod run;
+mod sender;
 
 pub(crate) use fetch::fetch_page_with;
 pub use fetch::{DepthWindow, PageSpec, Paging, fetch_page};
