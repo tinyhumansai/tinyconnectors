@@ -18,8 +18,10 @@
 //! cannot be read is an error; a store with nothing in it is a user who has not
 //! chosen yet.
 
+mod store;
 mod types;
 
+pub use store::PrefsStore;
 pub use types::{PREFS_NAMESPACE, UserScopePref};
 
 #[cfg(test)]

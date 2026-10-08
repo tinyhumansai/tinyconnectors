@@ -8,31 +8,25 @@ use std::sync::Mutex;
 use async_trait::async_trait;
 use serde_json::json;
 
-use super::{PREFS_NAMESPACE, UserScopePref};
+use super::{PREFS_NAMESPACE, PrefsStore, UserScopePref};
 use crate::scope::ToolScope;
-use crate::state::{STATE_NAMESPACE, SyncStateStore};
 use crate::{Error, Result};
 
 #[derive(Debug, Default)]
 struct MemoryStore {
-    values: Mutex<HashMap<(String, String), serde_json::Value>>,
+    values: Mutex<HashMap<String, serde_json::Value>>,
 }
 
 #[async_trait]
-impl SyncStateStore for MemoryStore {
-    async fn get(&self, namespace: &str, key: &str) -> Result<Option<serde_json::Value>> {
-        Ok(self
-            .values
-            .lock()
-            .unwrap()
-            .get(&(namespace.to_string(), key.to_string()))
-            .cloned())
+impl PrefsStore for MemoryStore {
+    async fn get(&self, key: &str) -> Result<Option<serde_json::Value>> {
+        Ok(self.values.lock().unwrap().get(key).cloned())
     }
-    async fn set(&self, namespace: &str, key: &str, value: &serde_json::Value) -> Result<()> {
+    async fn set(&self, key: &str, value: &serde_json::Value) -> Result<()> {
         self.values
             .lock()
             .unwrap()
-            .insert((namespace.to_string(), key.to_string()), value.clone());
+            .insert(key.to_string(), value.clone());
         Ok(())
     }
 }
@@ -71,9 +65,8 @@ fn the_key_is_normalized() {
 }
 
 #[test]
-fn the_namespace_is_distinct_from_sync_state() {
-    // A preference and a cursor for one toolkit must never collide.
-    assert_ne!(PREFS_NAMESPACE, STATE_NAMESPACE);
+fn the_namespace_is_pinned() {
+    // Changing it strands every user's saved choices on disk.
     assert_eq!(PREFS_NAMESPACE, "composio-user-scopes");
 }
 
@@ -114,7 +107,7 @@ async fn an_unreadable_preference_is_an_error_not_a_grant() {
     // permission the user may have explicitly removed.
     let store = MemoryStore::default();
     store
-        .set(PREFS_NAMESPACE, "gmail", &json!("not an object"))
+        .set("gmail", &json!("not an object"))
         .await
         .unwrap();
 
@@ -141,18 +134,14 @@ async fn preferences_do_not_collide_between_toolkits() {
 }
 
 #[tokio::test]
-async fn a_preference_lands_under_the_prefs_namespace() {
-    // Not the sync-state namespace: a cursor and a preference for one toolkit
-    // must never collide.
+async fn a_preference_lands_under_its_normalized_key() {
     let store = MemoryStore::default();
     UserScopePref::default()
-        .save(&store, "gmail")
+        .save(&store, " Gmail ")
         .await
         .unwrap();
 
-    let values = store.values.lock().unwrap();
-    assert!(values.contains_key(&(PREFS_NAMESPACE.to_string(), "gmail".to_string())));
-    assert!(!values.contains_key(&(STATE_NAMESPACE.to_string(), "gmail".to_string())));
+    assert!(store.values.lock().unwrap().contains_key("gmail"));
 }
 
 #[test]
