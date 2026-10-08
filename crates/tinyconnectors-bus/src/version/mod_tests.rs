@@ -35,6 +35,8 @@ fn an_older_minor_on_the_module_side_is_rejected() {
 #[test]
 fn a_different_major_is_rejected() {
     assert!(!is_compatible((0, 0)));
-    assert!(!is_compatible((2, 0)));
-    assert!(!is_compatible((2, 97)));
+    // The 1.x line, which still served `Sync`, no longer binds.
+    assert!(!is_compatible((1, 11)));
+    assert!(!is_compatible((3, 0)));
+    assert!(!is_compatible((3, 97)));
 }
