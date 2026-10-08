@@ -16,7 +16,7 @@ use crate::client::ComposioClient;
 ///
 /// It is *shared* rather than owned because the route can be replaced while the
 /// module runs — a user signs in after a lazily-loaded module was already up.
-/// A runner holding its own copy would keep running syncs against the
+/// A runner holding its own copy would keep running actions against the
 /// credential the module happened to start with, which after a sign-out is one
 /// that answers 401 to everything.
 #[derive(Debug, Clone)]
@@ -36,7 +36,7 @@ impl ClientActions {
 ///
 /// The execute pipeline formats a message for every failed response, so the
 /// fallback is not expected — but "the provider said no and would not say why"
-/// is still more useful to whoever reads the sync log than an empty string.
+/// is still more useful to whoever reads the log than an empty string.
 pub(crate) fn refusal_message(error: Option<String>) -> String {
     error
         .map(|error| error.trim().to_string())
@@ -72,9 +72,9 @@ impl ActionRunner for ClientActions {
 
         if !response.successful {
             // A refusal is an error for a provider even though `Execute`
-            // reports it as a reply: a sync that treated a refused page as an
-            // empty one would record "nothing new" and advance its cursor past
-            // records it never read.
+            // reports it as a reply: a provider reading an identity has nothing
+            // useful to do with a half-answer, and an empty profile would read as
+            // a successful lookup of an account with no fields.
             return Err(SyncError::Action {
                 action: action.to_string(),
                 message: refusal_message(response.error),
