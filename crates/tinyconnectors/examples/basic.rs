@@ -42,7 +42,7 @@ impl Transport for StubBackend {
     }
 
     async fn delete(&self, _path: &str) -> Result<serde_json::Value> {
-        Ok(serde_json::json!({ "deleted": true, "memory_chunks_deleted": 0 }))
+        Ok(serde_json::json!({ "deleted": true }))
     }
 }
 

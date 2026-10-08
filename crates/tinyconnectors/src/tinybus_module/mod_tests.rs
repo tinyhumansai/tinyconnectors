@@ -315,7 +315,7 @@ async fn carries_authorize_arguments_across_the_bus() -> tinybus::Result<()> {
 #[tokio::test]
 async fn deletes_a_connection_over_the_bus() -> tinybus::Result<()> {
     let transport = StubTransport::replying(json!({
-        "deleted": true, "memory_chunks_deleted": 3
+        "deleted": true
     }));
     let (_serving, _client, proxy, _bus) = proxy_to(service_over(transport)).await?;
 
@@ -324,13 +324,11 @@ async fn deletes_a_connection_over_the_bus() -> tinybus::Result<()> {
             names::methods::DELETE_CONNECTION,
             (ComposioDeleteConnectionRequest {
                 connection_id: "conn_9".into(),
-                clear_memory: true,
             },),
         )
         .await?;
 
     assert!(reply.deleted);
-    assert_eq!(reply.memory_chunks_deleted, 3);
     Ok(())
 }
 
