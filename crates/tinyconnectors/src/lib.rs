@@ -116,6 +116,6 @@ pub use tinyconnectors_bus::{
     ComposioToolFunction, ComposioToolSchema, ComposioToolkitCatalogEntry,
     ComposioToolkitsResponse, ComposioToolsResponse, ComposioTriggerEvent,
     ComposioTriggerHistoryEntry, ComposioTriggerHistoryResult, ComposioTriggerMetadata,
-    ComposioUserScopes, ComposioUserScopesResponse,
-    INTERFACE, METHODS, OBJECT_PATH, composio, is_compatible, names, version,
+    ComposioUserScopes, ComposioUserScopesResponse, INTERFACE, METHODS, OBJECT_PATH, composio,
+    is_compatible, names, version,
 };
