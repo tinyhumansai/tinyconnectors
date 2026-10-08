@@ -49,19 +49,18 @@ use tinyconnectors_bus::{
     ComposioRefreshIdentitiesResponse, ComposioSetUserScopesRequest, ComposioToolkitsResponse,
     ComposioToolsResponse, ComposioTransportConfig, ComposioTriggerHistoryResult,
     ComposioUserProfile, ComposioUserProfileRequest, ComposioUserScopes,
-    ComposioUserScopesResponse, ConnectorSyncRequest, ConnectorSyncResponse, names,
+    ComposioUserScopesResponse, names,
 };
 
 use crate::client::{
     COMPOSIO_API_BASE, ComposioClient, DirectRoute, HttpTransport, ProxyRoute, Route,
 };
 use tinyconnectors_sync::{
-    ProviderContext, ProviderRegistry, SyncLimits, SyncReason, SyncStateStore, UserScopePref,
-    classify_unknown, find_curated, run_sync,
+    PrefsStore, ProviderContext, ProviderRegistry, UserScopePref, classify_unknown, find_curated,
 };
 
 use crate::providers::ClientActions;
-use crate::state::FileStateStore;
+use crate::state::FilePrefsStore;
 use crate::triggers::TriggerArchive;
 
 /// How to reach Composio, when the host has said.
@@ -303,15 +302,15 @@ struct ConnectorService {
     /// hand the module a writable directory. Asking for one unconditionally
     /// would make every deployment carry a path it does not use.
     archive: Option<TriggerArchive>,
-    /// The toolkits this build knows how to read.
+    /// The toolkits this build knows.
     ///
     /// Answers the capability members without touching the network, and gives
     /// the profile members the action slug and identity field for a toolkit.
     registry: ProviderRegistry,
     /// How providers run their actions.
     actions: Arc<ClientActions>,
-    /// Where providers persist cursors and budgets.
-    state: Arc<dyn SyncStateStore>,
+    /// Where the per-toolkit scope preferences are persisted.
+    prefs: Arc<dyn PrefsStore>,
 }
 
 impl ConnectorService {
@@ -335,13 +334,7 @@ impl ConnectorService {
         ProviderContext {
             toolkit: toolkit.to_string(),
             connection_id: connection_id.to_string(),
-            // A profile read produces no records, so the source it would write
-            // to is not consulted. Named after the connection anyway so a log
-            // line ties the call to something.
-            source_id: format!("{toolkit}:{connection_id}"),
-            limits: SyncLimits::default(),
             actions: self.actions.clone(),
-            state: self.state.clone(),
         }
     }
 
@@ -389,7 +382,7 @@ impl ConnectorService {
         let Some(toolkit) = tinyconnectors_sync::toolkit_from_slug(action) else {
             return Ok(true);
         };
-        let pref = UserScopePref::load(self.state.as_ref(), &toolkit)
+        let pref = UserScopePref::load(self.prefs.as_ref(), &toolkit)
             .await
             .map_err(|error| tinybus::Error::failed(error.to_string()))?;
 
@@ -530,65 +523,11 @@ impl ConnectorService {
         Ok(response)
     }
 
-    async fn sync(&self, request: ConnectorSyncRequest) -> TinyBusResult<ConnectorSyncResponse> {
-        let provider = self.registry.get(&request.toolkit).ok_or_else(|| {
-            tinybus::Error::failed(format!(
-                "no provider for toolkit `{}`: this build does not know how to read it",
-                request.toolkit
-            ))
-        })?;
-
-        let connection_id = match request.connection_id {
-            Some(id) if !id.trim().is_empty() => id,
-            _ => self.first_active_connection(&request.toolkit).await?,
-        };
-        let source_id = request
-            .source_id
-            .filter(|id| !id.trim().is_empty())
-            .unwrap_or_else(|| format!("{}:{connection_id}", request.toolkit));
-
-        let mut limits = SyncLimits::default();
-        if let Some(max_items) = request.max_items.filter(|max| *max > 0) {
-            limits.max_items = max_items;
-        }
-        // The host owns the window. A request carrying none means unbounded:
-        // every release before the field existed read that way, and a module
-        // update must not start truncating a mailbox to the library default
-        // on its own. That default stays for direct callers of `run_sync`,
-        // who take it knowingly.
-        limits.depth_days = request.depth_days.filter(|days| *days > 0);
-
-        let context = ProviderContext {
-            toolkit: request.toolkit.clone(),
-            connection_id,
-            source_id,
-            limits,
-            actions: self.actions.clone(),
-            state: self.state.clone(),
-        };
-
-        let outcome = run_sync(
-            provider.as_ref(),
-            &context,
-            sync_reason(request.reason.as_deref()),
-        )
-        .await
-        .map_err(|error| tinybus::Error::failed(error.to_string()))?;
-
-        Ok(ConnectorSyncResponse {
-            batch: outcome.batch,
-            stage: outcome.stage,
-            pages_read: outcome.pages_read,
-            records_skipped: outcome.records_skipped,
-            message: outcome.message,
-        })
-    }
-
     async fn get_user_scopes(
         &self,
         request: ComposioGetUserScopesRequest,
     ) -> TinyBusResult<ComposioUserScopesResponse> {
-        let pref = UserScopePref::load(self.state.as_ref(), &request.toolkit)
+        let pref = UserScopePref::load(self.prefs.as_ref(), &request.toolkit)
             .await
             .map_err(|error| tinybus::Error::failed(error.to_string()))?;
         Ok(scopes_response(&request.toolkit, pref))
@@ -603,7 +542,7 @@ impl ConnectorService {
             write: request.scopes.write,
             admin: request.scopes.admin,
         };
-        pref.save(self.state.as_ref(), &request.toolkit)
+        pref.save(self.prefs.as_ref(), &request.toolkit)
             .await
             .map_err(|error| tinybus::Error::failed(error.to_string()))?;
         Ok(scopes_response(&request.toolkit, pref))
@@ -831,65 +770,42 @@ impl ConnectorService {
     }
 }
 
-/// The state store for a host that named a directory, or an ephemeral one.
-fn state_store(state_dir: Option<&std::path::Path>) -> Arc<dyn SyncStateStore> {
+/// The preference store for a host that named a directory, or an ephemeral one.
+fn prefs_store(state_dir: Option<&std::path::Path>) -> Arc<dyn PrefsStore> {
     match state_dir {
-        Some(dir) => Arc::new(FileStateStore::new(dir)),
-        None => Arc::new(EphemeralStateStore::default()),
+        Some(dir) => Arc::new(FilePrefsStore::new(dir)),
+        None => Arc::new(EphemeralPrefsStore::default()),
     }
 }
 
-/// Sync state that lives only as long as the module.
+/// Preferences that live only as long as the module.
 ///
-/// A sync running on this re-reads a connection's history after every restart,
-/// which is why a host that means to sync should name a `state_dir`. It exists
-/// so the members that need no state — profiles, capabilities — work without
+/// A user's scope choices on this are forgotten at every restart, which is why
+/// a host that means them to stick should name a `state_dir`. It exists so the
+/// members that need no persistence — profiles, capabilities — work without
 /// one, rather than making every deployment carry a path it does not use.
 #[derive(Debug, Default)]
-struct EphemeralStateStore {
-    values: std::sync::Mutex<std::collections::HashMap<(String, String), serde_json::Value>>,
+struct EphemeralPrefsStore {
+    values: std::sync::Mutex<std::collections::HashMap<String, serde_json::Value>>,
 }
 
 #[async_trait::async_trait]
-impl SyncStateStore for EphemeralStateStore {
-    async fn get(
-        &self,
-        namespace: &str,
-        key: &str,
-    ) -> tinyconnectors_sync::Result<Option<serde_json::Value>> {
+impl PrefsStore for EphemeralPrefsStore {
+    async fn get(&self, key: &str) -> tinyconnectors_sync::Result<Option<serde_json::Value>> {
         Ok(self
             .values
             .lock()
             .unwrap_or_else(std::sync::PoisonError::into_inner)
-            .get(&(namespace.to_string(), key.to_string()))
+            .get(key)
             .cloned())
     }
 
-    async fn set(
-        &self,
-        namespace: &str,
-        key: &str,
-        value: &serde_json::Value,
-    ) -> tinyconnectors_sync::Result<()> {
+    async fn set(&self, key: &str, value: &serde_json::Value) -> tinyconnectors_sync::Result<()> {
         self.values
             .lock()
             .unwrap_or_else(std::sync::PoisonError::into_inner)
-            .insert((namespace.to_string(), key.to_string()), value.clone());
+            .insert(key.to_string(), value.clone());
         Ok(())
-    }
-}
-
-/// Why a caller says the run started.
-///
-/// An unrecognized reason is treated as manual rather than refused: the reason
-/// is for a log line and a status label, and failing a sync over one would
-/// break a working integration for a cosmetic field.
-fn sync_reason(reason: Option<&str>) -> SyncReason {
-    match reason.map(str::trim).unwrap_or_default() {
-        "initial_connect" => SyncReason::InitialConnect,
-        "scheduled" => SyncReason::Scheduled,
-        "trigger" => SyncReason::Trigger,
-        _ => SyncReason::Manual,
     }
 }
 
@@ -931,12 +847,12 @@ async fn setup(connection: Connection, config: ModuleConfig) -> TinyBusResult<()
         // A module with no route still answers the capability members, so the
         // action runner is built over a client that reports the missing route
         // if a provider ever reaches it. It shares the handle rather than
-        // copying it, so a later `Configure` reaches running syncs too.
+        // copying it, so a later `Configure` reaches it too.
         actions: Arc::new(ClientActions::new(Arc::clone(&client))),
         // A host that named no state directory gets an in-memory store: profile
-        // and capability members need none, and a sync run without persistence
-        // is better than a module that refuses to load.
-        state: state_store(config_state_dir.as_deref()),
+        // and capability members need none, and scope preferences without
+        // persistence are better than a module that refuses to load.
+        prefs: prefs_store(config_state_dir.as_deref()),
         registry: crate::providers::default_registry(),
         client,
         archive,
@@ -977,7 +893,6 @@ export_module! {
         "Authorize",
         "DeleteConnection",
         "ListTools",
-        "Sync",
         "GetUserScopes",
         "SetUserScopes",
         "Execute",
