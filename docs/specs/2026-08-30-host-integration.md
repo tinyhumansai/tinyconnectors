@@ -82,8 +82,8 @@ module gets a credential:
 `config.composio.mode` and the keychain lookup in
 `security::credentials::get_composio_api_key` stay in OpenHuman. They stop
 constructing a client and start choosing a blob. `state_dir` should be the
-host's existing state directory — the module keeps its sync cursors and the
-trigger archive there.
+host's existing state directory — the module keeps the user's scope preferences
+and the trigger archive there.
 
 The blob is also optional. A module loaded without one still answers the
 capability members, so a signed-out user is not locked out of the question
@@ -151,10 +151,8 @@ one of them ends up stale and permissive.
 
 ## What changes for memory
 
-Nothing, until phase 4. `tinymemory` keeps its Composio sync until the host
-calls `Sync` on the module instead, and the sync returns records the host writes
-to memory over memory's own API. Phase 4 then deletes what nothing calls —
-see the ordering note at the top of that phase.
+Nothing. The `Sync` hand-off this section once described was removed in
+contract 2.0 (see ADR 0002): OpenHuman no longer syncs Composio into memory.
 
 
 ## 6. The scope store is not moved yet
