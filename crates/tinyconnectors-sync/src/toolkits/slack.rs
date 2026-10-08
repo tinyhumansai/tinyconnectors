@@ -22,7 +22,7 @@ impl ConnectorProvider for SlackProvider {
     }
 
     fn description(&self) -> &'static str {
-        "Read and send Slack messages, and ingest channel history as memory."
+        "Read and send Slack messages."
     }
 
     fn curated_tools(&self) -> Option<&'static [CuratedTool]> {
