@@ -20,7 +20,7 @@
 //! - [`toolkits`] — the toolkits this build knows, each with its curated action
 //!   catalog and how to read the connected account's identity.
 //!
-# Example
+//! # Example
 //!
 //! ```
 //! use tinyconnectors_sync::scope::{ToolScope, classify_unknown, toolkit_from_slug};
