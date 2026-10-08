@@ -1,42 +1,12 @@
-//! The Notion provider.
+//! The Notion provider: its identity read and its curated action catalog.
 
 use async_trait::async_trait;
 
-use super::identity::pick;
 use super::notion_catalog::CURATED;
+use super::identity::pick;
 use crate::Result;
-use crate::pipeline::{PageSpec, Paging, ProviderPage, fetch_page};
 use crate::provider::{ConnectorProvider, ProviderContext, ProviderUserProfile};
 use crate::scope::CuratedTool;
-
-/// How one page of this toolkit is read.
-///
-/// The paths are alternatives, tried in order: Composio wraps provider payloads
-/// inconsistently, and the same field arrives under different names from
-/// different endpoints of the same API.
-const PAGE: PageSpec = PageSpec {
-    action: "NOTION_FETCH_DATA",
-    item_pointers: &["/data/results", "/results", "/data/data/results"],
-    id_paths: &["id", "page_id"],
-    title_paths: &["title", "properties.title.title.0.plain_text"],
-    content_paths: &["content", "markdown", "plain_text"],
-    url_paths: &["url", "public_url"],
-    sender_paths: &[],
-    version_paths: &["last_edited_time"],
-    fixed_arguments: &[],
-    page_size_arg: "page_size",
-    depth_window: None,
-    cursor_arg: "start_cursor",
-    // Notion names the next page `next_cursor`, and leaves it null on the last.
-    paging: Paging::Token {
-        next: &[
-            "/data/next_cursor",
-            "/next_cursor",
-            "/data/data/next_cursor",
-        ],
-    },
-    clean_bodies: false,
-};
 
 /// The action that reads the connected account's identity.
 const PROFILE_ACTION: &str = "NOTION_GET_ABOUT_ME";
@@ -52,15 +22,11 @@ impl ConnectorProvider for NotionProvider {
     }
 
     fn description(&self) -> &'static str {
-        "Read and search a Notion workspace, and ingest its pages as memory."
+        "Read and search a Notion workspace."
     }
 
     fn curated_tools(&self) -> Option<&'static [CuratedTool]> {
         Some(CURATED)
-    }
-
-    fn sync_interval_secs(&self) -> Option<u64> {
-        Some(1800)
     }
 
     async fn fetch_user_profile(&self, context: &ProviderContext) -> Result<ProviderUserProfile> {
@@ -79,11 +45,4 @@ impl ConnectorProvider for NotionProvider {
         })
     }
 
-    async fn fetch_page(
-        &self,
-        context: &ProviderContext,
-        cursor: Option<&str>,
-    ) -> Result<ProviderPage> {
-        fetch_page(context, cursor, &PAGE).await
-    }
 }

@@ -1,42 +1,12 @@
-//! The Gmail provider.
+//! The Gmail provider: its identity read and its curated action catalog.
 
 use async_trait::async_trait;
 
 use super::gmail_catalog::CURATED;
 use super::identity::pick;
 use crate::Result;
-use crate::pipeline::{DepthWindow, PageSpec, Paging, ProviderPage, fetch_page};
 use crate::provider::{ConnectorProvider, ProviderContext, ProviderUserProfile};
 use crate::scope::CuratedTool;
-
-/// How one page of this toolkit is read.
-///
-/// The paths are alternatives, tried in order: Composio wraps provider payloads
-/// inconsistently, and the same field arrives under different names from
-/// different endpoints of the same API.
-const PAGE: PageSpec = PageSpec {
-    action: "GMAIL_FETCH_EMAILS",
-    item_pointers: &[
-        "/data/messages",
-        "/data/data/messages",
-        "/messages",
-        "/data/items",
-    ],
-    id_paths: &["id", "messageId", "message_id"],
-    title_paths: &["subject", "payload.headers.0.value"],
-    content_paths: &["messageText", "snippet", "body", "preview"],
-    url_paths: &["messageUrl", "webLink"],
-    sender_paths: &["sender", "from"],
-    version_paths: &["historyId", "internalDate"],
-    fixed_arguments: &[],
-    page_size_arg: "max_results",
-    cursor_arg: "page_token",
-    paging: Paging::Token {
-        next: crate::pipeline::PAGE_TOKEN_POINTERS,
-    },
-    depth_window: Some(DepthWindow::GmailQueryAfter),
-    clean_bodies: true,
-};
 
 /// The action that reads the connected account's identity.
 const PROFILE_ACTION: &str = "GMAIL_GET_PROFILE";
@@ -52,15 +22,11 @@ impl ConnectorProvider for GmailProvider {
     }
 
     fn description(&self) -> &'static str {
-        "Read and send email, and ingest recent mail as memory."
+        "Read and send email."
     }
 
     fn curated_tools(&self) -> Option<&'static [CuratedTool]> {
         Some(CURATED)
-    }
-
-    fn sync_interval_secs(&self) -> Option<u64> {
-        Some(900)
     }
 
     async fn fetch_user_profile(&self, context: &ProviderContext) -> Result<ProviderUserProfile> {
@@ -77,11 +43,4 @@ impl ConnectorProvider for GmailProvider {
         })
     }
 
-    async fn fetch_page(
-        &self,
-        context: &ProviderContext,
-        cursor: Option<&str>,
-    ) -> Result<ProviderPage> {
-        fetch_page(context, cursor, &PAGE).await
-    }
 }
