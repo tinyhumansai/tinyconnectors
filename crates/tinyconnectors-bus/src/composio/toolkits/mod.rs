@@ -7,7 +7,7 @@
 //!   Composio catalog. It depends on a signed-in backend session.
 //! - [`ComposioCapabilitiesResponse`] answers *"what does this build know how
 //!   to do with a toolkit once connected?"* — native provider, curated tools,
-//!   sync hooks, memory ingestion. It is a property of the compiled binary and
+//!   user profile, trigger webhooks. It is a property of the compiled binary and
 //!   needs no session at all.
 //!
 //! A toolkit can be connectable with no capabilities (the user links it, but

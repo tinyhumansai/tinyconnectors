@@ -12,7 +12,6 @@ payload vocabulary has to be published as an ordinary library. This is it.
 | ---------- | ------------------------------------------------------------ |
 | `names`    | interface name, object path, one constant per member          |
 | `composio` | the Composio backend's value vocabulary, by payload family    |
-| `records`  | what a connector sync emits, on its way to memory             |
 | `version`  | `CONTRACT_VERSION` and the bind rule a host applies to it     |
 
 `composio` holds six families — `toolkits`, `connections`, `tools`, `execute`,
@@ -20,15 +19,6 @@ payload vocabulary has to be published as an ordinary library. This is it.
 connector backend, not the only one this contract expects to carry, so it is
 namespaced: a second backend arrives as a sibling module with its own interface
 and object path rather than as a rename of every type here.
-
-`records` goes the other direction. Everything in `composio` is an answer to a
-question a host asked; `ConnectorRecordBatch` is what a *sync* emits — the items
-pulled out of a connected account, handed to the host, and written into memory
-over memory's own bus API. `ConnectorRecord`'s field names are memory's
-ingestion vocabulary exactly, asserted against a literal key list in
-`records/test.rs` rather than imported from the memory contract: importing it
-would reintroduce the coupling this crate exists to remove, and a near-miss
-shape means a translation step where fields quietly stop arriving.
 
 Two dependencies, both pure Rust: `serde` and `serde_json`.
 
@@ -116,6 +106,14 @@ Composio operations arrive as additive minor bumps rather than sitting here
 unanswered.
 
 ## Versioning
+
+Contract 2.0 removed the `Sync` member, the `records` module
+(`ConnectorRecord`, `ConnectorRecordBatch`, `RecordSender`, `SyncEvent`,
+`SyncStage`, `ConnectorSyncRequest`, `ConnectorSyncResponse`) and the sync
+fields of `ComposioCapability` (`initial_sync`, `periodic_sync`,
+`sync_interval_secs`, `memory_ingest`). The module no longer reads records out
+of connected accounts; a host that wants account data runs actions through
+`Execute`.
 
 `CONTRACT_VERSION` describes *this vocabulary*, not the package. Bump its major
 component when a payload's wire form changes incompatibly or a member is removed
