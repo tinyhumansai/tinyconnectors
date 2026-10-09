@@ -299,7 +299,8 @@ fn status_message(status: u16, body: &str) -> String {
     };
     let mut out = format!("HTTP {status}: {}", sanitize(&message));
     if let Some(fix) = fix {
-        out.push_str(&format!(" Suggested fix: {}", sanitize(&fix)));
+        out.push_str(" Suggested fix: ");
+        out.push_str(&sanitize(&fix));
     }
     out
 }

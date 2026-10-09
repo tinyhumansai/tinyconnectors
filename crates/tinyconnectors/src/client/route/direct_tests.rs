@@ -67,13 +67,13 @@ impl FakeTransport {
 #[async_trait]
 impl Transport for FakeTransport {
     async fn get(&self, path: &str) -> Result<serde_json::Value> {
-        if path.starts_with("/connected_accounts/") {
-            if let Some(account) = self.account.lock().unwrap().clone() {
-                return account.map_err(|message| Error::Transport {
-                    path: path.to_string(),
-                    message,
-                });
-            }
+        if path.starts_with("/connected_accounts/")
+            && let Some(account) = self.account.lock().unwrap().clone()
+        {
+            return account.map_err(|message| Error::Transport {
+                path: path.to_string(),
+                message,
+            });
         }
         self.answer(path)
     }
