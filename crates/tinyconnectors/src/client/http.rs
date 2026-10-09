@@ -290,30 +290,44 @@ const REDACTED_MARKERS: [&str; 6] = [
 ];
 
 /// `HTTP <status>`, plus the provider's own message when the body carries one
-/// (`{"error":{"message":..}}` or `{"message":..}`), scrubbed of identifiers
-/// and bounded in length. Anything else about the body is dropped.
+/// (`{"error":{"message":..}}` or `{"message":..}`) and its `suggested_fix`
+/// when it has one, each scrubbed of identifiers and bounded in length.
+/// Anything else about the body is dropped.
 fn status_message(status: u16, body: &str) -> String {
-    let Some(message) = api_error_message(body) else {
+    let Some((message, fix)) = api_error_message(body) else {
         return format!("HTTP {status}");
     };
-    let mut sanitized = message.replace('\n', " ");
+    let mut out = format!("HTTP {status}: {}", sanitize(&message));
+    if let Some(fix) = fix {
+        out.push_str(&format!(" Suggested fix: {}", sanitize(&fix)));
+    }
+    out
+}
+
+fn sanitize(text: &str) -> String {
+    let mut sanitized = text.replace('\n', " ");
     for marker in REDACTED_MARKERS {
         sanitized = sanitized.replace(marker, "[redacted]");
     }
-    format!(
-        "HTTP {status}: {}",
-        truncate(&sanitized, ERROR_MESSAGE_MAX_CHARS)
-    )
+    truncate(&sanitized, ERROR_MESSAGE_MAX_CHARS)
 }
 
-fn api_error_message(body: &str) -> Option<String> {
+fn api_error_message(body: &str) -> Option<(String, Option<String>)> {
     let parsed: serde_json::Value = serde_json::from_str(body).ok()?;
-    parsed
-        .get("error")
+    let error = parsed.get("error");
+    let message = error
         .and_then(|error| error.get("message"))
         .and_then(serde_json::Value::as_str)
-        .or_else(|| parsed.get("message").and_then(serde_json::Value::as_str))
-        .map(ToString::to_string)
+        .or_else(|| parsed.get("message").and_then(serde_json::Value::as_str))?
+        .to_string();
+    let fix = error
+        .and_then(|error| error.get("suggested_fix"))
+        .or_else(|| parsed.get("suggested_fix"))
+        .and_then(serde_json::Value::as_str)
+        .map(str::trim)
+        .filter(|fix| !fix.is_empty())
+        .map(ToString::to_string);
+    Some((message, fix))
 }
 
 fn truncate(text: &str, max_chars: usize) -> String {

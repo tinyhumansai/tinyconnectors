@@ -23,6 +23,9 @@ struct FakeTransport {
     calls: Mutex<u32>,
     last_body: Mutex<Option<serde_json::Value>>,
     last_path: Mutex<Option<String>>,
+    /// Reply to `GET /connected_accounts/{id}`, when set; `Err` fails the lookup.
+    account: Mutex<Option<std::result::Result<serde_json::Value, String>>>,
+    last_execute_body: Mutex<Option<serde_json::Value>>,
 }
 
 impl FakeTransport {
@@ -64,11 +67,22 @@ impl FakeTransport {
 #[async_trait]
 impl Transport for FakeTransport {
     async fn get(&self, path: &str) -> Result<serde_json::Value> {
+        if path.starts_with("/connected_accounts/") {
+            if let Some(account) = self.account.lock().unwrap().clone() {
+                return account.map_err(|message| Error::Transport {
+                    path: path.to_string(),
+                    message,
+                });
+            }
+        }
         self.answer(path)
     }
 
     async fn post(&self, path: &str, body: &serde_json::Value) -> Result<serde_json::Value> {
         *self.last_body.lock().unwrap() = Some(body.clone());
+        if path.starts_with("/tools/execute/") {
+            *self.last_execute_body.lock().unwrap() = Some(body.clone());
+        }
         self.answer(path)
     }
 
@@ -502,4 +516,38 @@ async fn a_tool_without_a_description_is_described_by_its_name() {
         tools.tools[0].function.description.as_deref(),
         Some("A tool")
     );
+}
+
+fn execute_body(transport: &FakeTransport) -> serde_json::Value {
+    transport.last_execute_body.lock().unwrap().clone().unwrap()
+}
+
+#[tokio::test]
+async fn execute_acts_as_the_connected_accounts_own_user() {
+    let transport = FakeTransport::replying(json!({ "successful": true, "data": {} }));
+    *transport.account.lock().unwrap() =
+        Some(Ok(json!({ "id": "c1", "user_id": "pg-generated-user" })));
+    route(transport.clone())
+        .execute("GMAIL_SEND_EMAIL", &json!({}), Some("c1"))
+        .await
+        .unwrap();
+    assert_eq!(execute_body(&transport)["entity_id"], "pg-generated-user");
+}
+
+#[tokio::test]
+async fn execute_keeps_the_configured_entity_when_the_owner_is_unknown() {
+    let transport = FakeTransport::replying(json!({ "successful": true, "data": {} }));
+    *transport.account.lock().unwrap() = Some(Err("boom".to_string()));
+    route(transport.clone())
+        .execute("GMAIL_SEND_EMAIL", &json!({}), Some("c1"))
+        .await
+        .unwrap();
+    assert_eq!(execute_body(&transport)["entity_id"], "entity-1");
+
+    *transport.account.lock().unwrap() = Some(Ok(json!({ "id": "c1", "user_id": "  " })));
+    route(transport.clone())
+        .execute("GMAIL_SEND_EMAIL", &json!({}), Some("c1"))
+        .await
+        .unwrap();
+    assert_eq!(execute_body(&transport)["entity_id"], "entity-1");
 }
