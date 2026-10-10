@@ -309,9 +309,10 @@ fn status_message(status: u16, body: &str) -> String {
     };
     // The assembled detail stays within `ERROR_MESSAGE_MAX_CHARS`, with a
     // share of it reserved for the fix so a long message cannot crowd it out.
-    let message = sanitize(&message, ERROR_MESSAGE_MAX_CHARS / 2);
-    let fix_budget =
-        ERROR_MESSAGE_MAX_CHARS.saturating_sub(message.chars().count() + FIX_LABEL.chars().count());
+    // `truncate` appends an ellipsis, so each budget leaves room for it.
+    let message = sanitize(&message, ERROR_MESSAGE_MAX_CHARS / 2 - ELLIPSIS_CHARS);
+    let fix_budget = ERROR_MESSAGE_MAX_CHARS
+        .saturating_sub(message.chars().count() + FIX_LABEL.chars().count() + ELLIPSIS_CHARS);
     format!(
         "HTTP {status}: {message}{FIX_LABEL}{}",
         sanitize(&fix, fix_budget)
