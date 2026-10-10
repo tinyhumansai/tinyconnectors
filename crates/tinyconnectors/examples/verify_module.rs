@@ -52,11 +52,8 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 /// Wait until the module claims its bus name, then check that its manifest
 /// declares exactly the members the contract does.
 ///
-/// The verifier deliberately stops short of *calling* a member. Every member
-/// reaches a live connector backend with a real user's credential, so a
-/// call-based check would need a signed-in account and would make a release
-/// gate depend on a third party being up. Claiming the name and matching the
-/// declared member table is what the artifact can honestly be held to.
+/// Preparation and classification use local fixture payloads without calling
+/// any backend or requiring a signed-in user.
 async fn verify_served_surface(
     bus: &MemoryBus,
     info: &ModuleInfo,
@@ -86,6 +83,39 @@ async fn verify_served_surface(
             "module declares {declared:?} but the contract declares {expected:?}"
         ))
         .into());
+    }
+    let proxy = client.proxy(names::INTERFACE, names::OBJECT_PATH, names::INTERFACE)?;
+    let prepared: tinyconnectors_bus::PreparedArguments = proxy
+        .call(
+            names::methods::PREPARE_ARGUMENTS,
+            (tinyconnectors_bus::PrepareArgumentsRequest {
+                tool: "GOOGLECALENDAR_EVENTS_LIST".into(),
+                arguments: Some(serde_json::json!({"timeMin":"2026-06-01"})),
+                timezone: Some("Asia/Kuwait".into()),
+                since: None,
+            },),
+        )
+        .await?;
+    if prepared.error.is_some()
+        || prepared
+            .arguments
+            .as_ref()
+            .and_then(|args| args.get("timeZone"))
+            != Some(&serde_json::json!("Asia/Kuwait"))
+    {
+        return Err(io::Error::other("module did not apply calendar defaults").into());
+    }
+    let classified: tinyconnectors_bus::ProviderError = proxy
+        .call(
+            names::methods::CLASSIFY_ERROR,
+            (tinyconnectors_bus::ClassifyErrorRequest {
+                tool: "GMAIL_SEND_EMAIL".into(),
+                message: "HTTP 404 connection error, try to authenticate".into(),
+            },),
+        )
+        .await?;
+    if classified.class != "action_not_found" {
+        return Err(io::Error::other("module did not classify action failure").into());
     }
     Ok(())
 }

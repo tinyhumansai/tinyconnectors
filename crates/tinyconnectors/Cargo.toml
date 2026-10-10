@@ -18,6 +18,9 @@ publish = false
 crate-type = ["rlib", "cdylib"]
 
 [dependencies]
+# Random opaque archive leases prevent stale handles from binding after reload.
+getrandom = "0.4"
+
 # The wire contract: member names, payload types, and the contract version.
 # Re-exported wholesale from `src/lib.rs` so a consumer takes one dependency
 # rather than two, and so `tinyconnectors::ComposioConnection` and

@@ -52,6 +52,11 @@ use tinyconnectors_bus::{
     ComposioUserScopesResponse, names,
 };
 
+use tinyconnectors_bus::{
+    ClassifyErrorRequest, ComposioTriggerHistoryEntry, FilterResponseRequest,
+    PrepareArgumentsRequest, PreparedArguments, ProviderError,
+};
+
 use crate::client::{
     COMPOSIO_API_BASE, ComposioClient, DirectRoute, HttpTransport, ProxyRoute, Route,
 };
@@ -302,6 +307,7 @@ struct ConnectorService {
     /// hand the module a writable directory. Asking for one unconditionally
     /// would make every deployment carry a path it does not use.
     archive: Option<TriggerArchive>,
+    archives: Arc<archives::Archives>,
     /// The toolkits this build knows.
     ///
     /// Answers the capability members without touching the network, and gives
@@ -546,6 +552,92 @@ impl ConnectorService {
             .await
             .map_err(|error| tinybus::Error::failed(error.to_string()))?;
         Ok(scopes_response(&request.toolkit, pref))
+    }
+
+    // Pure preparation is synchronous; async signatures are required by TinyBus.
+    #[allow(
+        clippy::unused_async,
+        reason = "TinyBus interface signatures are async; this operation performs synchronous in-memory work"
+    )]
+    async fn prepare_arguments(
+        &self,
+        request: PrepareArgumentsRequest,
+    ) -> TinyBusResult<PreparedArguments> {
+        let result = processing::prepare(request);
+        Ok(result)
+    }
+
+    #[allow(
+        clippy::unused_async,
+        reason = "TinyBus interface signatures are async; this operation performs synchronous in-memory work"
+    )]
+    async fn filter_response(
+        &self,
+        request: FilterResponseRequest,
+    ) -> TinyBusResult<ComposioExecuteResponse> {
+        let since = processing::parse_since(&request.since)?;
+        Ok(crate::execute::filter_response(
+            &request.tool,
+            request.response,
+            since,
+        ))
+    }
+
+    #[allow(
+        clippy::unused_async,
+        reason = "TinyBus interface signatures are async; this operation performs synchronous in-memory work"
+    )]
+    async fn classify_error(&self, request: ClassifyErrorRequest) -> TinyBusResult<ProviderError> {
+        Ok(processing::classified(&request.tool, &request.message))
+    }
+
+    async fn record_trigger(
+        &self,
+        request: tinyconnectors_bus::RecordTriggerRequest,
+    ) -> TinyBusResult<ComposioTriggerHistoryEntry> {
+        let archive = self.archives.get(&request.handle)?;
+        tokio::task::spawn_blocking(move || {
+            let event = request.event;
+            archive.record(
+                &event.toolkit,
+                &event.trigger,
+                &event.metadata.id,
+                &event.metadata.uuid,
+                &event.payload,
+            )
+        })
+        .await
+        .map_err(|_| tinybus::Error::failed("trigger archive worker failed"))?
+        .map_err(|_| tinybus::Error::failed("trigger archive write failed"))
+    }
+
+    async fn open_archive(
+        &self,
+        request: tinyconnectors_bus::OpenArchiveRequest,
+    ) -> TinyBusResult<tinyconnectors_bus::ArchiveHandle> {
+        let archives = self.archives.clone();
+        tokio::task::spawn_blocking(move || archives.open(&request.state_dir))
+            .await
+            .map_err(|_| tinybus::Error::failed("trigger archive worker failed"))?
+    }
+
+    async fn read_archive(
+        &self,
+        request: tinyconnectors_bus::ReadArchiveRequest,
+    ) -> TinyBusResult<ComposioTriggerHistoryResult> {
+        let archive = self.archives.get(&request.handle)?;
+        tokio::task::spawn_blocking(move || archive.list_recent(request.limit))
+            .await
+            .map_err(|_| tinybus::Error::failed("trigger archive worker failed"))?
+            .map_err(|_| tinybus::Error::failed("trigger archive read failed"))
+    }
+
+    #[allow(
+        clippy::unused_async,
+        reason = "TinyBus interface signatures are async; this operation performs synchronous in-memory work"
+    )]
+    async fn close_archive(&self, handle: tinyconnectors_bus::ArchiveHandle) -> TinyBusResult<()> {
+        self.archives.close(&handle)
     }
 
     async fn execute(
@@ -856,6 +948,7 @@ async fn setup(connection: Connection, config: ModuleConfig) -> TinyBusResult<()
         registry: crate::providers::default_registry(),
         client,
         archive,
+        archives: Arc::default(),
     };
 
     connection
@@ -895,6 +988,14 @@ export_module! {
         "ListTools",
         "GetUserScopes",
         "SetUserScopes",
+        "PrepareArguments",
+        "FilterResponse",
+        "ClassifyError",
+        "RecordTrigger",
+        "OpenArchive",
+        "ReadArchive",
+        "CloseArchive",
+
         "Execute",
         "ListCapabilities",
         "ListAgentReadyToolkits",
@@ -909,6 +1010,7 @@ export_module! {
         "ListTriggerHistory",
         "ListConnectionsDirect",
         "ListToolsDirect",
+
     ],
     signals = [],
     requires = [],
@@ -923,3 +1025,7 @@ mod test;
 #[cfg(test)]
 #[path = "direct_tests.rs"]
 mod direct_test;
+
+mod processing;
+
+mod archives;

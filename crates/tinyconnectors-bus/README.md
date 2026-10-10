@@ -132,3 +132,8 @@ One directory per family, with `mod.rs` explaining what the family is for,
 Composio envelope under `composio/`; put something genuinely backend-neutral at
 the root. Keep the crate dependency-light: the moment it links a transport or a
 runtime, the reason it exists is gone.
+
+Contract 1.13 adds processing DTOs and seven members for argument preparation,
+task filtering, structured provider classification and leased trigger archives. These
+are serialized vocabulary only; normalization, filtering and file I/O remain
+in the compiled module. Existing member arities and wire forms are unchanged.

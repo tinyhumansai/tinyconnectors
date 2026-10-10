@@ -94,6 +94,12 @@
 //! ```
 
 pub mod composio;
+pub mod processing;
+pub use processing::{
+    ArchiveHandle, ClassifyErrorRequest, FilterResponseRequest, OpenArchiveRequest,
+    PrepareArgumentsRequest, PreparedArguments, ProviderError, ReadArchiveRequest,
+    RecordTriggerRequest,
+};
 pub mod names;
 pub mod version;
 
