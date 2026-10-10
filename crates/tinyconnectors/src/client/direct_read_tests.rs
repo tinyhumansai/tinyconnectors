@@ -338,5 +338,5 @@ async fn a_blank_nested_fix_falls_back_to_the_top_level_one_within_the_bound() {
         detail.contains("Suggested fix: mmm"),
         "a long message must not crowd out the fix: {error}"
     );
-    assert!(detail.chars().count() <= 240 + 6, "{error}");
+    assert!(detail.chars().count() <= 240, "{error}");
 }

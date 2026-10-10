@@ -279,6 +279,8 @@ fn finish(
 /// Longest provider message kept in a failure.
 const ERROR_MESSAGE_MAX_CHARS: usize = 240;
 /// Joins the provider's message to its `suggested_fix` in a surfaced error.
+/// Length of the `...` that `truncate` appends.
+const ELLIPSIS_CHARS: usize = 3;
 const FIX_LABEL: &str = " Suggested fix: ";
 
 /// Field names a provider message may echo that identify the user's data.

@@ -138,24 +138,27 @@ impl DirectRoute {
 
     /// The user a connected account belongs to, from `GET /connected_accounts/{id}`.
     ///
-    /// Best effort: a failed lookup or a row without an owner yields `None`, and
-    /// the caller falls back to the configured entity. It bypasses the key gate
-    /// bookkeeping because the execute that follows records the real outcome.
-    async fn account_owner(&self, connection_id: &str) -> Option<String> {
-        self.check_gate().ok()?;
+    /// Best effort: a failed lookup or a row without an owner yields `Ok(None)`
+    /// and the caller falls back to the configured entity. The lookup goes
+    /// through [`Self::call`], so a rejected key counts toward the gate and
+    /// stops the execute that would only be refused again; that failure (and a
+    /// closed gate) is returned instead of swallowed.
+    async fn account_owner(&self, connection_id: &str) -> Result<Option<String>> {
         let path = format!("/connected_accounts/{}", encode(connection_id));
-        match self.transport.get(&path).await {
+        match self.call(self.transport.get(&path)).await {
             Ok(value) => {
                 let owner = slug_field(&value, &["user_id", "userId"]);
                 tracing::debug!(
                     found = owner.is_some(),
                     "[connectors][direct] account owner lookup"
                 );
-                owner
+                Ok(owner)
             }
+            Err(error @ Error::DirectAuthGated { .. }) => Err(error),
+            Err(error) if is_invalid_api_key(&error.to_string()) => Err(error),
             Err(error) => {
                 tracing::debug!(%error, "[connectors][direct] account owner lookup failed; using configured entity");
-                None
+                Ok(None)
             }
         }
     }
@@ -388,7 +391,7 @@ impl Route for DirectRoute {
         let entity_id = match connection_id {
             Some(connection_id) => self
                 .account_owner(connection_id)
-                .await
+                .await?
                 .unwrap_or_else(|| self.entity_id.clone()),
             None => self.entity_id.clone(),
         };
