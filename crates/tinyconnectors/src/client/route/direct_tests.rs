@@ -551,3 +551,28 @@ async fn execute_keeps_the_configured_entity_when_the_owner_is_unknown() {
         .unwrap();
     assert_eq!(execute_body(&transport)["entity_id"], "entity-1");
 }
+
+#[tokio::test]
+async fn a_rejected_key_in_the_owner_lookup_counts_toward_the_gate() {
+    let transport = FakeTransport::failing("401 invalid api key");
+    let direct = route(transport.clone());
+
+    // The lookup is the one request per execute: its rejection is returned,
+    // not swallowed into a second doomed execute.
+    for _ in 0..INVALID_API_KEY_THRESHOLD {
+        assert!(
+            direct
+                .execute("GMAIL_SEND_EMAIL", &json!({}), Some("c1"))
+                .await
+                .is_err()
+        );
+    }
+    assert_eq!(transport.calls(), INVALID_API_KEY_THRESHOLD);
+
+    let error = direct
+        .execute("GMAIL_SEND_EMAIL", &json!({}), Some("c1"))
+        .await
+        .unwrap_err();
+    assert!(matches!(error, Error::DirectAuthGated { .. }));
+    assert_eq!(transport.calls(), INVALID_API_KEY_THRESHOLD);
+}
