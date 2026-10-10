@@ -114,6 +114,7 @@ fn service_over(transport: Arc<StubTransport>) -> ConnectorService {
         // No archive: these tests exercise the backend-facing members. The
         // history member's own behaviour without one is tested separately.
         archive: None,
+        archives: Arc::default(),
     }
 }
 
@@ -986,10 +987,10 @@ async fn the_ephemeral_prefs_store_round_trips() {
 // ── setup ────────────────────────────────────────────────────────────
 
 /// A scratch directory that removes itself.
-struct TempDir(std::path::PathBuf);
+pub(super) struct TempDir(pub(super) std::path::PathBuf);
 
 impl TempDir {
-    fn new(name: &str) -> Self {
+    pub(super) fn new(name: &str) -> Self {
         let path = std::env::temp_dir().join(format!(
             "tinyconnectors-module-{name}-{}-{:?}",
             std::process::id(),
@@ -1182,6 +1183,7 @@ async fn a_module_loaded_without_a_route_becomes_usable_after_configure() {
         registry: crate::providers::default_registry(),
         client: Arc::new(std::sync::RwLock::new(None)),
         archive: None,
+        archives: Arc::default(),
     };
 
     let before = service.list_toolkits().await.unwrap_err();
@@ -1256,6 +1258,7 @@ async fn a_reconfigured_route_reaches_the_action_runner_too() {
         registry: crate::providers::default_registry(),
         client,
         archive: None,
+        archives: Arc::default(),
     };
 
     let before = tinyconnectors_sync::ActionRunner::run(
@@ -1352,4 +1355,235 @@ async fn a_failed_enable_trigger_carries_an_error_class() {
 
     assert!(error.contains("[composio:error:"), "{error}");
     assert!(error.contains("rate limited"), "{error}");
+}
+
+#[tokio::test]
+async fn bus_prepares_calendar_arguments_and_classifies_validation() -> tinybus::Result<()> {
+    use tinyconnectors_bus::{PrepareArgumentsRequest, PreparedArguments};
+    let (_serving, proxy) = serve_via_setup(ModuleConfig::default()).await?;
+    let reply: PreparedArguments = proxy
+        .call(
+            names::methods::PREPARE_ARGUMENTS,
+            (PrepareArgumentsRequest {
+                tool: "GOOGLECALENDAR_EVENTS_LIST".into(),
+                arguments: Some(json!({"timeMin":"2026-06-01", "timeZone":"UTC"})),
+                timezone: Some("Asia/Kuwait".into()),
+                since: None,
+            },),
+        )
+        .await?;
+    assert!(reply.error.is_none());
+    let args = reply.arguments.unwrap();
+    assert_eq!(args["timeMin"], "2026-06-01T00:00:00Z");
+    assert_eq!(args["timeZone"], "UTC");
+    assert_eq!(args["singleEvents"], true);
+    for (arguments, since) in [
+        (Some(json!([])), None),
+        (None, Some("private-invalid-boundary".into())),
+    ] {
+        let reply: PreparedArguments = proxy
+            .call(
+                names::methods::PREPARE_ARGUMENTS,
+                (PrepareArgumentsRequest {
+                    tool: "GMAIL_SEND_EMAIL".into(),
+                    arguments,
+                    timezone: None,
+                    since,
+                },),
+            )
+            .await?;
+        assert!(reply.arguments.is_none());
+        let error = reply.error.unwrap();
+        assert_eq!(error.class, "validation");
+        assert!(!error.message.contains("private-invalid-boundary"));
+    }
+    Ok(())
+}
+
+#[tokio::test]
+async fn bus_applies_task_windows_and_returns_structured_provider_errors() -> tinybus::Result<()> {
+    use tinyconnectors_bus::{
+        ClassifyErrorRequest, FilterResponseRequest, PrepareArgumentsRequest, PreparedArguments,
+        ProviderError,
+    };
+    let (_serving, proxy) = serve_via_setup(ModuleConfig::default()).await?;
+    let since = "2026-06-01T00:00:00Z";
+    let reply: PreparedArguments = proxy
+        .call(
+            names::methods::PREPARE_ARGUMENTS,
+            (PrepareArgumentsRequest {
+                tool: "CLICKUP_GET_TASKS".into(),
+                arguments: None,
+                timezone: None,
+                since: Some(since.into()),
+            },),
+        )
+        .await?;
+    assert!(reply.error.is_none());
+    assert!(reply.arguments.unwrap().is_object());
+    let response = ComposioExecuteResponse {
+        successful: true,
+        data: json!({"tasks":[{"id":"old","date_updated":"1"},{"id":"new","date_updated":"1780272000000"}]}),
+        markdown_formatted: Some("unfiltered".into()),
+        ..Default::default()
+    };
+    let reply: ComposioExecuteResponse = proxy
+        .call(
+            names::methods::FILTER_RESPONSE,
+            (FilterResponseRequest {
+                tool: "CLICKUP_GET_TASKS".into(),
+                response: response.clone(),
+                since: since.into(),
+            },),
+        )
+        .await?;
+    assert_eq!(reply.data["tasks"].as_array().unwrap().len(), 1);
+    assert_eq!(reply.data["tasks"][0]["id"], "new");
+    assert!(reply.markdown_formatted.is_none());
+    assert!(
+        proxy
+            .call::<ComposioExecuteResponse>(
+                names::methods::FILTER_RESPONSE,
+                (FilterResponseRequest {
+                    tool: "CLICKUP_GET_TASKS".into(),
+                    response,
+                    since: "invalid".into()
+                },)
+            )
+            .await
+            .is_err()
+    );
+    let reply: ProviderError = proxy
+        .call(
+            names::methods::CLASSIFY_ERROR,
+            (ClassifyErrorRequest {
+                tool: "GMAIL_SEND_EMAIL".into(),
+                message: "HTTP 404 connection error, try to authenticate".into(),
+            },),
+        )
+        .await?;
+    assert_eq!(reply.class, "action_not_found");
+    assert!(reply.message.contains("not a sign-in problem"));
+    Ok(())
+}
+
+#[tokio::test]
+async fn bus_archive_leases_separate_users_and_preserve_daily_history() -> tinybus::Result<()> {
+    use tinyconnectors_bus::{
+        ArchiveHandle, ComposioTriggerEvent, ComposioTriggerHistoryEntry, OpenArchiveRequest,
+        ReadArchiveRequest, RecordTriggerRequest,
+    };
+    let first = TempDir::new("archive-first");
+    let second = TempDir::new("archive-second");
+    let (_serving, proxy) = serve_via_setup(ModuleConfig::default()).await?;
+    let open = |dir: &TempDir| OpenArchiveRequest {
+        state_dir: dir.0.to_string_lossy().into_owned(),
+    };
+    let one: ArchiveHandle = proxy
+        .call(names::methods::OPEN_ARCHIVE, (open(&first),))
+        .await?;
+    let two: ArchiveHandle = proxy
+        .call(names::methods::OPEN_ARCHIVE, (open(&second),))
+        .await?;
+    assert_ne!(one, two);
+    let event = ComposioTriggerEvent {
+        toolkit: "gmail".into(),
+        trigger: "GMAIL_NEW_GMAIL_MESSAGE".into(),
+        payload: json!({"fixture":true}),
+        ..Default::default()
+    };
+    let recorded: ComposioTriggerHistoryEntry = proxy
+        .call(
+            names::methods::RECORD_TRIGGER,
+            (RecordTriggerRequest {
+                handle: one.clone(),
+                event: event.clone(),
+            },),
+        )
+        .await?;
+    let recent: ComposioTriggerHistoryResult = proxy
+        .call(
+            names::methods::READ_ARCHIVE,
+            (ReadArchiveRequest {
+                handle: one.clone(),
+                limit: None,
+            },),
+        )
+        .await?;
+    assert_eq!(recent.entries.len(), 1);
+    assert_eq!(recent.entries[0].received_at_ms, recorded.received_at_ms);
+    let other: ComposioTriggerHistoryResult = proxy
+        .call(
+            names::methods::READ_ARCHIVE,
+            (ReadArchiveRequest {
+                handle: two.clone(),
+                limit: None,
+            },),
+        )
+        .await?;
+    assert!(other.entries.is_empty());
+    proxy
+        .call::<()>(names::methods::CLOSE_ARCHIVE, (one.clone(),))
+        .await?;
+    closed_archive_calls_fail(&proxy, one, event).await;
+    let reopened: ArchiveHandle = proxy
+        .call(names::methods::OPEN_ARCHIVE, (open(&first),))
+        .await?;
+    let restored: ComposioTriggerHistoryResult = proxy
+        .call(
+            names::methods::READ_ARCHIVE,
+            (ReadArchiveRequest {
+                handle: reopened.clone(),
+                limit: None,
+            },),
+        )
+        .await?;
+    assert_eq!(restored.entries[0].payload, json!({"fixture":true}));
+    proxy
+        .call::<()>(names::methods::CLOSE_ARCHIVE, (reopened,))
+        .await?;
+    proxy
+        .call::<()>(names::methods::CLOSE_ARCHIVE, (two,))
+        .await?;
+    Ok(())
+}
+
+async fn closed_archive_calls_fail(
+    proxy: &tinybus::Proxy,
+    one: tinyconnectors_bus::ArchiveHandle,
+    event: tinyconnectors_bus::ComposioTriggerEvent,
+) {
+    use tinyconnectors_bus::{
+        ComposioTriggerHistoryEntry, ReadArchiveRequest, RecordTriggerRequest,
+    };
+    assert!(
+        proxy
+            .call::<ComposioTriggerHistoryEntry>(
+                names::methods::RECORD_TRIGGER,
+                (RecordTriggerRequest {
+                    handle: one.clone(),
+                    event
+                },)
+            )
+            .await
+            .is_err()
+    );
+    assert!(
+        proxy
+            .call::<ComposioTriggerHistoryResult>(
+                names::methods::READ_ARCHIVE,
+                (ReadArchiveRequest {
+                    handle: one.clone(),
+                    limit: None
+                },)
+            )
+            .await
+            .is_err()
+    );
+    assert!(
+        proxy
+            .call::<()>(names::methods::CLOSE_ARCHIVE, (one,))
+            .await
+            .is_err()
+    );
 }

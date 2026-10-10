@@ -21,6 +21,7 @@ fn unrouted_service() -> ConnectorService {
         registry: crate::providers::default_registry(),
         client,
         archive: None,
+        archives: Arc::default(),
     }
 }
 

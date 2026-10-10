@@ -199,6 +199,20 @@ pub mod methods {
     /// [`LIST_CONNECTIONS_DIRECT`]; the user's scope preference is not applied.
     /// Added in contract 1.10.
     pub const LIST_TOOLS_DIRECT: &str = "ListToolsDirect";
+    /// Prepares arguments using host-selected time zone and recency context.
+    pub const PREPARE_ARGUMENTS: &str = "PrepareArguments";
+    /// Filters task results inside the module.
+    pub const FILTER_RESPONSE: &str = "FilterResponse";
+    /// Returns a structured provider error for host presentation.
+    pub const CLASSIFY_ERROR: &str = "ClassifyError";
+    /// Archives a delivered trigger inside the module.
+    pub const RECORD_TRIGGER: &str = "RecordTrigger";
+    /// Opens a module-owned trigger archive and returns its opaque handle.
+    pub const OPEN_ARCHIVE: &str = "OpenArchive";
+    /// Reads recent deliveries from an owned archive.
+    pub const READ_ARCHIVE: &str = "ReadArchive";
+    /// Releases an archive lease without deleting persisted history.
+    pub const CLOSE_ARCHIVE: &str = "CloseArchive";
 }
 
 /// Every member of [`INTERFACE`], in the order the interface dispatches them.
@@ -214,6 +228,13 @@ pub const METHODS: &[&str] = &[
     methods::LIST_TOOLS,
     methods::GET_USER_SCOPES,
     methods::SET_USER_SCOPES,
+    methods::PREPARE_ARGUMENTS,
+    methods::FILTER_RESPONSE,
+    methods::CLASSIFY_ERROR,
+    methods::RECORD_TRIGGER,
+    methods::OPEN_ARCHIVE,
+    methods::READ_ARCHIVE,
+    methods::CLOSE_ARCHIVE,
     methods::EXECUTE,
     methods::LIST_CAPABILITIES,
     methods::LIST_AGENT_READY_TOOLKITS,
