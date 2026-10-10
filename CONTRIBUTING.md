@@ -13,7 +13,7 @@ This repository follows the shared module CI and release contract maintained in
 
 Install a stable Rust toolchain with Rust 2024 support (see `rust-version` in
 `Cargo.toml` for the minimum supported version), initialize the vendored
-submodules, then run these baseline checks locally; the reusable CI workflow also runs the cross-platform module gates described above:
+submodules, then run these baseline checks locally. CI also runs docs, MSRV, supply-chain, module E2E, and feature-test gates on the platforms listed in the shared contract:
 
 ```sh
 git submodule update --init --recursive
