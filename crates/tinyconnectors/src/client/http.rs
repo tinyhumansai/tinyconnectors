@@ -297,12 +297,14 @@ fn status_message(status: u16, body: &str) -> String {
     let Some((message, fix)) = api_error_message(body) else {
         return format!("HTTP {status}");
     };
-    let mut out = format!("HTTP {status}: {}", sanitize(&message));
+    // Bound the assembled text, not each field, so the whole detail stays
+    // within `ERROR_MESSAGE_MAX_CHARS`.
+    let mut detail = message;
     if let Some(fix) = fix {
-        out.push_str(" Suggested fix: ");
-        out.push_str(&sanitize(&fix));
+        detail.push_str(" Suggested fix: ");
+        detail.push_str(&fix);
     }
-    out
+    format!("HTTP {status}: {}", sanitize(&detail))
 }
 
 fn sanitize(text: &str) -> String {
@@ -321,13 +323,17 @@ fn api_error_message(body: &str) -> Option<(String, Option<String>)> {
         .and_then(serde_json::Value::as_str)
         .or_else(|| parsed.get("message").and_then(serde_json::Value::as_str))?
         .to_string();
-    let fix = error
-        .and_then(|error| error.get("suggested_fix"))
-        .or_else(|| parsed.get("suggested_fix"))
-        .and_then(serde_json::Value::as_str)
-        .map(str::trim)
-        .filter(|fix| !fix.is_empty())
-        .map(ToString::to_string);
+    // Each candidate is validated on its own, so an unusable nested value
+    // (null, non-string, blank) falls back to the top-level one.
+    let usable = |value: Option<&serde_json::Value>| {
+        value
+            .and_then(serde_json::Value::as_str)
+            .map(str::trim)
+            .filter(|fix| !fix.is_empty())
+            .map(ToString::to_string)
+    };
+    let fix = usable(error.and_then(|error| error.get("suggested_fix")))
+        .or_else(|| usable(parsed.get("suggested_fix")));
     Some((message, fix))
 }
 

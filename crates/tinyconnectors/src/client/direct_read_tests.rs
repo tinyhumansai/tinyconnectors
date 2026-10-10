@@ -319,3 +319,23 @@ async fn the_suggested_fix_is_surfaced_redacted_and_bounded() {
     );
     assert!(error.ends_with("..."), "{error}");
 }
+
+#[tokio::test]
+async fn a_blank_nested_fix_falls_back_to_the_top_level_one_within_the_bound() {
+    let body = r#"{"error":{"message":"bad","suggested_fix":"  "},"suggested_fix":"try again"}"#;
+    let (base, _) = server(move |_| (400, Vec::new(), body.to_string()));
+    assert_eq!(
+        list_connections(&credential(&base)).await.unwrap_err(),
+        "Composio v3 connected_accounts failed: HTTP 400: bad Suggested fix: try again"
+    );
+
+    let long = "m".repeat(400);
+    let body = format!(r#"{{"message":"{long}","suggested_fix":"{long}"}}"#);
+    let (base, _) = server(move |_| (400, Vec::new(), body.clone()));
+    let error = list_connections(&credential(&base)).await.unwrap_err();
+    let detail = error.split("HTTP 400: ").nth(1).unwrap();
+    assert!(
+        detail.chars().count() <= ERROR_MESSAGE_MAX_CHARS + 3,
+        "{error}"
+    );
+}
