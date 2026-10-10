@@ -278,6 +278,8 @@ fn finish(
 
 /// Longest provider message kept in a failure.
 const ERROR_MESSAGE_MAX_CHARS: usize = 240;
+/// Joins the provider's message to its `suggested_fix` in a surfaced error.
+const FIX_LABEL: &str = " Suggested fix: ";
 
 /// Field names a provider message may echo that identify the user's data.
 const REDACTED_MARKERS: [&str; 6] = [
@@ -297,7 +299,6 @@ fn status_message(status: u16, body: &str) -> String {
     let Some((message, fix)) = api_error_message(body) else {
         return format!("HTTP {status}");
     };
-    const FIX_LABEL: &str = " Suggested fix: ";
     let Some(fix) = fix else {
         return format!(
             "HTTP {status}: {}",
