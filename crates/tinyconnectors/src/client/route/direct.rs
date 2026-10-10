@@ -136,6 +136,33 @@ impl DirectRoute {
         }
     }
 
+    /// The user a connected account belongs to, from `GET /connected_accounts/{id}`.
+    ///
+    /// Best effort: a failed lookup or a row without an owner yields `Ok(None)`
+    /// and the caller falls back to the configured entity. The lookup goes
+    /// through [`Self::call`], so a rejected key counts toward the gate and
+    /// stops the execute that would only be refused again; that failure (and a
+    /// closed gate) is returned instead of swallowed.
+    async fn account_owner(&self, connection_id: &str) -> Result<Option<String>> {
+        let path = format!("/connected_accounts/{}", encode(connection_id));
+        match self.call(self.transport.get(&path)).await {
+            Ok(value) => {
+                let owner = slug_field(&value, &["user_id", "userId"]);
+                tracing::debug!(
+                    found = owner.is_some(),
+                    "[connectors][direct] account owner lookup"
+                );
+                Ok(owner)
+            }
+            Err(error @ Error::DirectAuthGated { .. }) => Err(error),
+            Err(error) if is_invalid_api_key(&error.to_string()) => Err(error),
+            Err(error) => {
+                tracing::debug!(%error, "[connectors][direct] account owner lookup failed; using configured entity");
+                Ok(None)
+            }
+        }
+    }
+
     async fn call<F>(&self, request: F) -> Result<serde_json::Value>
     where
         F: std::future::Future<Output = Result<serde_json::Value>>,
@@ -356,9 +383,21 @@ impl Route for DirectRoute {
         let path = format!("/tools/execute/{}", encode(tool));
         tracing::debug!(tool = %tool, "[connectors][direct] execute");
 
+        // Composio rejects an execute whose user does not own the connected
+        // account (HTTP 400), and an account made in the dashboard belongs to a
+        // generated user id rather than the configured entity. Act as the
+        // account's own user when it can be read; otherwise keep the configured
+        // entity.
+        let entity_id = match connection_id {
+            Some(connection_id) => self
+                .account_owner(connection_id)
+                .await?
+                .unwrap_or_else(|| self.entity_id.clone()),
+            None => self.entity_id.clone(),
+        };
         let mut body = serde_json::json!({
             "arguments": arguments,
-            "entity_id": self.entity_id,
+            "entity_id": entity_id,
         });
         if let Some(connection_id) = connection_id {
             body["connected_account_id"] = serde_json::Value::String(connection_id.to_string());

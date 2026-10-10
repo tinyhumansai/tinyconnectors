@@ -278,6 +278,10 @@ fn finish(
 
 /// Longest provider message kept in a failure.
 const ERROR_MESSAGE_MAX_CHARS: usize = 240;
+/// Joins the provider's message to its `suggested_fix` in a surfaced error.
+/// Length of the `...` that `truncate` appends.
+const ELLIPSIS_CHARS: usize = 3;
+const FIX_LABEL: &str = " Suggested fix: ";
 
 /// Field names a provider message may echo that identify the user's data.
 const REDACTED_MARKERS: [&str; 6] = [
@@ -290,30 +294,59 @@ const REDACTED_MARKERS: [&str; 6] = [
 ];
 
 /// `HTTP <status>`, plus the provider's own message when the body carries one
-/// (`{"error":{"message":..}}` or `{"message":..}`), scrubbed of identifiers
-/// and bounded in length. Anything else about the body is dropped.
+/// (`{"error":{"message":..}}` or `{"message":..}`) and its `suggested_fix`
+/// when it has one, each scrubbed of identifiers and bounded in length.
+/// Anything else about the body is dropped.
 fn status_message(status: u16, body: &str) -> String {
-    let Some(message) = api_error_message(body) else {
+    let Some((message, fix)) = api_error_message(body) else {
         return format!("HTTP {status}");
     };
-    let mut sanitized = message.replace('\n', " ");
-    for marker in REDACTED_MARKERS {
-        sanitized = sanitized.replace(marker, "[redacted]");
-    }
+    let Some(fix) = fix else {
+        return format!(
+            "HTTP {status}: {}",
+            sanitize(&message, ERROR_MESSAGE_MAX_CHARS)
+        );
+    };
+    // The assembled detail stays within `ERROR_MESSAGE_MAX_CHARS`, with a
+    // share of it reserved for the fix so a long message cannot crowd it out.
+    // `truncate` appends an ellipsis, so each budget leaves room for it.
+    let message = sanitize(&message, ERROR_MESSAGE_MAX_CHARS / 2 - ELLIPSIS_CHARS);
+    let fix_budget = ERROR_MESSAGE_MAX_CHARS
+        .saturating_sub(message.chars().count() + FIX_LABEL.chars().count() + ELLIPSIS_CHARS);
     format!(
-        "HTTP {status}: {}",
-        truncate(&sanitized, ERROR_MESSAGE_MAX_CHARS)
+        "HTTP {status}: {message}{FIX_LABEL}{}",
+        sanitize(&fix, fix_budget)
     )
 }
 
-fn api_error_message(body: &str) -> Option<String> {
+fn sanitize(text: &str, max_chars: usize) -> String {
+    let mut sanitized = text.replace('\n', " ");
+    for marker in REDACTED_MARKERS {
+        sanitized = sanitized.replace(marker, "[redacted]");
+    }
+    truncate(&sanitized, max_chars)
+}
+
+fn api_error_message(body: &str) -> Option<(String, Option<String>)> {
     let parsed: serde_json::Value = serde_json::from_str(body).ok()?;
-    parsed
-        .get("error")
+    let error = parsed.get("error");
+    let message = error
         .and_then(|error| error.get("message"))
         .and_then(serde_json::Value::as_str)
-        .or_else(|| parsed.get("message").and_then(serde_json::Value::as_str))
-        .map(ToString::to_string)
+        .or_else(|| parsed.get("message").and_then(serde_json::Value::as_str))?
+        .to_string();
+    // Each candidate is validated on its own, so an unusable nested value
+    // (null, non-string, blank) falls back to the top-level one.
+    let usable = |value: Option<&serde_json::Value>| {
+        value
+            .and_then(serde_json::Value::as_str)
+            .map(str::trim)
+            .filter(|fix| !fix.is_empty())
+            .map(ToString::to_string)
+    };
+    let fix = usable(error.and_then(|error| error.get("suggested_fix")))
+        .or_else(|| usable(parsed.get("suggested_fix")));
+    Some((message, fix))
 }
 
 fn truncate(text: &str, max_chars: usize) -> String {
