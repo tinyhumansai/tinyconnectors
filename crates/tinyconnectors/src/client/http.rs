@@ -297,22 +297,30 @@ fn status_message(status: u16, body: &str) -> String {
     let Some((message, fix)) = api_error_message(body) else {
         return format!("HTTP {status}");
     };
-    // Bound the assembled text, not each field, so the whole detail stays
-    // within `ERROR_MESSAGE_MAX_CHARS`.
-    let mut detail = message;
-    if let Some(fix) = fix {
-        detail.push_str(" Suggested fix: ");
-        detail.push_str(&fix);
-    }
-    format!("HTTP {status}: {}", sanitize(&detail))
+    const FIX_LABEL: &str = " Suggested fix: ";
+    let Some(fix) = fix else {
+        return format!(
+            "HTTP {status}: {}",
+            sanitize(&message, ERROR_MESSAGE_MAX_CHARS)
+        );
+    };
+    // The assembled detail stays within `ERROR_MESSAGE_MAX_CHARS`, with a
+    // share of it reserved for the fix so a long message cannot crowd it out.
+    let message = sanitize(&message, ERROR_MESSAGE_MAX_CHARS / 2);
+    let fix_budget =
+        ERROR_MESSAGE_MAX_CHARS.saturating_sub(message.chars().count() + FIX_LABEL.chars().count());
+    format!(
+        "HTTP {status}: {message}{FIX_LABEL}{}",
+        sanitize(&fix, fix_budget)
+    )
 }
 
-fn sanitize(text: &str) -> String {
+fn sanitize(text: &str, max_chars: usize) -> String {
     let mut sanitized = text.replace('\n', " ");
     for marker in REDACTED_MARKERS {
         sanitized = sanitized.replace(marker, "[redacted]");
     }
-    truncate(&sanitized, ERROR_MESSAGE_MAX_CHARS)
+    truncate(&sanitized, max_chars)
 }
 
 fn api_error_message(body: &str) -> Option<(String, Option<String>)> {
