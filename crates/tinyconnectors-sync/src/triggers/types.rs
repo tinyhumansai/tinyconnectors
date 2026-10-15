@@ -3,6 +3,11 @@
 use serde::{Deserialize, Serialize};
 
 /// What happened, independent of the toolkit that reports it.
+///
+/// The key a host builds a feature on: "brief me before meetings" subscribes
+/// to [`TriggerEvent::MeetingStartingSoon`] on whichever calendar the user
+/// connected. Serialized in `snake_case`, the same string [`Self::as_str`]
+/// returns; non-exhaustive because the catalog grows.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
 #[non_exhaustive]
@@ -79,6 +84,9 @@ impl TriggerEvent {
 }
 
 /// How the backend learns that the trigger fired.
+///
+/// A poll trigger takes an `interval` in minutes, so its latency is up to one
+/// interval; a webhook trigger arrives when the upstream service pushes it.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
 pub enum TriggerDelivery {
@@ -89,6 +97,10 @@ pub enum TriggerDelivery {
 }
 
 /// How early a trigger is worth building on.
+///
+/// [`Self::Core`] and [`Self::Extended`] work account-wide with no
+/// configuration. [`Self::PerResource`] watches one repository, pull request,
+/// team or page, so a host has to ask the user which.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
 pub enum TriggerTier {
@@ -97,15 +109,24 @@ pub enum TriggerTier {
     /// Worth building once the core set works.
     Extended,
     /// Needs a specific resource id in its configuration.
+    ///
+    /// The id is usually in [`CuratedTrigger::required_config`]. Notion's
+    /// page-created trigger is the exception: Composio leaves its
+    /// `parent_page_id` optional, but without one it fires for every page in
+    /// the workspace.
     PerResource,
 }
 
 /// One entry in the curated trigger catalog.
+///
+/// Configuration keys are spelled exactly as Composio's trigger config schema
+/// spells them, camelCase for some toolkits and `snake_case` for others.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct CuratedTrigger {
-    /// Composio trigger slug.
+    /// Composio trigger slug, e.g. `"GMAIL_NEW_GMAIL_MESSAGE"`.
     pub slug: &'static str,
-    /// The toolkit the trigger belongs to.
+    /// The canonical slug of the toolkit the trigger belongs to, e.g.
+    /// `"googlecalendar"`.
     pub toolkit: &'static str,
     /// What the trigger reports.
     pub event: TriggerEvent,
