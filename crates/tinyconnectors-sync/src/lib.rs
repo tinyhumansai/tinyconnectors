@@ -38,6 +38,7 @@ pub mod prefs;
 pub mod provider;
 pub mod scope;
 pub mod toolkits;
+pub mod triggers;
 
 pub use error::{Error, Result};
 pub use prefs::{PREFS_NAMESPACE, PrefsStore, ScopePrefStore, UserScopePref};
