@@ -30,8 +30,7 @@ const EVENT_CREATED_USE: &str = "Notice a new invite or booking, so the user can
      conflicts and prepare.";
 
 const EVENT_CANCELED_CONFIG: &[&str] = &["calendarId", "interval"];
-const EVENT_CANCELED_USE: &str =
-    "Tell the user a meeting was canceled and the time is free again.";
+const EVENT_CANCELED_USE: &str = "Tell the user a meeting was canceled and the time is free again.";
 
 const ATTENDEE_RESPONSE_CONFIG: &[&str] = &["calendarId", "interval", "showDeleted"];
 const ATTENDEE_RESPONSE_USE: &str =
@@ -48,8 +47,7 @@ const FILE_SHARED_USE: &str =
     "Tell the user a file was shared with them, and offer to summarize it.";
 
 const COMMENT_ADDED_CONFIG: &[&str] = &["file_id", "interval", "max_files"];
-const COMMENT_ADDED_USE: &str =
-    "Surface comments on the user's documents that may need an answer.";
+const COMMENT_ADDED_USE: &str = "Surface comments on the user's documents that may need an answer.";
 
 // ── gmail ───────────────────────────────────────────────────────────
 /// The curated triggers of the `gmail` toolkit.

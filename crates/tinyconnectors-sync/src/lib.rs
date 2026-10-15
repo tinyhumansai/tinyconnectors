@@ -51,6 +51,6 @@ pub use provider::{
 pub use scope::{CuratedTool, ToolScope, classify_unknown, find_curated, toolkit_from_slug};
 pub use toolkits::default_registry;
 pub use triggers::{
-    CuratedTrigger, TriggerDelivery, TriggerEvent, TriggerTier, curated_trigger,
-    curated_triggers, curated_triggers_for_toolkit, toolkits_for_event, trigger_for_event,
+    CuratedTrigger, TriggerDelivery, TriggerEvent, TriggerTier, curated_trigger, curated_triggers,
+    curated_triggers_for_toolkit, toolkits_for_event, trigger_for_event,
 };

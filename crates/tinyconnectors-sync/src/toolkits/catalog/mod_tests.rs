@@ -229,5 +229,8 @@ fn canonical_toolkit_folds_aliases_case_and_whitespace() {
         assert_eq!(canonical_toolkit(input), canonical, "{input}");
     }
     // A toolkit nobody aliases passes through, lowercased.
-    assert_eq!(canonical_toolkit("Nonexistent-Toolkit"), "nonexistent-toolkit");
+    assert_eq!(
+        canonical_toolkit("Nonexistent-Toolkit"),
+        "nonexistent-toolkit"
+    );
 }

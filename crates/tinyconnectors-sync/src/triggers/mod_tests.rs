@@ -13,7 +13,10 @@ pub(super) const EVENT_WIRE_NAMES: &[(TriggerEvent, &str)] = &[
     (TriggerEvent::EmailSent, "email_sent"),
     (TriggerEvent::MeetingStartingSoon, "meeting_starting_soon"),
     (TriggerEvent::CalendarEventCreated, "calendar_event_created"),
-    (TriggerEvent::CalendarEventCanceled, "calendar_event_canceled"),
+    (
+        TriggerEvent::CalendarEventCanceled,
+        "calendar_event_canceled",
+    ),
     (
         TriggerEvent::AttendeeResponseChanged,
         "attendee_response_changed",
