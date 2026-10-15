@@ -28,6 +28,10 @@ docs/
 Complex modules also carry a module-level `README.md` inside `src/<module>/`
 covering their design, public surface, and important constraints.
 
+The curated Composio trigger catalog (which upstream events are worth building
+assistant features on, per toolkit) is in
+[`specs/curated-triggers.md`](specs/curated-triggers.md).
+
 The current module-release contract is in
 [`specs/tinybus-module-release.md`](specs/tinybus-module-release.md), with its
 implementation sequence in

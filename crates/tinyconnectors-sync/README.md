@@ -18,6 +18,7 @@ vocabulary. Connected accounts are reached through agent tool execution
 | `prefs`    | `UserScopePref` and the `PrefsStore` seam it is persisted through       |
 | `provider` | `ConnectorProvider`, `ProviderRegistry`, `ActionRunner`, `ProviderContext` |
 | `toolkits` | the shipped providers and their curated catalogs, plus `default_registry` |
+| `triggers` | the curated trigger catalog and its lookups by slug, toolkit and event   |
 
 A provider answers three questions about a toolkit: its slug and description,
 which actions are worth offering an agent, and who the connected account is
@@ -54,3 +55,18 @@ Scope and profile payloads are re-exported from `tinyconnectors-bus::vocabulary`
 provider and bus callers use the same types. Import `ScopePrefStore` alongside
 `UserScopePref` to call `UserScopePref::load` and `preference.save`. Persistence
 stays in this crate, while the contract carries the fields and stable row key.
+
+## Curated triggers
+
+Composio offers hundreds of triggers, and most are noise for an assistant.
+`triggers` names the few per toolkit worth building features on, each keyed by
+a toolkit-agnostic `TriggerEvent` (`new_email`, `meeting_starting_soon`, …),
+with its delivery (`webhook` or `poll`), its tier, its configuration keys and
+what it is good for. `trigger_for_event(TriggerEvent::NewEmail, toolkit)`
+answers "the new-email trigger on whatever mail toolkit this user connected";
+toolkit names fold through the same aliases as the tool catalogs.
+
+A `per_resource` trigger watches one repository, pull request, team or page, so
+a host asks the user which before creating it. The full table, how it was
+verified against Composio, and what was left out are in
+[`docs/specs/curated-triggers.md`](../../docs/specs/curated-triggers.md).
