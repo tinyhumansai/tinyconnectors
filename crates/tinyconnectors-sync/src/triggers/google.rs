@@ -163,7 +163,7 @@ pub(super) const GOOGLESUPER_TRIGGERS: &[CuratedTrigger] = &[
         toolkit: "googlesuper",
         event: TriggerEvent::EmailSent,
         delivery: TriggerDelivery::Poll,
-        tier: TriggerTier::Extended,
+        tier: TriggerTier::Core,
         required_config: &[],
         optional_config: EMAIL_SENT_CONFIG,
         use_case: EMAIL_SENT_USE,

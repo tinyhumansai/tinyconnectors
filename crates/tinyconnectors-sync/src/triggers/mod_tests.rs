@@ -251,3 +251,29 @@ fn toolkits_for_event_lists_each_toolkit_once_in_table_order() {
         ["github"]
     );
 }
+
+#[test]
+fn googlesuper_mirrors_the_gmail_calendar_and_drive_triggers() {
+    // One Google connection must offer exactly what the per-product
+    // connections offer, configured the same way.
+    let shape = |t: &CuratedTrigger| {
+        (
+            t.event.as_str(),
+            t.delivery,
+            t.tier,
+            t.required_config,
+            t.optional_config,
+        )
+    };
+    let mut mirrored: Vec<_> = ["gmail", "googlecalendar", "googledrive"]
+        .into_iter()
+        .flat_map(curated_triggers_for_toolkit)
+        .map(shape)
+        .collect();
+    let mut superset: Vec<_> = curated_triggers_for_toolkit("googlesuper")
+        .map(shape)
+        .collect();
+    mirrored.sort_by_key(|row| row.0);
+    superset.sort_by_key(|row| row.0);
+    assert_eq!(superset, mirrored);
+}
