@@ -1,0 +1,405 @@
+[
+  {
+    "slug": "GITHUB_ISSUE_ASSIGNED_TO_ME_TRIGGER",
+    "toolkit": "github",
+    "event": "issue_assigned_to_me",
+    "delivery": "poll",
+    "tier": "extended",
+    "required_config": [],
+    "optional_config": [
+      "interval",
+      "labels",
+      "state"
+    ]
+  },
+  {
+    "slug": "GITHUB_PULL_REQUEST_EVENT",
+    "toolkit": "github",
+    "event": "pull_request_activity",
+    "delivery": "webhook",
+    "tier": "per_resource",
+    "required_config": [
+      "owner",
+      "repo"
+    ],
+    "optional_config": []
+  },
+  {
+    "slug": "GITHUB_PULL_REQUEST_REVIEW_SUBMITTED_TRIGGER",
+    "toolkit": "github",
+    "event": "pull_request_review_submitted",
+    "delivery": "poll",
+    "tier": "per_resource",
+    "required_config": [
+      "owner",
+      "repo",
+      "pull_number"
+    ],
+    "optional_config": [
+      "interval"
+    ]
+  },
+  {
+    "slug": "GITHUB_REPOSITORY_NOTIFICATION_RECEIVED_TRIGGER",
+    "toolkit": "github",
+    "event": "repository_notification",
+    "delivery": "poll",
+    "tier": "per_resource",
+    "required_config": [
+      "owner",
+      "repo"
+    ],
+    "optional_config": [
+      "all",
+      "interval",
+      "participating"
+    ]
+  },
+  {
+    "slug": "GMAIL_EMAIL_SENT_TRIGGER",
+    "toolkit": "gmail",
+    "event": "email_sent",
+    "delivery": "poll",
+    "tier": "extended",
+    "required_config": [],
+    "optional_config": [
+      "interval",
+      "query",
+      "userId"
+    ]
+  },
+  {
+    "slug": "GMAIL_NEW_GMAIL_MESSAGE",
+    "toolkit": "gmail",
+    "event": "new_email",
+    "delivery": "poll",
+    "tier": "core",
+    "required_config": [],
+    "optional_config": [
+      "interval",
+      "labelIds",
+      "query",
+      "userId"
+    ]
+  },
+  {
+    "slug": "GOOGLECALENDAR_ATTENDEE_RESPONSE_CHANGED_TRIGGER",
+    "toolkit": "googlecalendar",
+    "event": "attendee_response_changed",
+    "delivery": "poll",
+    "tier": "extended",
+    "required_config": [],
+    "optional_config": [
+      "calendarId",
+      "interval",
+      "showDeleted"
+    ]
+  },
+  {
+    "slug": "GOOGLECALENDAR_EVENT_CANCELED_DELETED_TRIGGER",
+    "toolkit": "googlecalendar",
+    "event": "calendar_event_canceled",
+    "delivery": "poll",
+    "tier": "extended",
+    "required_config": [],
+    "optional_config": [
+      "calendarId",
+      "interval"
+    ]
+  },
+  {
+    "slug": "GOOGLECALENDAR_EVENT_STARTING_SOON_TRIGGER",
+    "toolkit": "googlecalendar",
+    "event": "meeting_starting_soon",
+    "delivery": "poll",
+    "tier": "core",
+    "required_config": [],
+    "optional_config": [
+      "calendarId",
+      "countdownWindowMinutes",
+      "includeAllDay",
+      "interval",
+      "minutesBeforeStart"
+    ]
+  },
+  {
+    "slug": "GOOGLECALENDAR_GOOGLE_CALENDAR_EVENT_CREATED_TRIGGER",
+    "toolkit": "googlecalendar",
+    "event": "calendar_event_created",
+    "delivery": "poll",
+    "tier": "core",
+    "required_config": [],
+    "optional_config": [
+      "calendarId",
+      "interval",
+      "showDeleted"
+    ]
+  },
+  {
+    "slug": "GOOGLEDRIVE_COMMENT_ADDED_TRIGGER",
+    "toolkit": "googledrive",
+    "event": "document_comment",
+    "delivery": "poll",
+    "tier": "extended",
+    "required_config": [],
+    "optional_config": [
+      "file_id",
+      "interval",
+      "max_files"
+    ]
+  },
+  {
+    "slug": "GOOGLEDRIVE_FILE_SHARED_PERMISSIONS_ADDED",
+    "toolkit": "googledrive",
+    "event": "file_shared",
+    "delivery": "poll",
+    "tier": "extended",
+    "required_config": [],
+    "optional_config": [
+      "drive_id",
+      "file_id",
+      "interval",
+      "page_size",
+      "supports_all_drives"
+    ]
+  },
+  {
+    "slug": "GOOGLESUPER_ATTENDEE_RESPONSE_CHANGED_TRIGGER",
+    "toolkit": "googlesuper",
+    "event": "attendee_response_changed",
+    "delivery": "poll",
+    "tier": "extended",
+    "required_config": [],
+    "optional_config": [
+      "calendarId",
+      "interval",
+      "showDeleted"
+    ]
+  },
+  {
+    "slug": "GOOGLESUPER_COMMENT_ADDED_TRIGGER",
+    "toolkit": "googlesuper",
+    "event": "document_comment",
+    "delivery": "poll",
+    "tier": "extended",
+    "required_config": [],
+    "optional_config": [
+      "file_id",
+      "interval",
+      "max_files"
+    ]
+  },
+  {
+    "slug": "GOOGLESUPER_EMAIL_SENT_TRIGGER",
+    "toolkit": "googlesuper",
+    "event": "email_sent",
+    "delivery": "poll",
+    "tier": "extended",
+    "required_config": [],
+    "optional_config": [
+      "interval",
+      "query",
+      "userId"
+    ]
+  },
+  {
+    "slug": "GOOGLESUPER_EVENT_CANCELED_DELETED_TRIGGER",
+    "toolkit": "googlesuper",
+    "event": "calendar_event_canceled",
+    "delivery": "poll",
+    "tier": "extended",
+    "required_config": [],
+    "optional_config": [
+      "calendarId",
+      "interval"
+    ]
+  },
+  {
+    "slug": "GOOGLESUPER_EVENT_STARTING_SOON_TRIGGER",
+    "toolkit": "googlesuper",
+    "event": "meeting_starting_soon",
+    "delivery": "poll",
+    "tier": "core",
+    "required_config": [],
+    "optional_config": [
+      "calendarId",
+      "countdownWindowMinutes",
+      "includeAllDay",
+      "interval",
+      "minutesBeforeStart"
+    ]
+  },
+  {
+    "slug": "GOOGLESUPER_FILE_SHARED_PERMISSIONS_ADDED",
+    "toolkit": "googlesuper",
+    "event": "file_shared",
+    "delivery": "poll",
+    "tier": "extended",
+    "required_config": [],
+    "optional_config": [
+      "drive_id",
+      "file_id",
+      "interval",
+      "page_size",
+      "supports_all_drives"
+    ]
+  },
+  {
+    "slug": "GOOGLESUPER_GOOGLE_CALENDAR_EVENT_CREATED_TRIGGER",
+    "toolkit": "googlesuper",
+    "event": "calendar_event_created",
+    "delivery": "poll",
+    "tier": "core",
+    "required_config": [],
+    "optional_config": [
+      "calendarId",
+      "interval",
+      "showDeleted"
+    ]
+  },
+  {
+    "slug": "GOOGLESUPER_NEW_MESSAGE",
+    "toolkit": "googlesuper",
+    "event": "new_email",
+    "delivery": "poll",
+    "tier": "core",
+    "required_config": [],
+    "optional_config": [
+      "interval",
+      "labelIds",
+      "query",
+      "userId"
+    ]
+  },
+  {
+    "slug": "LINEAR_COMMENT_EVENT_TRIGGER",
+    "toolkit": "linear",
+    "event": "issue_comment",
+    "delivery": "webhook",
+    "tier": "per_resource",
+    "required_config": [
+      "team_id"
+    ],
+    "optional_config": []
+  },
+  {
+    "slug": "LINEAR_ISSUE_CREATED_TRIGGER",
+    "toolkit": "linear",
+    "event": "issue_created",
+    "delivery": "webhook",
+    "tier": "per_resource",
+    "required_config": [
+      "team_id"
+    ],
+    "optional_config": []
+  },
+  {
+    "slug": "LINEAR_ISSUE_UPDATED_TRIGGER",
+    "toolkit": "linear",
+    "event": "issue_updated",
+    "delivery": "webhook",
+    "tier": "per_resource",
+    "required_config": [
+      "team_id"
+    ],
+    "optional_config": []
+  },
+  {
+    "slug": "NOTION_COMMENT_CREATED",
+    "toolkit": "notion",
+    "event": "page_comment",
+    "delivery": "webhook",
+    "tier": "extended",
+    "required_config": [],
+    "optional_config": [
+      "page_id"
+    ]
+  },
+  {
+    "slug": "NOTION_PAGE_CREATED",
+    "toolkit": "notion",
+    "event": "page_created",
+    "delivery": "webhook",
+    "tier": "per_resource",
+    "required_config": [],
+    "optional_config": [
+      "data_source_id",
+      "parent_page_id"
+    ]
+  },
+  {
+    "slug": "OUTLOOK_EVENT_TRIGGER",
+    "toolkit": "outlook",
+    "event": "calendar_event_created",
+    "delivery": "webhook",
+    "tier": "core",
+    "required_config": [],
+    "optional_config": []
+  },
+  {
+    "slug": "OUTLOOK_MESSAGE_TRIGGER",
+    "toolkit": "outlook",
+    "event": "new_email",
+    "delivery": "webhook",
+    "tier": "core",
+    "required_config": [],
+    "optional_config": [
+      "folder_id",
+      "from_email",
+      "has_attachments",
+      "importance",
+      "subject_contains",
+      "to_email"
+    ]
+  },
+  {
+    "slug": "OUTLOOK_SENT_MESSAGE_TRIGGER",
+    "toolkit": "outlook",
+    "event": "email_sent",
+    "delivery": "webhook",
+    "tier": "extended",
+    "required_config": [],
+    "optional_config": [
+      "folder_id",
+      "from_email",
+      "has_attachments",
+      "importance",
+      "subject_contains",
+      "to_email"
+    ]
+  },
+  {
+    "slug": "SLACK_CHANNEL_MESSAGE_RECEIVED",
+    "toolkit": "slack",
+    "event": "channel_message",
+    "delivery": "webhook",
+    "tier": "extended",
+    "required_config": [],
+    "optional_config": [
+      "channel_id",
+      "channel_type",
+      "is_bot_message",
+      "is_thread_reply"
+    ]
+  },
+  {
+    "slug": "SLACK_DIRECT_MESSAGE_RECEIVED",
+    "toolkit": "slack",
+    "event": "direct_message",
+    "delivery": "webhook",
+    "tier": "core",
+    "required_config": [],
+    "optional_config": [
+      "is_thread_reply"
+    ]
+  },
+  {
+    "slug": "SLACK_REACTION_ADDED",
+    "toolkit": "slack",
+    "event": "reaction_added",
+    "delivery": "webhook",
+    "tier": "extended",
+    "required_config": [],
+    "optional_config": []
+  }
+]
