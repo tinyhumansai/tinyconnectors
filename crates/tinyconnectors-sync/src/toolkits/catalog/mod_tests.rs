@@ -212,3 +212,22 @@ fn curated_catalogs_carry_no_duplicate_slugs() {
         assert_eq!(before, seen.len(), "{toolkit} catalog has duplicate slugs");
     }
 }
+
+#[test]
+fn canonical_toolkit_folds_aliases_case_and_whitespace() {
+    for (input, canonical) in [
+        ("google_calendar", "googlecalendar"),
+        ("  GoogleCalendar ", "googlecalendar"),
+        ("google_drive", "googledrive"),
+        ("google_docs", "googledocs"),
+        ("google_sheets", "googlesheets"),
+        ("microsoft", "microsoft_teams"),
+        ("one", "one_drive"),
+        ("onedrive", "one_drive"),
+        ("OUTLOOK", "outlook"),
+    ] {
+        assert_eq!(canonical_toolkit(input), canonical, "{input}");
+    }
+    // A toolkit nobody aliases passes through, lowercased.
+    assert_eq!(canonical_toolkit("Nonexistent-Toolkit"), "nonexistent-toolkit");
+}

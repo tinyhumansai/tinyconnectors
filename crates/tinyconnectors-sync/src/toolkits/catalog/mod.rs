@@ -121,6 +121,12 @@ pub fn catalog_for_toolkit(toolkit: &str) -> Option<&'static [CuratedTool]> {
     }
 }
 
+/// The canonical slug for `toolkit`: trimmed, lowercased, with every alias the
+/// catalogs accept folded onto the slug `CURATED_TOOLKITS` lists.
+pub(crate) fn canonical_toolkit(toolkit: &str) -> String {
+    toolkit.trim().to_ascii_lowercase()
+}
+
 #[cfg(test)]
 #[path = "mod_tests.rs"]
 mod tests;
