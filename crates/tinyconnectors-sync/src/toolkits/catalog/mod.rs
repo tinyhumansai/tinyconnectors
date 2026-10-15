@@ -75,10 +75,11 @@ pub fn has_native_provider(toolkit: &str) -> bool {
 /// The lookup key is the lowercased prefix `toolkit_from_slug` returns for an
 /// action slug — `GOOGLECALENDAR_CREATE_EVENT` → `"googlecalendar"`.
 /// Multi-segment prefixes like `MICROSOFT_TEAMS_*` return their known toolkit
-/// slug.
+/// slug. Aliases (`google_calendar`, `onedrive`, …) resolve through
+/// [`canonical_toolkit`] first.
 #[must_use]
 pub fn catalog_for_toolkit(toolkit: &str) -> Option<&'static [CuratedTool]> {
-    match toolkit.trim().to_ascii_lowercase().as_str() {
+    match canonical_toolkit(toolkit).as_str() {
         // Toolkits with a native provider. Each provider's `curated_tools()`
         // returns this same slice.
         "gmail" => Some(gmail::GMAIL_CURATED),
@@ -89,14 +90,12 @@ pub fn catalog_for_toolkit(toolkit: &str) -> Option<&'static [CuratedTool]> {
         "slack" => Some(messaging::SLACK_CURATED),
         // Catalog-only toolkits.
         "discord" => Some(messaging::DISCORD_CURATED),
-        "googlecalendar" | "google_calendar" => Some(google::GOOGLECALENDAR_CURATED),
-        "googledrive" | "google_drive" => Some(google::GOOGLEDRIVE_CURATED),
-        "googledocs" | "google_docs" => Some(google::GOOGLEDOCS_CURATED),
-        "googlesheets" | "google_sheets" => Some(google::GOOGLESHEETS_CURATED),
+        "googlecalendar" => Some(google::GOOGLECALENDAR_CURATED),
+        "googledrive" => Some(google::GOOGLEDRIVE_CURATED),
+        "googledocs" => Some(google::GOOGLEDOCS_CURATED),
+        "googlesheets" => Some(google::GOOGLESHEETS_CURATED),
         "outlook" => Some(productivity::OUTLOOK_CURATED),
-        // The legacy "microsoft" alias stays while `toolkit_from_slug` returns
-        // the precise "microsoft_teams" slug for Teams actions.
-        "microsoft" | "microsoft_teams" => Some(messaging::MICROSOFT_TEAMS_CURATED),
+        "microsoft_teams" => Some(messaging::MICROSOFT_TEAMS_CURATED),
         "jira" => Some(productivity::JIRA_CURATED),
         "trello" => Some(productivity::TRELLO_CURATED),
         "asana" => Some(productivity::ASANA_CURATED),
@@ -112,9 +111,7 @@ pub fn catalog_for_toolkit(toolkit: &str) -> Option<&'static [CuratedTool]> {
         "airtable" => Some(business::AIRTABLE_CURATED),
         "figma" => Some(business::FIGMA_CURATED),
         "youtube" => Some(social_media::YOUTUBE_CURATED),
-        // The multi-segment prefix extracts to "one_drive"; retain "one" as
-        // a legacy alias alongside the canonical UI/backend spellings.
-        "one" | "one_drive" | "onedrive" => Some(microsoft::ONE_DRIVE_CURATED),
+        "one_drive" => Some(microsoft::ONE_DRIVE_CURATED),
         "excel" => Some(microsoft::EXCEL_CURATED),
         "todoist" => Some(productivity::TODOIST_CURATED),
         _ => None,
@@ -123,8 +120,25 @@ pub fn catalog_for_toolkit(toolkit: &str) -> Option<&'static [CuratedTool]> {
 
 /// The canonical slug for `toolkit`: trimmed, lowercased, with every alias the
 /// catalogs accept folded onto the slug `CURATED_TOOLKITS` lists.
+///
+/// The trigger catalog resolves toolkits through this too, so an alias that
+/// reaches a tool catalog reaches the same toolkit's triggers.
 pub(crate) fn canonical_toolkit(toolkit: &str) -> String {
-    toolkit.trim().to_ascii_lowercase()
+    let lower = toolkit.trim().to_ascii_lowercase();
+    let canonical = match lower.as_str() {
+        "google_calendar" => "googlecalendar",
+        "google_drive" => "googledrive",
+        "google_docs" => "googledocs",
+        "google_sheets" => "googlesheets",
+        // The legacy "microsoft" alias stays while `toolkit_from_slug` returns
+        // the precise "microsoft_teams" slug for Teams actions.
+        "microsoft" => "microsoft_teams",
+        // The multi-segment prefix extracts to "one_drive"; retain "one" as
+        // a legacy alias alongside the canonical UI/backend spellings.
+        "one" | "onedrive" => "one_drive",
+        _ => return lower,
+    };
+    canonical.to_string()
 }
 
 #[cfg(test)]
