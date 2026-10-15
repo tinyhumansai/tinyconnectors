@@ -76,7 +76,7 @@ pub fn has_native_provider(toolkit: &str) -> bool {
 /// action slug — `GOOGLECALENDAR_CREATE_EVENT` → `"googlecalendar"`.
 /// Multi-segment prefixes like `MICROSOFT_TEAMS_*` return their known toolkit
 /// slug. Aliases (`google_calendar`, `onedrive`, …) resolve through
-/// [`canonical_toolkit`] first.
+/// the same alias folding the trigger catalog uses.
 #[must_use]
 pub fn catalog_for_toolkit(toolkit: &str) -> Option<&'static [CuratedTool]> {
     match canonical_toolkit(toolkit).as_str() {
