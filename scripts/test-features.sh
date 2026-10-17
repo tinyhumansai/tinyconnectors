@@ -19,6 +19,7 @@ if [ -n "$forbidden" ]; then
   echo "of transports, async runtimes, HTTP clients and native libraries." >&2
   exit 1
 fi
+bash scripts/test-storage-needs-consumer.sh
 case "${RUNNER_OS:-$(uname -s)}" in
   Windows|MINGW*|MSYS*|CYGWIN*) ;;
   *) python3 scripts/test-package-layout.py ;;

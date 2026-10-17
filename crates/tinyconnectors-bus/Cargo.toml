@@ -5,7 +5,7 @@ edition.workspace = true
 rust-version.workspace = true
 license.workspace = true
 repository.workspace = true
-description = "The TinyBus wire contract for TinyConnectors: OAuth connector member names, payload types, and the contract version."
+description = "The data contract for TinyConnectors: OAuth member names, payload types, storage needs, and the contract version."
 documentation = "https://docs.rs/tinyconnectors-bus"
 readme = "README.md"
 keywords = ["tinybus", "oauth", "connectors", "contract"]
@@ -19,6 +19,9 @@ publish = false
 [dependencies]
 serde = { workspace = true }
 serde_json = { workspace = true }
+# The host-grant schema is shared with the storage bus without enabling its
+# default TinyBus compatibility client.
+tinystoragedrivers-bus = { workspace = true }
 # Verifying and decoding Composio's webhook deliveries, for a host that
 # receives them at its own endpoint. Optional: only the `webhook` feature
 # pulls these in, so a host that never sees a delivery pays nothing.

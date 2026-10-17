@@ -1,0 +1,12 @@
+[workspace]
+resolver = "3"
+members = ["."]
+
+[package]
+name = "tinyconnectors-storage-needs-consumer-proof"
+version = "0.0.0"
+edition = "2024"
+publish = false
+
+[dependencies]
+tinyconnectors-bus = { path = "../../crates/tinyconnectors-bus" }

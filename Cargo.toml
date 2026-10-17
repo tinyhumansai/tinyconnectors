@@ -12,7 +12,7 @@ members = ["crates/*"]
 # repository; each contains a full copy of this manifest and every crate under
 # it, so without this entry cargo walks into them and reports duplicate
 # packages.
-exclude = ["vendor", "worktrees"]
+exclude = ["vendor", "worktrees", "proof-workspaces/storage-needs"]
 
 # Shared package metadata. A member inherits a field with `field.workspace =
 # true`, so a reviewed release version bump is written in exactly one place
@@ -31,6 +31,9 @@ repository = "https://github.com/tinyhumansai/tinyconnectors"
 # release, and a pinned requirement here would stop resolving the moment it did.
 # Nothing in this workspace is published, so the path is the whole address.
 tinyconnectors-bus = { path = "crates/tinyconnectors-bus" }
+# Canonical storage-needs schemas for module declarations. Disable the legacy
+# TinyBus client: this data contract only needs the type definitions.
+tinystoragedrivers-bus = { git = "https://github.com/tinyhumansai/tinystoragedrivers", rev = "08caa16d1d4e3c6b8d649e4f26fe1a426ee1d168", default-features = false }
 # The provider registry, scope catalogs and scope preferences. The module crate
 # depends on it for the capability, profile and user-scope members, which are
 # answered from what the registered providers know. It stays a separate crate so

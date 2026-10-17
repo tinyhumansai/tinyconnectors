@@ -13,6 +13,11 @@ built as both an `rlib` and the `cdylib` TinyBus loads. A host that only makes
 calls depends on the contract crate alone and compiles neither the module nor
 `tinybus` itself.
 
+The contract re-exports the canonical `tinystoragedrivers_bus::StorageNeeds`
+schema for the module's document and trigger-archive resources. Its TSD bus
+dependency disables the optional TinyBus client, keeping host declarations
+transport-free.
+
 ## Backends
 
 Composio is the connector backend today, and the design does not assume it will

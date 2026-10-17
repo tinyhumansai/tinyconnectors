@@ -8,11 +8,12 @@ implementation: `crates/tinyconnectors` is built as a `cdylib` and exports one
 object. A host can load that binary but cannot `use` anything out of it, so the
 payload vocabulary has to be published as an ordinary library. This is it.
 
-| module     | what it holds                                                |
-| ---------- | ------------------------------------------------------------ |
-| `names`    | interface name, object path, one constant per member          |
-| `composio` | the Composio backend's value vocabulary, by payload family    |
-| `version`  | `CONTRACT_VERSION` and the bind rule a host applies to it     |
+| module         | what it holds                                                 |
+| -------------- | ------------------------------------------------------------- |
+| `names`        | interface name, object path, one constant per member          |
+| `composio`     | the Composio backend's value vocabulary, by payload family    |
+| `version`      | `CONTRACT_VERSION` and the bind rule a host applies to it     |
+| storage needs  | canonical `StorageNeeds` and collection schema from TSD       |
 
 `composio` holds six families — `toolkits`, `connections`, `tools`, `execute`,
 `triggers`, `github` — all re-exported at the crate root. Composio is one OAuth
@@ -20,9 +21,11 @@ connector backend, not the only one this contract expects to carry, so it is
 namespaced: a second backend arrives as a sibling module with its own interface
 and object path rather than as a rename of every type here.
 
-Two dependencies, both pure Rust: `serde` and `serde_json`. The optional
-`webhook` feature adds `hmac`, `sha2`, `base64` and `thiserror` — still pure
-Rust, still no I/O.
+Three data dependencies: `serde`, `serde_json`, and the canonical
+`tinystoragedrivers-bus` crate. That dependency is pinned by the workspace to
+the released storage contract with default features disabled, so its optional
+TinyBus client is not linked. The optional `webhook` feature adds `hmac`,
+`sha2`, `base64` and `thiserror` — still pure Rust, still no I/O.
 
 ## This crate sits underneath `tinyconnectors`
 
@@ -74,9 +77,19 @@ policy, its timeouts, its tracing — and the useful part is the vocabulary.
 
 That is also structural, not just preference: `tinybus` is vendored as a
 submodule whose manifest inherits fields from its own nested
-`[workspace.package]`. Keeping the contract crate transport-free is what keeps
-it down to two dependencies and what lets anything in the workspace — or outside
-it — depend on it freely. CI asserts the dependency tree stays that way.
+`[workspace.package]`. The TSD dependency's default client feature is disabled,
+keeping this contract transport-free. CI checks the normal/build dependency
+graph from an independent consumer workspace.
+
+## Storage needs
+
+`STORAGE_NEEDS` is the concrete declaration exported by this crate; its
+`StorageNeeds` value and `CollectionSpec`, `IndexSpec` and `SearchSpec` types
+come directly from `tinystoragedrivers-bus`. It describes requested resources;
+the host remains responsible for choosing and binding the grant. TinyConnectors
+requests the `composio-user-scopes` collection with no indexes, TTL field or
+search schema, plus the `triggers/` stream prefix. It requests no blob or secret
+prefixes.
 
 ## Making a call
 

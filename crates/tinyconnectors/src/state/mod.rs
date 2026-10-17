@@ -14,10 +14,9 @@
 //! the ports only and never chooses a backend.
 
 mod document_store;
-mod needs;
 
 pub use document_store::DocumentPrefsStore;
-pub use needs::{STORAGE_NEEDS, StorageNeeds};
+pub use tinyconnectors_bus::{STORAGE_NEEDS, StorageNeeds};
 
 #[cfg(test)]
 #[path = "mod_tests.rs"]

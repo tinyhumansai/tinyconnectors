@@ -62,11 +62,20 @@ interpolates them. `HttpTransport`'s `Debug` is hand-written to omit the token.
 
 ### The contract crate stays dependency-light and transport-free
 
-`tinyconnectors-bus` depends on `serde` and `serde_json` and nothing else. A
-host that only makes calls links it alone. This is also structural: `tinybus` is
-vendored as a submodule whose manifest inherits from its own nested
-`[workspace.package]`, so a crate every member can depend on has to stay
-transport-free.
+`tinyconnectors-bus` depends on `serde`, `serde_json`, and the canonical
+`tinystoragedrivers-bus` schema crate with default features disabled. A host that
+only makes calls links this contract crate alone. The TSD bus dependency
+provides the shared `StorageNeeds` and complete `CollectionSpec` types; disabling
+its default `client` feature keeps TinyBus out of this contract's dependency
+graph.
+
+The connector module requests one `composio-user-scopes` collection with no
+indexes, TTL field, or search schema; preferences are one document per toolkit
+with a `{ "value": … }` body. It requests the `triggers/` stream prefix and no
+blob or secret prefixes. This declaration describes needs; the host still
+decides the grant and binds it to the authenticated caller. The concrete
+`tinyconnectors_bus::STORAGE_NEEDS` static lives in the contract crate, while
+the implementation re-exports that same static for its module adapters.
 
 ### Routing is the module's job; choosing a route is the host's
 

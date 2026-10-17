@@ -1212,7 +1212,10 @@ async fn scope_preferences_persist_in_the_hosts_documents_across_instances() -> 
     let stored = storage
         .scoped
         .documents()
-        .get(tinyconnectors_sync::PREFS_NAMESPACE, "gmail")
+        .get(
+            crate::state::STORAGE_NEEDS.collections[0].name.as_str(),
+            "gmail",
+        )
         .await
         .expect("reads")
         .expect("the preference is a document on the host");
