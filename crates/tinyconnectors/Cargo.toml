@@ -25,7 +25,7 @@ getrandom = "0.4"
 # Re-exported wholesale from `src/lib.rs` so a consumer takes one dependency
 # rather than two, and so `tinyconnectors::ComposioConnection` and
 # `tinyconnectors_bus::ComposioConnection` are the same type.
-tinyconnectors-bus = { workspace = true }
+tinyconnectors-bus = { workspace = true, features = ["storage"] }
 # The provider registry, which answers the capability and profile members: what
 # this build knows how to do for a toolkit is a property of its providers.
 tinyconnectors-sync = { workspace = true }

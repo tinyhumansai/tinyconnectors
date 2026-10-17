@@ -67,7 +67,8 @@ fn the_key_is_normalized() {
 #[test]
 fn the_namespace_is_pinned() {
     // Changing it strands every user's saved choices on disk.
-    assert_eq!(PREFS_NAMESPACE, "composio-user-scopes");
+    assert_eq!(PREFS_NAMESPACE, "connectors.user_scopes");
+    assert_eq!(super::LEGACY_PREFS_NAMESPACE, "composio-user-scopes");
 }
 
 #[test]

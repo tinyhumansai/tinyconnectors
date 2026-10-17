@@ -1216,7 +1216,7 @@ async fn scope_preferences_persist_in_the_hosts_documents_across_instances() -> 
         .await
         .expect("reads")
         .expect("the preference is a document on the host");
-    assert_eq!(stored.doc["value"]["write"], false);
+    assert_eq!(stored.doc["write"], false);
 
     drop(proxy);
     drop(first);

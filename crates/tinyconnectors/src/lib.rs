@@ -96,6 +96,7 @@ pub use tinybus_module::linked_module;
 pub mod triggers;
 
 pub use error::{Error, Result};
+pub use state::storage_schema;
 
 // The wire contract, re-exported by module rather than by item so every path
 // through this crate resolves to the same definitions the contract crate

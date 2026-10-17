@@ -22,7 +22,7 @@ mod store;
 mod types;
 
 pub use store::PrefsStore;
-pub use types::{PREFS_NAMESPACE, ScopePrefStore, UserScopePref};
+pub use types::{LEGACY_PREFS_NAMESPACE, PREFS_NAMESPACE, ScopePrefStore, UserScopePref};
 
 #[cfg(test)]
 #[path = "mod_tests.rs"]

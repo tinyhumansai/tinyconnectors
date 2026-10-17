@@ -27,7 +27,7 @@ which actions are worth offering an agent, and who the connected account is
 
 `PrefsStore` is two methods over JSON, deliberately as small as it is: a seam
 any wider would start describing a storage engine, and this crate must not
-depend on one. `PREFS_NAMESPACE` and the lowercased toolkit key are durable and
+depend on one. `PREFS_NAMESPACE` (`connectors.user_scopes`; `composio-user-scopes` before schema v2) and the lowercased toolkit key are durable and
 pinned by tests; changing either strands every user's saved scope choices.
 
 ## Scope classification

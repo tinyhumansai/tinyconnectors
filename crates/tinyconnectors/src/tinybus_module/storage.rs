@@ -5,7 +5,7 @@
 //! host's `Storage` objects through its `TinyBus` connection
 //! (`tinystoragedrivers_busproxy::connect_storage`), the same way every other
 //! storage-using module does. The host binds the scope from the authenticated
-//! caller and enforces the grant in [`crate::state::STORAGE_NEEDS`]; nothing
+//! caller and enforces the grant in [`crate::state::storage_needs`]; nothing
 //! here names a scope, a directory or a backend.
 
 use std::sync::Arc;

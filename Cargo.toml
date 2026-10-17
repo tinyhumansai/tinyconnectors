@@ -92,14 +92,14 @@ chrono = { version = "0.4", default-features = false, features = ["std", "clock"
 # The storage ports (documents, streams) the scope preferences and the trigger
 # archive are written through. Ports only: no driver crate, no database client.
 # A tag so a host that vendors tinystoragedrivers once can `[patch]` it.
-tinystoragedrivers-core = { git = "https://github.com/tinyhumansai/tinystoragedrivers", tag = "v0.11.0" }
+tinystoragedrivers-core = { git = "https://github.com/tinyhumansai/tinystoragedrivers", tag = "v1.0.0", default-features = false }
 # The module's side of the storage bus: `connect_storage` hands back the same
 # port traits over the module's TinyBus connection, so the host's backend (not a
 # process-local registry) is what the cdylib reads and writes. The host side of
 # the same crate (`serve`) is what the loopback tests stand up.
-tinystoragedrivers-busproxy = { git = "https://github.com/tinyhumansai/tinystoragedrivers", tag = "v0.11.0" }
+tinystoragedrivers-busproxy = { git = "https://github.com/tinyhumansai/tinystoragedrivers", tag = "v1.0.0" }
 # `StorageServer` binds a scope to a backend; dev-only, for the loopback host.
-tinystoragedrivers-client = { git = "https://github.com/tinyhumansai/tinystoragedrivers", tag = "v0.11.0" }
+tinystoragedrivers-client = { git = "https://github.com/tinyhumansai/tinystoragedrivers", tag = "v1.0.0" }
 
 # Lints apply to every member that opts in with `[lints] workspace = true`, and
 # to every target of that member. CI runs clippy with `-D warnings`, so anything

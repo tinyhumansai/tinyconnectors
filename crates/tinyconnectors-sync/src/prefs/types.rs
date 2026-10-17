@@ -3,11 +3,8 @@
 use super::store::PrefsStore;
 use crate::{Error, Result};
 
-/// The key-value namespace holding one row per toolkit.
-///
-/// Durable: changing it strands every user's saved choices, and each toolkit
-/// silently reads as the default again. Pinned by a test.
-pub const PREFS_NAMESPACE: &str = "composio-user-scopes";
+// Declared once, in the contract crate beside the storage schema that uses them.
+pub use tinyconnectors_bus::storage::{LEGACY_PREFS_NAMESPACE, PREFS_NAMESPACE};
 
 pub use tinyconnectors_bus::vocabulary::UserScopePref;
 

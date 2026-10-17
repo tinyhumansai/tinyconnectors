@@ -15,6 +15,8 @@
 //!   member, plus [`names::METHODS`] listing them in dispatch order.
 //! - [`composio`] — the value vocabulary of the Composio backend, one module
 //!   per payload family. Its types are re-exported at this root.
+//! - [`storage`] — the module's storage schema, its v1 to v2 steps and the
+//!   grant generated from it. Pure data and functions; no I/O.
 //! - [`version`] — [`CONTRACT_VERSION`] and the [`is_compatible`] bind rule.
 //!
 //! # One backend today, room for more
@@ -109,6 +111,7 @@ pub use processing::{
     RecordTriggerRequest,
 };
 pub mod names;
+pub mod storage;
 pub mod version;
 
 pub use composio::{

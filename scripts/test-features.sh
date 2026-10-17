@@ -9,6 +9,9 @@ cargo test --locked --workspace --all-features
 cargo run -p tinyconnectors --example basic
 
 set -euo pipefail
+# Strict on default features. The opt-in `storage` feature adds
+# `tinystoragedrivers-core` (ports only, which pulls tokio with io-util and
+# time); it is deliberately not checked here, so the default closure stays pure.
 forbidden="$(cargo tree -p tinyconnectors-bus -e normal,build --prefix none \
   | grep -Ei 'tinybus|tokio|reqwest|ureq|hyper|rusqlite|git2' || true)"
 if [ -n "$forbidden" ]; then

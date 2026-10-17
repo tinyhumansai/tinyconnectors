@@ -55,7 +55,7 @@ async fn records_a_delivery_and_reads_it_back() {
     assert_eq!(history.entries[0].metadata_id, "evt-1");
     assert_eq!(history.entries[0].payload["subject"], "hi");
     assert_eq!(history.current_day_file, archive.current_day_file());
-    assert_eq!(history.archive_dir, "triggers");
+    assert_eq!(history.archive_dir, "connectors.triggers");
 }
 
 #[tokio::test]
@@ -196,7 +196,7 @@ async fn writes_land_in_the_current_day_stream() {
         .expect("records");
 
     let name = archive.current_day_file();
-    assert!(name.starts_with("triggers/"));
+    assert!(name.starts_with("connectors.triggers/"));
     assert_eq!(
         streams.len(&name).await.unwrap(),
         1,
@@ -215,7 +215,7 @@ async fn reads_across_more_than_one_day() {
         .expect("records");
     streams
         .append(
-            "triggers/2000-01-01",
+            "connectors.triggers/2000-01-01",
             json!({
                 "received_at_ms": 1, "toolkit": "gmail", "trigger": "T",
                 "metadata_id": "old-0", "metadata_uuid": "u", "payload": {}

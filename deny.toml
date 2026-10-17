@@ -7,7 +7,12 @@ all-features = true
 [advisories]
 # Fail on any crate with a security advisory or an unmaintained warning.
 # Add an entry here only with a comment explaining the exposure and the plan.
-ignore = []
+# `zip` 2.x is pulled in only by the vendored `tinybus` (module artifact
+# extraction of first-party, digest-checked release archives). The three
+# advisories are about `ZipArchive::extract` on attacker-controlled archives;
+# the fix is a major `zip` bump owned by tinybus. Remove these entries when the
+# `vendor/tinybus` pin moves to a release on `zip` >= 9.
+ignore = ["RUSTSEC-2026-0367", "RUSTSEC-2026-0368", "RUSTSEC-2026-0369"]
 
 [licenses]
 # Licenses accepted for this crate and its dependencies. Keep GPL-3.0-only for

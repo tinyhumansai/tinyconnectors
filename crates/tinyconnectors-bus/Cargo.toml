@@ -27,8 +27,21 @@ sha2 = { workspace = true, optional = true }
 base64 = { workspace = true, optional = true }
 # The webhook module's error type, the same derive the module crate uses.
 thiserror = { workspace = true, optional = true }
+# Only the `storage` feature: `storage::storage_schema` is built from the
+# storage ports' declaration types. Ports only, no driver; the ports crate's
+# tokio use is limited to io-util and time. Off by default, so the default
+# dependency closure of this contract is unchanged.
+tinystoragedrivers-core = { workspace = true, optional = true }
+
+[dev-dependencies]
+# `MemoryStorage` runs the v1 to v2 steps over real documents and streams.
+tokio = { workspace = true }
 
 [features]
+# `storage::{storage_schema, storage_needs}`: the module's storage schema and the
+# grant generated from it, as pure data over the storage ports. A host that
+# composes schemas enables this; a host that only makes calls does not.
+storage = ["dep:tinystoragedrivers-core"]
 # `composio::triggers::webhook`: verify a delivery's signature and decode its
 # body into a `ComposioTriggerEvent`. Pure functions over bytes — no transport,
 # no runtime — for a host that owns a public webhook endpoint.
