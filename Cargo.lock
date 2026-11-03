@@ -1421,7 +1421,7 @@ dependencies = [
 
 [[package]]
 name = "tinyconnectors"
-version = "0.22.1"
+version = "0.22.2"
 dependencies = [
  "async-trait",
  "chrono",
@@ -1448,7 +1448,7 @@ dependencies = [
 
 [[package]]
 name = "tinyconnectors-bus"
-version = "0.22.1"
+version = "0.22.2"
 dependencies = [
  "base64",
  "hmac",
@@ -1461,7 +1461,7 @@ dependencies = [
 
 [[package]]
 name = "tinyconnectors-sync"
-version = "0.22.1"
+version = "0.22.2"
 dependencies = [
  "async-trait",
  "serde",
