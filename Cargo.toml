@@ -39,13 +39,13 @@ tinyconnectors-sync = { path = "crates/tinyconnectors-sync" }
 # TinyBus defines the message types, interface macro, and frozen module ABI
 # used by the generated integration. Socket and CLI features are unnecessary
 # here.
-tinybus = { version = ">=0.3.6, <0.4", default-features = false, features = [
+tinybus = { version = ">=0.3.12, <0.4", default-features = false, features = [
     "macros",
     "modules",
 ] }
 # The module-side SDK owns the isolated runtime and exports the ABI entrypoints
 # required by TinyBus's dynamic loader.
-tinybus-module = ">=0.3.6, <0.4"
+tinybus-module = ">=0.3.12, <0.4"
 
 # Derive macros for the crate-wide error type in `crates/tinyconnectors/src/error/`.
 # Every dependency entry should carry a comment like this one saying why it is
@@ -92,15 +92,15 @@ percent-encoding = "2"
 # rather than after a fixed number of elapsed seconds. No default features.
 chrono = { version = "0.4", default-features = false, features = ["std", "clock", "serde"] }
 # Storage contracts are split into data types and runtime-neutral ports.
-tinystoragedrivers-types = { git = "https://github.com/tinyhumansai/tinystoragedrivers", rev = "bf1f0a97fbe6165a6edd9521659c7f6859700761" }
-tinystoragedrivers-api = { git = "https://github.com/tinyhumansai/tinystoragedrivers", rev = "bf1f0a97fbe6165a6edd9521659c7f6859700761" }
+tinystoragedrivers-types = { git = "https://github.com/tinyhumansai/tinystoragedrivers", rev = "6226b9484c8bd01c58741718cd89ba90a13a36bb" }
+tinystoragedrivers-api = { git = "https://github.com/tinyhumansai/tinystoragedrivers", rev = "6226b9484c8bd01c58741718cd89ba90a13a36bb" }
 # The module's side of the storage bus: `connect_storage` hands back the same
 # port traits over the module's TinyBus connection, so the host's backend (not a
 # process-local registry) is what the cdylib reads and writes. The host side of
 # the same crate (`serve`) is what the loopback tests stand up.
-tinystoragedrivers-busproxy = { git = "https://github.com/tinyhumansai/tinystoragedrivers", rev = "bf1f0a97fbe6165a6edd9521659c7f6859700761" }
+tinystoragedrivers-busproxy = { git = "https://github.com/tinyhumansai/tinystoragedrivers", rev = "6226b9484c8bd01c58741718cd89ba90a13a36bb" }
 # Test-only backend factories and decorators; never part of a published normal tree.
-tinystoragedrivers-testkit = { git = "https://github.com/tinyhumansai/tinystoragedrivers", rev = "bf1f0a97fbe6165a6edd9521659c7f6859700761" }
+tinystoragedrivers-testkit = { git = "https://github.com/tinyhumansai/tinystoragedrivers", rev = "6226b9484c8bd01c58741718cd89ba90a13a36bb" }
 
 # Lints apply to every member that opts in with `[lints] workspace = true`, and
 # to every target of that member. CI runs clippy with `-D warnings`, so anything
