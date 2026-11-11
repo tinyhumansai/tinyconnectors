@@ -340,6 +340,59 @@ impl DirectRoute {
         })
     }
 
+    /// The auth config a v3 link names for `toolkit`.
+    ///
+    /// Reuses an enabled config for the toolkit, preferring a Composio-managed
+    /// one; with none, creates a Composio-managed config. Every field read here
+    /// is one Composio documents for `GET` / `POST /auth_configs`.
+    async fn auth_config_for(&self, toolkit: &str) -> Result<String> {
+        let path = format!("/auth_configs?toolkit_slug={}&limit=200", encode(toolkit));
+        let rows = self
+            .list_pages(&path)
+            .await
+            .map_err(|error| refused_request(toolkit, error))?;
+        let usable: Vec<&serde_json::Value> = rows
+            .iter()
+            .filter(|row| {
+                slug_field(row, &["status"])
+                    .is_none_or(|status| status.eq_ignore_ascii_case("ENABLED"))
+                    && field(row, &["toolkit"])
+                        .is_some_and(|slug| slug.eq_ignore_ascii_case(toolkit))
+            })
+            .collect();
+        let managed = |row: &&&serde_json::Value| {
+            row.get("is_composio_managed")
+                .and_then(serde_json::Value::as_bool)
+                == Some(true)
+        };
+        if let Some(id) = usable
+            .iter()
+            .find(managed)
+            .or_else(|| usable.first())
+            .and_then(|row| slug_field(row, &["id"]))
+        {
+            return Ok(id);
+        }
+
+        tracing::debug!(toolkit = %toolkit, "[connectors][direct] POST /auth_configs (Composio-managed)");
+        let path = "/auth_configs";
+        let request = serde_json::json!({
+            "toolkit": { "slug": toolkit },
+            "auth_config": { "type": "use_composio_managed_auth" },
+        });
+        let created = self
+            .call(self.transport.post(path, &request))
+            .await
+            .map_err(|error| refused_request(toolkit, error))?;
+        created
+            .get("auth_config")
+            .and_then(|config| slug_field(config, &["id"]))
+            .ok_or(Error::Decode {
+                path: path.to_string(),
+                message: "auth config response carried no id".to_string(),
+            })
+    }
+
     async fn call<F>(&self, request: F) -> Result<serde_json::Value>
     where
         F: std::future::Future<Output = Result<serde_json::Value>>,
@@ -370,6 +423,23 @@ fn fingerprint(api_key: &str) -> u64 {
 fn is_invalid_api_key(error: &Error) -> bool {
     matches!(error, Error::Transport { message, .. }
         if message.starts_with("HTTP 401") && message.to_ascii_lowercase().contains("api key"))
+}
+
+/// Turn a request Composio refused as invalid (HTTP 400/422) into an
+/// [`Error::Authorize`] carrying its detail, so a host can show why the
+/// connection could not start. Every other failure passes through unchanged.
+fn refused_request(toolkit: &str, error: Error) -> Error {
+    match error {
+        Error::Transport { message, .. }
+            if message.starts_with("HTTP 400") || message.starts_with("HTTP 422") =>
+        {
+            Error::Authorize {
+                toolkit: toolkit.to_string(),
+                message: format!("Composio rejected the connect request: {message}"),
+            }
+        }
+        other => other,
+    }
 }
 
 /// Read a string field, tolerating the object-wrapped form Composio also emits.
@@ -496,14 +566,36 @@ impl Route for DirectRoute {
         toolkit: &str,
         body: &serde_json::Value,
     ) -> Result<ComposioAuthorizeResponse> {
-        tracing::debug!(toolkit = %toolkit, "[connectors][direct] POST /connected_accounts/link");
-        let mut request = body.clone();
-        if let Some(object) = request.as_object_mut() {
-            object.insert("entity_id".to_string(), self.entity_id.clone().into());
-        }
+        // v3 links an auth config to a user, not a toolkit to an entity: the
+        // proxy-shaped body (`toolkit`, extra params, scopes) fails v3's
+        // validation with a 400, so only the two fields it requires are sent.
+        let auth_config_id = self.auth_config_for(toolkit).await?;
+        let dropped: Vec<&str> = body
+            .as_object()
+            .map(|object| {
+                object
+                    .keys()
+                    .map(String::as_str)
+                    .filter(|key| *key != "toolkit")
+                    .collect()
+            })
+            .unwrap_or_default();
+        tracing::debug!(
+            toolkit = %toolkit,
+            auth_config_id = %auth_config_id,
+            ?dropped,
+            "[connectors][direct] POST /connected_accounts/link"
+        );
+        let request = serde_json::json!({
+            "auth_config_id": auth_config_id,
+            "user_id": self.entity_id,
+        });
 
         let path = "/connected_accounts/link";
-        let value = self.call(self.transport.post(path, &request)).await?;
+        let value = self
+            .call(self.transport.post(path, &request))
+            .await
+            .map_err(|error| refused_request(toolkit, error))?;
 
         let connect_url =
             field(&value, &["redirectUrl", "redirect_url", "connectUrl"]).ok_or(Error::Decode {

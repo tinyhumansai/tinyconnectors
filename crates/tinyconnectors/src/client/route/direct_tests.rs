@@ -26,6 +26,10 @@ struct FakeTransport {
     /// Reply to `GET /connected_accounts/{id}`, when set; `Err` fails the lookup.
     account: Mutex<Option<std::result::Result<serde_json::Value, String>>>,
     last_execute_body: Mutex<Option<serde_json::Value>>,
+    /// Replies for paths starting with a prefix, checked before `reply`.
+    routed: Mutex<Vec<(String, serde_json::Value)>>,
+    /// Every POST, in order, as `(path, body)`.
+    posts: Mutex<Vec<(String, serde_json::Value)>>,
 }
 
 impl FakeTransport {
@@ -43,6 +47,28 @@ impl FakeTransport {
         })
     }
 
+    /// A route whose toolkit lookup finds one enabled, Composio-managed
+    /// gmail auth config, `ac_gmail`, and whose other calls answer `link`.
+    fn linking(link: serde_json::Value) -> Arc<Self> {
+        let transport = Self::replying(link);
+        transport.route_prefix(
+            "/auth_configs?",
+            json!({ "items": [gmail_config("ac_gmail", true, "ENABLED")] }),
+        );
+        transport
+    }
+
+    fn route_prefix(&self, prefix: &str, reply: serde_json::Value) {
+        self.routed
+            .lock()
+            .unwrap()
+            .push((prefix.to_string(), reply));
+    }
+
+    fn posts(&self) -> Vec<(String, serde_json::Value)> {
+        self.posts.lock().unwrap().clone()
+    }
+
     fn answer(&self, path: &str) -> Result<serde_json::Value> {
         *self.calls.lock().unwrap() += 1;
         *self.last_path.lock().unwrap() = Some(path.to_string());
@@ -51,6 +77,15 @@ impl FakeTransport {
                 path: path.to_string(),
                 message,
             });
+        }
+        if let Some((_, reply)) = self
+            .routed
+            .lock()
+            .unwrap()
+            .iter()
+            .find(|(prefix, _)| path.starts_with(prefix.as_str()))
+        {
+            return Ok(reply.clone());
         }
         Ok(self.reply.lock().unwrap().clone())
     }
@@ -80,6 +115,22 @@ impl Transport for FakeTransport {
 
     async fn post(&self, path: &str, body: &serde_json::Value) -> Result<serde_json::Value> {
         *self.last_body.lock().unwrap() = Some(body.clone());
+        self.posts
+            .lock()
+            .unwrap()
+            .push((path.to_string(), body.clone()));
+        // Composio v3 validates the link body: it needs `auth_config_id` and
+        // `user_id`, and answers the proxy-route shape with this 400.
+        if path == "/connected_accounts/link"
+            && (body.get("auth_config_id").is_none()
+                || body.get("user_id").is_none()
+                || body.get("toolkit").is_some())
+        {
+            return Err(Error::Transport {
+                path: path.to_string(),
+                message: "HTTP 400: Validation error while processing request".to_string(),
+            });
+        }
         if path.starts_with("/tools/execute/") {
             *self.last_execute_body.lock().unwrap() = Some(body.clone());
         }
@@ -89,6 +140,16 @@ impl Transport for FakeTransport {
     async fn delete(&self, path: &str) -> Result<serde_json::Value> {
         self.answer(path)
     }
+}
+
+/// A `GET /auth_configs` item for gmail.
+fn gmail_config(id: &str, managed: bool, status: &str) -> serde_json::Value {
+    json!({
+        "id": id,
+        "toolkit": { "slug": "gmail" },
+        "is_composio_managed": managed,
+        "status": status,
+    })
 }
 
 fn route(transport: Arc<FakeTransport>) -> DirectRoute {
@@ -104,7 +165,7 @@ fn names_itself_direct() {
 async fn falls_back_to_the_default_entity() {
     // An empty entity id must not travel to Composio as an empty string, which
     // it rejects; "default" is what the direct client has always sent.
-    let transport = FakeTransport::replying(json!({ "redirectUrl": "https://composio.dev/x" }));
+    let transport = FakeTransport::linking(json!({ "redirectUrl": "https://composio.dev/x" }));
     let direct = DirectRoute::new(transport.clone(), "sk", "   ");
 
     direct
@@ -113,7 +174,7 @@ async fn falls_back_to_the_default_entity() {
         .unwrap();
 
     let body = transport.last_body.lock().unwrap().clone().unwrap();
-    assert_eq!(body["entity_id"], "default");
+    assert_eq!(body["user_id"], "default");
 }
 
 #[tokio::test]
@@ -244,12 +305,15 @@ async fn drops_only_a_row_with_no_id_at_all() {
 }
 
 #[tokio::test]
-async fn authorize_reads_the_v3_redirect_url_and_stamps_the_entity() {
-    let transport = FakeTransport::replying(json!({
+async fn authorize_links_the_toolkits_auth_config_to_the_entity() {
+    let transport = FakeTransport::linking(json!({
         "redirectUrl": "https://composio.dev/oauth/xyz"
     }));
     let resp = route(transport.clone())
-        .authorize("gmail", &json!({ "toolkit": "gmail" }))
+        .authorize(
+            "gmail",
+            &json!({ "toolkit": "gmail", "oauth_scopes": ["gmail.readonly"] }),
+        )
         .await
         .unwrap();
 
@@ -258,13 +322,130 @@ async fn authorize_reads_the_v3_redirect_url_and_stamps_the_entity() {
     // documented contract, not a decode failure.
     assert_eq!(resp.connection_id.len(), 0);
 
-    let body = transport.last_body.lock().unwrap().clone().unwrap();
-    assert_eq!(body["entity_id"], "entity-1");
+    // The lookup names the toolkit; the link sends exactly the v3 fields.
+    assert!(
+        transport
+            .last_path()
+            .starts_with("/connected_accounts/link"),
+        "{}",
+        transport.last_path()
+    );
+    let posts = transport.posts();
+    assert_eq!(posts.len(), 1, "an existing config is reused, none created");
+    assert_eq!(
+        posts[0],
+        (
+            "/connected_accounts/link".to_string(),
+            json!({ "auth_config_id": "ac_gmail", "user_id": "entity-1" })
+        )
+    );
+}
+
+#[tokio::test]
+async fn authorize_creates_a_managed_auth_config_when_none_is_usable() {
+    let transport = FakeTransport::linking(json!({ "redirect_url": "https://composio.dev/o" }));
+    // Only a disabled gmail config and another toolkit's config exist.
+    transport.routed.lock().unwrap().clear();
+    transport.route_prefix(
+        "/auth_configs?",
+        json!({ "items": [
+            gmail_config("ac_off", true, "DISABLED"),
+            { "id": "ac_slack", "toolkit": { "slug": "slack" }, "status": "ENABLED" }
+        ] }),
+    );
+    transport.route_prefix(
+        "/auth_configs",
+        json!({ "toolkit": { "slug": "gmail" }, "auth_config": { "id": "ac_new" } }),
+    );
+
+    route(transport.clone())
+        .authorize("gmail", &json!({ "toolkit": "gmail" }))
+        .await
+        .unwrap();
+
+    let posts = transport.posts();
+    assert_eq!(
+        posts[0],
+        (
+            "/auth_configs".to_string(),
+            json!({
+                "toolkit": { "slug": "gmail" },
+                "auth_config": { "type": "use_composio_managed_auth" }
+            })
+        )
+    );
+    assert_eq!(posts[1].1["auth_config_id"], "ac_new");
+}
+
+#[tokio::test]
+async fn authorize_prefers_a_composio_managed_auth_config() {
+    let transport = FakeTransport::linking(json!({ "redirectUrl": "https://composio.dev/x" }));
+    transport.routed.lock().unwrap().clear();
+    transport.route_prefix(
+        "/auth_configs?",
+        json!({ "items": [
+            gmail_config("ac_custom", false, "ENABLED"),
+            gmail_config("ac_managed", true, "ENABLED")
+        ] }),
+    );
+
+    route(transport.clone())
+        .authorize("gmail", &json!({ "toolkit": "gmail" }))
+        .await
+        .unwrap();
+
+    assert_eq!(transport.posts()[0].1["auth_config_id"], "ac_managed");
+}
+
+#[tokio::test]
+async fn authorize_reports_a_created_auth_config_with_no_id() {
+    let transport = FakeTransport::replying(json!({ "items": [] }));
+    transport.route_prefix("/auth_configs", json!({ "auth_config": {} }));
+
+    let error = route(transport)
+        .authorize("gmail", &json!({ "toolkit": "gmail" }))
+        .await
+        .unwrap_err();
+
+    assert!(matches!(error, Error::Decode { .. }), "{error}");
+}
+
+#[tokio::test]
+async fn a_refused_connect_request_is_an_authorize_error_with_composios_detail() {
+    let transport = FakeTransport::failing("HTTP 400: Validation error while processing request");
+
+    let error = route(transport)
+        .authorize("gmail", &json!({ "toolkit": "gmail" }))
+        .await
+        .unwrap_err();
+
+    match error {
+        Error::Authorize { toolkit, message } => {
+            assert_eq!(toolkit, "gmail");
+            assert!(message.contains("Validation error"), "{message}");
+        }
+        other => panic!("expected Error::Authorize, got {other:?}"),
+    }
+}
+
+#[tokio::test]
+async fn the_proxy_shaped_link_body_is_what_v3_rejects() {
+    // Guards the fake itself: the old `{toolkit, entity_id}` body must fail,
+    // so the tests above prove the new body rather than a permissive mock.
+    let transport = FakeTransport::replying(json!({}));
+    let error = transport
+        .post(
+            "/connected_accounts/link",
+            &json!({ "toolkit": "gmail", "entity_id": "entity-1" }),
+        )
+        .await
+        .unwrap_err();
+    assert!(error.to_string().contains("HTTP 400"), "{error}");
 }
 
 #[tokio::test]
 async fn authorize_reports_a_link_response_with_no_url() {
-    let transport = FakeTransport::replying(json!({ "unexpected": true }));
+    let transport = FakeTransport::linking(json!({ "unexpected": true }));
     let error = route(transport)
         .authorize("gmail", &json!({ "toolkit": "gmail" }))
         .await
@@ -450,7 +631,7 @@ async fn treats_a_v3_result_with_an_error_and_no_verdict_as_failed() {
 
 #[tokio::test]
 async fn authorize_keeps_a_connection_id_when_v3_supplies_one() {
-    let transport = FakeTransport::replying(json!({
+    let transport = FakeTransport::linking(json!({
         "redirect_url": "https://composio.dev/oauth/z",
         "connectedAccountId": "ca_7"
     }));
