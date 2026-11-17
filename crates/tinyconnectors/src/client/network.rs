@@ -54,12 +54,14 @@ pub(super) fn build_agent(
     network: Option<&ComposioTransportConfig>,
     host: &str,
 ) -> Result<Agent> {
-    let mut config = Config::builder().timeout_global(Some(timeout));
+    // A non-2xx reply must be readable rather than collapsed into a bare
+    // transport error, so the caller can surface the backend's own message on
+    // both the backend and the credentialed routes.
+    let mut config = Config::builder()
+        .timeout_global(Some(timeout))
+        .http_status_as_error(false);
     if strictness == Strictness::Credentialed {
-        config = config
-            .max_redirects(0)
-            .max_redirects_will_error(false)
-            .http_status_as_error(false);
+        config = config.max_redirects(0).max_redirects_will_error(false);
     }
     if let Some(network) = network {
         // No proxy URL means the host's policy leaves proxying to the process
