@@ -253,29 +253,25 @@ const NO_CONTENT_BODY: &str = "null";
 
 /// Turn one request's outcome into its body, or a failure message.
 ///
-/// The backend route keeps the HTTP client's own wording. The credentialed
-/// route reports what the provider said instead, because the caller acts on it:
-/// a rejected key is told apart from an outage by `HTTP 401: Invalid API key`,
-/// not by a bare "status 401". Transport failures there read as
-/// `error sending request for url (..)`, the phrase failure classification
-/// already keys on.
+/// A non-2xx status is never collapsed into a bare transport error: the body is
+/// read and handed to `status_message`, so the backend's own wording survives on
+/// both routes. A rejected credential is told apart from an outage by
+/// `HTTP 401: Invalid API key`, not by a bare "status 401". Transport failures
+/// read as `error sending request for url (..)` on the credentialed route — the
+/// phrase failure classification already keys on — and as the client's own
+/// wording on the backend route.
 fn finish(
     url: &str,
     strictness: Strictness,
     result: std::result::Result<ureq::http::Response<ureq::Body>, ureq::Error>,
 ) -> std::result::Result<String, String> {
-    if strictness == Strictness::Backend {
-        let mut response = result.map_err(|error| error.to_string())?;
-        if response.status().as_u16() == NO_CONTENT {
-            return Ok(NO_CONTENT_BODY.to_string());
+    let mut response = result.map_err(|error| {
+        if strictness == Strictness::Backend {
+            error.to_string()
+        } else {
+            format!("error sending request for url ({url}): {error}")
         }
-        return response
-            .body_mut()
-            .read_to_string()
-            .map_err(|error| error.to_string());
-    }
-    let mut response =
-        result.map_err(|error| format!("error sending request for url ({url}): {error}"))?;
+    })?;
     let status = response.status().as_u16();
     if status == NO_CONTENT {
         return Ok(NO_CONTENT_BODY.to_string());
@@ -305,9 +301,9 @@ const REDACTED_MARKERS: [&str; 6] = [
 ];
 
 /// `HTTP <status>`, plus the provider's own message when the body carries one
-/// (`{"error":{"message":..}}` or `{"message":..}`) and its `suggested_fix`
-/// when it has one, each scrubbed of identifiers and bounded in length.
-/// Anything else about the body is dropped.
+/// (`{"error":{"message":..}}`, `{"error":".."}`, or `{"message":..}`) and its
+/// `suggested_fix` when it has one, each scrubbed of identifiers and bounded in
+/// length. Anything else about the body is dropped.
 fn status_message(status: u16, body: &str) -> String {
     let Some((message, fix)) = api_error_message(body) else {
         return format!("HTTP {status}");
@@ -341,9 +337,15 @@ fn sanitize(text: &str, max_chars: usize) -> String {
 fn api_error_message(body: &str) -> Option<(String, Option<String>)> {
     let parsed: serde_json::Value = serde_json::from_str(body).ok()?;
     let error = parsed.get("error");
+    // The `error` field is either an object with a `message` or the message
+    // string itself; both shapes reach the user.
     let message = error
-        .and_then(|error| error.get("message"))
-        .and_then(serde_json::Value::as_str)
+        .and_then(|error| {
+            error
+                .get("message")
+                .and_then(serde_json::Value::as_str)
+                .or_else(|| error.as_str())
+        })
         .or_else(|| parsed.get("message").and_then(serde_json::Value::as_str))?
         .to_string();
     // Each candidate is validated on its own, so an unusable nested value

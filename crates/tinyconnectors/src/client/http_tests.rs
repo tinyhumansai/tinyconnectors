@@ -138,7 +138,7 @@ fn constructors_refuse_an_unsafe_base_url() {
 
 #[test]
 fn trims_a_trailing_slash_so_joined_paths_have_one_separator() {
-    let transport = HttpTransport::bearer("https://api.example.com/", "token").unwrap();
+    let transport = HttpTransport::bearer("https://api.example.com/", "t0ken").unwrap();
     assert_eq!(
         transport.url("/agent-integrations/composio/toolkits"),
         "https://api.example.com/agent-integrations/composio/toolkits"
@@ -357,4 +357,31 @@ fn only_iana_shaped_zones_are_kept() {
     assert_eq!(kept("Asia Kolkata"), None);
     assert_eq!(kept(""), None);
     assert_eq!(kept(&"A".repeat(65)), None);
+}
+
+#[tokio::test]
+async fn a_bearer_400_surfaces_the_backend_error_message() {
+    // The bug behind #5507: the bearer route collapsed a non-2xx reply into a
+    // bare transport error, so the app-side mapper never saw the body. The
+    // transport must now hand the backend's own message through.
+    let (base_url, _requests) = loopback_server_with_status(
+        "400 Bad Request",
+        r#"{"success":false,"error":"No auth config found for toolkit \"reddit\""}"#,
+    );
+    let transport = HttpTransport::bearer(&base_url, "t0ken").unwrap();
+
+    let error = transport
+        .post(
+            "/agent-integrations/composio/authorize",
+            &serde_json::json!({}),
+        )
+        .await
+        .unwrap_err();
+
+    assert!(
+        error
+            .to_string()
+            .contains("HTTP 400: No auth config found for toolkit \"reddit\""),
+        "{error}"
+    );
 }
